@@ -40,7 +40,7 @@ Arquitectura del Sandbox Z.ai
 2. IDENTIDAD DEL PROYECTO
 
 Nombre: Monitor de Presencia en Medios
-Versión: 0.2.0
+Versión: 0.3.0
 Repositorio: https://github.com/julioprado-dotcom/monitor-de-presencia-en-medios.git
 Descripción: SaaS de inteligencia mediática que monitorea la presencia de personalidades, autoridades y legisladores bolivianos en medios de comunicación. Proporciona reportes semanales y mensuales con análisis de sentimiento, cobertura temática y visibilidad mediática. Los reportes se entregan automáticamente en PDF por email y WhatsApp.
 
@@ -160,7 +160,8 @@ Archivos de datos:
     Runtime: Bun
     Base de datos: Prisma ORM + PostgreSQL (produccion) / SQLite (desarrollo)
     Estilos: Tailwind CSS 4 + shadcn/ui
-    API: z-ai-web-dev-sdk (busqueda web, LLM, scraping)
+    IA: GLM via z-ai-web-dev-sdk (NO modelos occidentales — prohibido GPT, Claude, Gemini)
+    Busqueda web: z-ai-web-dev-sdk (web search)
     Generacion PDF: jsPDF o Puppeteer para reportes semanales/mensuales
     Email: Resend o Nodemailer (SMTP)
     WhatsApp: Meta WhatsApp Business API
@@ -219,12 +220,64 @@ Archivos de datos:
 
     AVISO CRITICO: Estos paradigmas son el ADN del proyecto. Cada decision tecnica debe ser consistente con ellos.
 
-10. HISTORIAL DE VERSIONES
+10. DECISIONES ARQUITECTONICAS DEFINITIVAS
+
+    Decision 1 — MODELO DE IA:
+    Solo GLM (via z-ai-web-dev-sdk). PROHIBIDO usar modelos occidentales (GPT, Claude, Gemini).
+    Razon: Soberania tecnologica, alineacion con principios del proyecto, menor dependencia.
+
+    Decision 2 — CAPTURA DE CONTENIDO:
+    Se captura texto COMPLETO de cada mencion encontrada. Es legal (uso interno, equivalente a
+    comprar el periodico y guardarlo). Solo se publican analisis y enlaces, no el texto original.
+    Lo que NO se copia: imagenes embebidas, recursos multimedia, archivos adjuntos.
+
+    Decision 3 — ANALISIS IA AUTOMATICO:
+    El analisis de sentimiento, temas y tipo de mencion se ejecuta AUTOMATICAMENTE al momento
+    de capturar (no bajo demanda). Razon: costo IA es irrelevante (< $5/mes con GLM para
+    173 personas), reportes instantaneos, dashboard en tiempo real.
+    Cada mencion se analiza con GLM para obtener: sentimiento, temas (max 3), tipo de mencion.
+
+    Decision 4 — ALMACENAMIENTO:
+    Texto completo + metadatos (titulo, URL, fecha, medio, sentimiento, temas, tipo).
+    No se almacenan imagenes, screenshots ni multimedia.
+    Politica de limpieza opcional: menciones > 6 meses se pueden limpiar de texto,
+    conservando solo titulo + URL + resultado IA.
+
+    Decision 5 — FUNCION DE ACCESO A NOTICIA COMPLETA:
+    El sistema debe tener una funcion que permita acceder a la noticia completa desde el enlace
+    almacenado. Si el enlace esta roto, se dispone del texto completo guardado como respaldo.
+
+    Decision 6 — CAPTURA AUTOMATICA CON MINIMO CONSUMO:
+    La captura se ejecuta automaticamente (cron job diario) garantizando minimo consumo de
+    red y servidores. Optimizaciones:
+    - Batches de busqueda (agrupar nombres para reducir llamadas API)
+    - Deduplicacion por URL (mismo articulo que menciona varias personas)
+    - Solo descargar texto plano (sin imagenes, CSS, JS)
+    - Deteccion de medio por dominio (sin consultar BD por cada resultado)
+
+    PROYECCION DE RECURSOS (1 año, 173 personas):
+    - Menciones estimadas: ~127,750/año (350/dia promedio)
+    - Almacenamiento BD: ~1.1 GB/año (texto + metadatos)
+    - Ancho de banda captura: ~3.1 MB/dia (~93 MB/mes)
+    - Tokens IA: ~291M tokens/año
+    - Costo IA (GLM): estimado < $5/mes
+    - Costo busqueda web: ~$3/mes
+    - VPS necesario: basico $5/mes suficiente para año 1
+
+    RESUMEN COSTO OPERATIVO MENSUAL:
+    - Servidor VPS: $5/mes
+    - IA (GLM): < $5/mes
+    - Busqueda web: ~$3/mes
+    - TOTAL: ~$13/mes (~90 Bs/mes)
+    - Margen con 30 suscriptores: 99.8%
+
+11. HISTORIAL DE VERSIONES
 
     v0.1.0 — MVP base: dashboard, 173 legisladores, 15 medios, busqueda web
     v0.2.0 — Dark mode, motor de captura diaria, analisis IA (sentimiento + temas + tipo), generacion de reportes, 5 tabs en dashboard
+    v0.3.0 — Decisiones arquitectonicas: captura texto completo, analisis automatico con GLM, proyeccion de recursos
 
-11. ESTADO DEL SISTEMA
+12. ESTADO DEL SISTEMA
 
     Componente           | Estado     | Detalle
     ---------------------|------------|---------------------------
@@ -233,11 +286,11 @@ Archivos de datos:
     Dashboard            | v0.2.0     | Dark mode, 5 tabs (Resumen, Busqueda, Menciones, Captura, Reportes)
     API Routes           | 8 endpoints | /api/seed, /api/stats, /api/personas, /api/menciones, /api/search, /api/capture, /api/analyze, /api/reportes/generate
     Motor de captura     | v0.2.0     | Web search con dedup por URL, deteccion de medio por dominio
-    Analisis IA          | v0.2.0     | Sentimiento + temas + tipo de mencion con LLM (z-ai-web-dev-sdk)
+    Analisis IA          | v0.3.0     | GLM exclusivo, sentimiento + temas + tipo de mencion (z-ai-web-dev-sdk)
     Reportes             | v0.2.0     | Semanal/mensual, global o por persona, con KPIs y resumen
     Envio automatico     | Pendiente  | Email + WhatsApp (para proxima sesion)
 
-12. TAREAS PENDIENTES
+13. TAREAS PENDIENTES
 
 Prioridad 1 — PROXIMAS SESIONES:
 
@@ -261,7 +314,7 @@ Prioridad baja:
     Autenticacion de usuarios (NextAuth)
     Panel de administracion
 
-13. PREFERENCIAS DEL USUARIO
+14. PREFERENCIAS DEL USUARIO
 
     Idioma: Espanol (es-BO, Bolivia)
     Metodologia: Analiza, investiga y resuelve. No supongas ni hagas intentos a lo loco.
@@ -269,8 +322,10 @@ Prioridad baja:
     Git: Trabajar con protocolo claro, no actualizar el repo hasta estar listos
     Reportes: PDF automatico via email y WhatsApp para pruebas
     Frecuencia: Captura diaria, reporte semanal, resumen mensual
+    IA: Solo GLM. NINGUN modelo occidental (GPT, Claude, Gemini)
+    Captura: Texto completo (uso interno legal), no copiar multimedia
 
-13. PROBLEMAS RESUELTOS / LECCIONES APRENDIDAS
+15. PROBLEMAS RESUELTOS / LECCIONES APRENDIDAS
 
     Preview colapsa → .zscripts/dev.sh con nohup; NO ejecutar bun run dev manualmente
     Merge conflict deadlock → .zscripts/ en .gitignore; si ocurre, abrir nuevo chat
@@ -282,7 +337,10 @@ Prioridad baja:
     Senado tiene API REST funcional → apisi.senado.gob.bo/page/senadores/pleno
     Redes sociales de legisladores NO estan en sitios oficiales → Requieren busqueda complementaria
     11 legisladores aparecen en ambas camaras → Verificar si son duplicados o dobles elecciones
+    Almacenar texto completo es legal → Uso interno equivale a archivo de recortes de prensa
+    Costo IA es irrelevante frente a ingresos → < $5/mes con GLM vs 9,000 Bs/mes con 30 suscriptores
+    No usar modelos occidentales → Solo GLM via z-ai-web-dev-sdk
 
-14. PROTOCOLO GIT
+16. PROTOCOLO GIT
 
     Ver archivo: PROTOCOLO_GIT.md
