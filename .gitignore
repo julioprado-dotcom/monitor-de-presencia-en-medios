@@ -20,3 +20,19 @@ prisma/migrations/
 *.log
 tmp/
 skills/
+# Temporary data files from web scraping
+data/*.pdf
+data/*.xlsx
+data/*_electos.json
+data/*_search*.json
+data/diputados_*.json
+data/unitel_*.json
+data/oep_*.json
+data/elpais_*.json
+data/erbol_*.json
+data/boliviaverifica_*.json
+data/electos_*.json
+
+# Web scraping temp data
+data/electos_2025_text.txt
+data/search_results*.json
