@@ -96,12 +96,14 @@ Fase de Pruebas (actual):
     Entrega por PDF via email y WhatsApp
     Feedback de usuarios para ajustar el producto
 
-Fase Comercial (post-pruebas):
+Precios ajustados al mercado boliviano ( Bs = Bolivianos):
 
-    Plan Basico (1 persona): $50-100 USD/mes — Reporte semanal PDF, dashboard basico
-    Plan Profesional (1-5 personas): $200-400 USD/mes — Reportes + dashboard + alertas + comparativos
-    Plan Institucional (ilimitado): $800-1500 USD/mes — Todo + analisis tematico + API + soporte dedicado
-    Reporte unico: $30-60 USD por reporte — Para clientes eventuales
+    Plan Basico (1 persona): 300 Bs/mes — Reporte semanal PDF + resumen mensual
+    Plan Avanzado (1-3 personas): 700 Bs/mes — Reportes + dashboard web + alertas inmediatas
+    Plan Institucional (ilimitado): 1.500 Bs/mes — Todo + comparativos + analisis tematico + soporte
+    Reporte unico: 50 Bs por reporte — Para clientes eventuales
+
+    Nota: Precios sujetos a ajuste segun consultas con usuarios objetivo
 
 Entrega de reportes:
     PDF automatico por email (SMTP dedicado)
