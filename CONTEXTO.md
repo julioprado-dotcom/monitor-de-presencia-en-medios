@@ -40,7 +40,7 @@ Arquitectura del Sandbox Z.ai
 2. IDENTIDAD DEL PROYECTO
 
 Nombre: Monitor de Presencia en Medios
-Versión: 09.00.02
+Versión: 0.2.0
 Repositorio: https://github.com/julioprado-dotcom/monitor-de-presencia-en-medios.git
 Descripción: SaaS de inteligencia mediática que monitorea la presencia de personalidades, autoridades y legisladores bolivianos en medios de comunicación. Proporciona reportes semanales y mensuales con análisis de sentimiento, cobertura temática y visibilidad mediática. Los reportes se entregan automáticamente en PDF por email y WhatsApp.
 
@@ -219,45 +219,49 @@ Archivos de datos:
 
     AVISO CRITICO: Estos paradigmas son el ADN del proyecto. Cada decision tecnica debe ser consistente con ellos.
 
-10. ESTADO DE DOCUMENTACION
+10. HISTORIAL DE VERSIONES
 
-    Documento          | Estado     | Accion
-    -------------------|------------|---------------------------
-    CONTEXTO.md        | v09.00.02  | Actualizado con estrategia completa
-    PROTOCOLO_GIT.md   | Creado     | Revisar cada sesion
-    worklog.md         | Creado     | Actualizar continuamente
-    Base de datos      | Extraido   | 173 legisladores consolidados
-    Arquitectura       | Pendiente  | Disenar antes de desarrollo
-    Modelo de datos    | Pendiente  | Definir con Prisma schema
-    Fuentes de medios  | Pendiente  | Catalogar y validar accesibilidad
+    v0.1.0 — MVP base: dashboard, 173 legisladores, 15 medios, busqueda web
+    v0.2.0 — Dark mode, motor de captura diaria, analisis IA (sentimiento + temas + tipo), generacion de reportes, 5 tabs en dashboard
 
-11. TAREAS PENDIENTES
+11. ESTADO DEL SISTEMA
 
-Prioridad 1 — MAXIMA:
+    Componente           | Estado     | Detalle
+    ---------------------|------------|---------------------------
+    Base de datos        | Activa     | 173 legisladores + 15 medios en SQLite
+    Modelo de datos      | Completo   | 6 tablas Prisma
+    Dashboard            | v0.2.0     | Dark mode, 5 tabs (Resumen, Busqueda, Menciones, Captura, Reportes)
+    API Routes           | 8 endpoints | /api/seed, /api/stats, /api/personas, /api/menciones, /api/search, /api/capture, /api/analyze, /api/reportes/generate
+    Motor de captura     | v0.2.0     | Web search con dedup por URL, deteccion de medio por dominio
+    Analisis IA          | v0.2.0     | Sentimiento + temas + tipo de mencion con LLM (z-ai-web-dev-sdk)
+    Reportes             | v0.2.0     | Semanal/mensual, global o por persona, con KPIs y resumen
+    Envio automatico     | Pendiente  | Email + WhatsApp (para proxima sesion)
 
-    Disenar el modelo de datos (Prisma schema) para personas, medios, menciones, temas y reportes
-    Catalogar y validar las fuentes de medios bolivianos disponibles para scraping/API
-    Disenar la arquitectura completa del sistema de busqueda y monitoreo
-    Implementar motor de captura diaria de datos (scraping + web search)
-    Implementar generacion de reportes PDF semanales
-    Implementar envio automatico por email y WhatsApp
+12. TAREAS PENDIENTES
+
+Prioridad 1 — PROXIMAS SESIONES:
+
+    Pruebas reales de captura y analisis con datos en vivo
+    Implementar envio automatico por email (Resend/Nodemailer)
+    Implementar envio por WhatsApp (Meta Business API)
+    Busqueda de redes sociales de legisladores
+    Pruebas con legisladores objetivo para validar el producto
 
 Prioridad media:
 
-    Implementar analisis de sentimiento con LLM
-    Implementar clasificacion tematica con LLM
-    Prototipar dashboard web con datos reales
-    Busqueda manual/complementaria de redes sociales de legisladores
+    Generacion de PDF real con Puppeteer
+    Cron job automatico para captura diaria
+    Dashboard de comparativos entre personas
+    Sistema de alertas en tiempo real
 
 Prioridad baja:
 
-    Sistema de alertas en tiempo real
-    Dashboard de comparativos entre personas
-    Reporte mensual consolidado
     Exportacion a Excel
     API publica para clientes institucionales
+    Autenticacion de usuarios (NextAuth)
+    Panel de administracion
 
-12. PREFERENCIAS DEL USUARIO
+13. PREFERENCIAS DEL USUARIO
 
     Idioma: Espanol (es-BO, Bolivia)
     Metodologia: Analiza, investiga y resuelve. No supongas ni hagas intentos a lo loco.
