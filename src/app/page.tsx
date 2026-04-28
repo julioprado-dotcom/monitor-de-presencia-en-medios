@@ -32,6 +32,15 @@ import {
   Brain,
   CheckCircle2,
   RefreshCw,
+  UsersRound,
+  XCircle,
+  ExternalLink,
+  MessageSquare,
+  ChevronDown,
+  ChevronUp,
+  Link2,
+  ShieldCheck,
+  ShieldX,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -59,6 +68,11 @@ interface MencionRow {
   sentimiento: string;
   temas: string;
   fechaCaptura: string;
+  enlaceActivo: boolean;
+  fechaVerificacion: string | null;
+  textoCompleto: string;
+  comentariosCount: number;
+  comentariosResumen: string;
   persona: { id: string; nombre: string; partidoSigla: string; camara: string };
   medio: { id: string; nombre: string; tipo: string };
 }
@@ -68,6 +82,8 @@ interface DashboardData {
   totalMedios: number;
   mencionesSemana: number;
   totalReportes: number;
+  enlacesRotos: number;
+  totalComentarios: number;
   topPersonas: PersonaStat[];
   mencionesPorPartido: PartidoStat[];
   ultimasMenciones: MencionRow[];
@@ -91,7 +107,65 @@ interface ReporteRow {
   sentimientoPromedio: number;
   temasPrincipales: string;
   fechaCreacion: string;
+  totalComentarios?: number;
+  sentimientoComentarios?: string;
+  enlacesRotos?: number;
   persona?: { nombre: string } | null;
+}
+
+interface PersonaListItem {
+  id: string;
+  nombre: string;
+  camara: string;
+  departamento: string;
+  partido: string;
+  partidoSigla: string;
+}
+
+interface PersonaDetail {
+  persona: {
+    id: string;
+    nombre: string;
+    camara: string;
+    departamento: string;
+    partido: string;
+    partidoSigla: string;
+    tipo: string;
+    cargoDirectiva: string | null;
+    email: string | null;
+    activa: boolean;
+  };
+  stats: {
+    totalMenciones: number;
+    mencionesSemana: number;
+    mencionesMes: number;
+    sentimientoPromedio: number;
+    temasPrincipales: string[];
+  };
+  menciones: MencionRow[];
+  mediosStats: Array<{ medio: string; count: number }>;
+}
+
+interface ComentarioRow {
+  id: string;
+  autor: string;
+  texto: string;
+  sentimiento: string;
+  fechaComentario: string | null;
+}
+
+interface VerifyStats {
+  total: number;
+  activos: number;
+  rotos: number;
+  sinVerificar: number;
+  recientes: Array<{
+    id: string;
+    url: string;
+    enlaceActivo: boolean;
+    fechaVerificacion: string | null;
+    titulo: string;
+  }>;
 }
 
 /* ─── constants ─── */
@@ -149,6 +223,34 @@ export default function Dashboard() {
   const [reporteLoading, setReporteLoading] = useState(false);
   const [generarReporteLoading, setGenerarReporteLoading] = useState(false);
   const [selectedReporte, setSelectedReporte] = useState<ReporteRow | null>(null);
+
+  // Gestión state — Person Detail
+  const [personaSearch, setPersonaSearch] = useState('');
+  const [personaList, setPersonaList] = useState<PersonaListItem[]>([]);
+  const [personaListLoading, setPersonaListLoading] = useState(false);
+  const [selectedPersona, setSelectedPersona] = useState<PersonaDetail | null>(null);
+  const [personaDetailLoading, setPersonaDetailLoading] = useState(false);
+  const [personaMencionesPage, setPersonaMencionesPage] = useState(1);
+
+  // Gestión state — Expanded texto completo
+  const [expandedTexto, setExpandedTexto] = useState<string | null>(null);
+
+  // Gestión state — Comments modal
+  const [selectedMencionComments, setSelectedMencionComments] = useState<{
+    mencionId: string;
+    titulo: string;
+    comentarios: ComentarioRow[];
+  } | null>(null);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+
+  // Gestión state — Link verification
+  const [verifyStats, setVerifyStats] = useState<VerifyStats | null>(null);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<{
+    verified: number;
+    activos: number;
+    rotos: number;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -244,7 +346,6 @@ export default function Dashboard() {
         setError(json.error);
       } else {
         setCaptureResult(json);
-        // Fetch latest menciones
         const mencionesRes = await fetch('/api/menciones?limit=20');
         const mencionesJson = await mencionesRes.json();
         setCaptureMenciones(mencionesJson.menciones || []);
@@ -274,7 +375,6 @@ export default function Dashboard() {
       } else {
         setAnalyzeResult(json);
         await refreshData();
-        // Refresh captured menciones
         const mencionesRes = await fetch('/api/menciones?limit=20');
         const mencionesJson = await mencionesRes.json();
         setCaptureMenciones(mencionesJson.menciones || []);
@@ -327,13 +427,114 @@ export default function Dashboard() {
     }
   };
 
-  // Load reportes when switching to reportes tab (via tab change handler)
+  // Load personas list for gestión tab
+  const loadPersonas = useCallback(async (search?: string) => {
+    setPersonaListLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: '173' });
+      if (search) params.set('search', search);
+      const res = await fetch(`/api/personas?${params}`);
+      const json = await res.json();
+      setPersonaList(json.personas || []);
+    } catch {
+      // silently fail
+    } finally {
+      setPersonaListLoading(false);
+    }
+  }, []);
+
+  // Load persona detail
+  const loadPersonaDetail = useCallback(async (personaId: string) => {
+    setPersonaDetailLoading(true);
+    setSelectedPersona(null);
+    setPersonaMencionesPage(1);
+    try {
+      const res = await fetch(`/api/personas/${personaId}`);
+      const json = await res.json();
+      if (json.error) {
+        setError(json.error);
+      } else {
+        setSelectedPersona(json);
+      }
+    } catch {
+      setError('Error al cargar detalle de persona');
+    } finally {
+      setPersonaDetailLoading(false);
+    }
+  }, []);
+
+  // Load comments for a mencion
+  const loadComments = useCallback(async (mencionId: string, titulo: string) => {
+    setCommentsLoading(true);
+    setSelectedMencionComments({ mencionId, titulo, comentarios: [] });
+    try {
+      const res = await fetch(`/api/menciones/${mencionId}`);
+      const json = await res.json();
+      setSelectedMencionComments({
+        mencionId,
+        titulo,
+        comentarios: json.comentarios || [],
+      });
+    } catch {
+      setError('Error al cargar comentarios');
+    } finally {
+      setCommentsLoading(false);
+    }
+  }, []);
+
+  // Verify links
+  const handleVerifyLinks = async () => {
+    setVerifyLoading(true);
+    setVerifyResult(null);
+    setError('');
+    try {
+      const res = await fetch('/api/verify-links?batch=20', { method: 'POST' });
+      const json = await res.json();
+      if (json.error) {
+        setError(json.error);
+      } else {
+        setVerifyResult({ verified: json.verified, activos: json.activos, rotos: json.rotos });
+        await refreshData();
+        await loadVerifyStats();
+      }
+    } catch {
+      setError('Error al verificar enlaces');
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
+  const loadVerifyStats = useCallback(async () => {
+    try {
+      const res = await fetch('/api/verify-links');
+      const json = await res.json();
+      setVerifyStats(json);
+    } catch {
+      // silently fail
+    }
+  }, []);
+
+  // Tab change handler
   const handleTabChange = useCallback((value: string) => {
     setActiveTab(value);
     if (value === 'reportes' && reportes.length === 0) {
       loadReportes();
     }
-  }, [reportes.length, loadReportes]);
+    if (value === 'gestion') {
+      loadPersonas();
+      loadVerifyStats();
+    }
+  }, [reportes.length, loadReportes, loadPersonas, loadVerifyStats]);
+
+  // Persona search handler
+  useEffect(() => {
+    if (activeTab === 'gestion') {
+      const timer = setTimeout(() => {
+        loadPersonas(personaSearch || undefined);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [personaSearch, activeTab, loadPersonas]);
 
   /* ─── loading skeleton ─── */
   if (loading) {
@@ -397,11 +598,14 @@ export default function Dashboard() {
           <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 dark:bg-red-950/30 dark:border-red-900/40 flex items-center gap-2 text-red-700 dark:text-red-300 text-sm">
             <AlertCircle className="h-4 w-4 shrink-0" />
             {error}
+            <button onClick={() => setError('')} className="ml-auto hover:opacity-70">
+              <XCircle className="h-4 w-4" />
+            </button>
           </div>
         )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="bg-card border border-border">
+          <TabsList className="bg-card border border-border flex-wrap">
             <TabsTrigger value="resumen" className="text-xs sm:text-sm">
               <BarChart3 className="h-4 w-4 mr-1.5 hidden sm:block" />
               Resumen
@@ -421,6 +625,10 @@ export default function Dashboard() {
             <TabsTrigger value="reportes" className="text-xs sm:text-sm">
               <FileBarChart className="h-4 w-4 mr-1.5 hidden sm:block" />
               Reportes
+            </TabsTrigger>
+            <TabsTrigger value="gestion" className="text-xs sm:text-sm">
+              <UsersRound className="h-4 w-4 mr-1.5 hidden sm:block" />
+              Gestión
             </TabsTrigger>
           </TabsList>
 
@@ -791,6 +999,9 @@ export default function Dashboard() {
                           </TableHead>
                           <TableHead className="text-xs text-muted-foreground">Tipo</TableHead>
                           <TableHead className="text-xs text-muted-foreground">Sentimiento</TableHead>
+                          <TableHead className="text-xs text-muted-foreground hidden sm:table-cell">
+                            Estado
+                          </TableHead>
                           <TableHead className="text-xs text-muted-foreground hidden lg:table-cell">
                             Fecha
                           </TableHead>
@@ -834,6 +1045,22 @@ export default function Dashboard() {
                                 {m.sentimiento.replace('_', ' ')}
                               </span>
                             </TableCell>
+                            <TableCell className="py-2.5 hidden sm:table-cell">
+                              <div className="flex items-center gap-1">
+                                <div
+                                  className={`w-2 h-2 rounded-full shrink-0 ${
+                                    m.fechaVerificacion
+                                      ? (m.enlaceActivo ? 'bg-emerald-500' : 'bg-red-500')
+                                      : 'bg-stone-300 dark:bg-stone-600'
+                                  }`}
+                                />
+                                <span className="text-[10px] text-muted-foreground">
+                                  {m.fechaVerificacion
+                                    ? (m.enlaceActivo ? 'Activo' : 'Roto')
+                                    : '—'}
+                                </span>
+                              </div>
+                            </TableCell>
                             <TableCell className="py-2.5 hidden lg:table-cell text-xs text-muted-foreground">
                               {m.fechaCaptura
                                 ? new Date(m.fechaCaptura).toLocaleDateString('es-BO', {
@@ -860,7 +1087,6 @@ export default function Dashboard() {
 
           {/* ═══ TAB CAPTURA ═══ */}
           <TabsContent value="captura" className="space-y-6">
-            {/* Captura Card */}
             <Card className="border-border">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -1003,7 +1229,6 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {/* Captured Menciones List */}
                   {captureMenciones.length > 0 && (
                     <div className="mt-4">
                       <p className="text-sm font-medium text-foreground mb-2">
@@ -1117,6 +1342,12 @@ export default function Dashboard() {
                             </p>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
                               {r.totalMenciones} menciones · Sentimiento promedio: {r.sentimientoPromedio.toFixed(1)}
+                              {r.totalComentarios !== undefined && r.totalComentarios > 0 && (
+                                <> · {r.totalComentarios} comentarios</>
+                              )}
+                              {r.enlacesRotos !== undefined && r.enlacesRotos > 0 && (
+                                <> · {r.enlacesRotos} enlaces rotos</>
+                              )}
                             </p>
                             <p className="text-[10px] text-muted-foreground mt-0.5">
                               {new Date(r.fechaCreacion).toLocaleDateString('es-BO', {
@@ -1193,6 +1424,33 @@ export default function Dashboard() {
                         </div>
                       </div>
 
+                      {/* New KPIs for v0.4.0 */}
+                      {(selectedReporte.totalComentarios !== undefined || selectedReporte.enlacesRotos !== undefined) && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {(selectedReporte.totalComentarios ?? 0) > 0 && (
+                            <div className="p-3 rounded-lg bg-muted">
+                              <p className="text-lg font-bold text-foreground">{selectedReporte.totalComentarios}</p>
+                              <p className="text-[11px] text-muted-foreground">Total comentarios</p>
+                            </div>
+                          )}
+                          {selectedReporte.sentimientoComentarios && (
+                            <div className="p-3 rounded-lg bg-muted col-span-2">
+                              <p className="text-sm font-medium text-foreground">Sentimiento comentarios</p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5">{selectedReporte.sentimientoComentarios}</p>
+                            </div>
+                          )}
+                          {(selectedReporte.enlacesRotos ?? 0) > 0 && (
+                            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40">
+                              <div className="flex items-center gap-1.5">
+                                <ShieldX className="h-4 w-4 text-red-500" />
+                                <p className="text-lg font-bold text-red-700 dark:text-red-400">{selectedReporte.enlacesRotos}</p>
+                              </div>
+                              <p className="text-[11px] text-red-600 dark:text-red-400">Enlaces rotos</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {selectedReporte.temasPrincipales && (
                         <div>
                           <h4 className="text-sm font-medium text-foreground mb-2">Temas principales</h4>
@@ -1209,7 +1467,7 @@ export default function Dashboard() {
                       {selectedReporte.resumen && (
                         <div>
                           <h4 className="text-sm font-medium text-foreground mb-1">Resumen</h4>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
+                          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
                             {selectedReporte.resumen}
                           </p>
                         </div>
@@ -1220,8 +1478,427 @@ export default function Dashboard() {
               </Card>
             )}
           </TabsContent>
+
+          {/* ═══ TAB GESTIÓN ═══ */}
+          <TabsContent value="gestion" className="space-y-6">
+            {/* Section A: Link Verification */}
+            <Card className="border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Link2 className="h-4 w-4 text-muted-foreground" />
+                  Verificación de enlaces
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Verifica que los enlaces a notas periodísticas sigan activos
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                  <Button
+                    onClick={handleVerifyLinks}
+                    disabled={verifyLoading}
+                    variant="outline"
+                  >
+                    {verifyLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Verificando...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="h-4 w-4 mr-2" />
+                        Verificar enlaces (20)
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {verifyResult && (
+                  <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{verifyResult.verified}</p>
+                        <p className="text-[11px] text-emerald-600 dark:text-emerald-500">Verificados</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{verifyResult.activos}</p>
+                        <p className="text-[11px] text-emerald-600 dark:text-emerald-500">Activos</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-red-600 dark:text-red-400">{verifyResult.rotos}</p>
+                        <p className="text-[11px] text-red-500 dark:text-red-400">Rotos</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {verifyStats && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3 rounded-lg bg-muted text-center">
+                      <p className="text-lg font-bold text-foreground">{verifyStats.total}</p>
+                      <p className="text-[11px] text-muted-foreground">Total enlaces</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted text-center">
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{verifyStats.activos}</p>
+                      <p className="text-[11px] text-muted-foreground">Activos</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted text-center">
+                      <p className="text-lg font-bold text-red-600 dark:text-red-400">{verifyStats.rotos}</p>
+                      <p className="text-[11px] text-muted-foreground">Rotos</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted text-center">
+                      <p className="text-lg font-bold text-stone-500">{verifyStats.sinVerificar}</p>
+                      <p className="text-[11px] text-muted-foreground">Sin verificar</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recently verified links table */}
+                {verifyStats && verifyStats.recientes.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-sm font-medium text-foreground mb-2">Enlaces verificados recientemente</p>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {verifyStats.recientes.slice(0, 10).map((link) => (
+                        <div key={link.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-xs">
+                          {link.enlaceActivo ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                          ) : (
+                            <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                          )}
+                          <span className="flex-1 truncate text-foreground/70">
+                            {link.titulo || link.url}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">
+                            {link.fechaVerificacion
+                              ? new Date(link.fechaVerificacion).toLocaleDateString('es-BO', { day: '2-digit', month: 'short' })
+                              : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Section B: Person Detail Panel */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Person list */}
+              <Card className="border-border lg:col-span-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <UsersRound className="h-4 w-4 text-muted-foreground" />
+                    Legisladores
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    {personaList.length} legisladores registrados
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 space-y-3">
+                  <Input
+                    placeholder="Buscar por nombre..."
+                    value={personaSearch}
+                    onChange={(e) => setPersonaSearch(e.target.value)}
+                    className="text-sm"
+                  />
+
+                  {personaListLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <div className="space-y-1 max-h-[500px] overflow-y-auto">
+                      {personaList.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => loadPersonaDetail(p.id)}
+                          className={`w-full text-left p-2 rounded-lg hover:bg-muted/50 transition-colors flex items-center justify-between gap-2 ${
+                            selectedPersona?.persona.id === p.id ? 'bg-muted ring-1 ring-foreground/20' : ''
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-foreground truncate">{p.nombre}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {p.camara} · {p.partidoSigla}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 shrink-0">
+                            {p.departamento}
+                          </Badge>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Person detail */}
+              <Card className="border-border lg:col-span-2">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold">
+                    Detalle del legislador
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  {personaDetailLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : selectedPersona ? (
+                    <div className="space-y-4">
+                      {/* Person info */}
+                      <div className="p-4 rounded-lg bg-muted/50 space-y-2">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h3 className="text-lg font-bold text-foreground">{selectedPersona.persona.nombre}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {selectedPersona.persona.camara} · {selectedPersona.persona.partidoSigla} — {selectedPersona.persona.partido}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Departamento: {selectedPersona.persona.departamento} · Tipo: {selectedPersona.persona.tipo}
+                            </p>
+                            {selectedPersona.persona.cargoDirectiva && (
+                              <p className="text-sm text-muted-foreground">
+                                Cargo directiva: {selectedPersona.persona.cargoDirectiva}
+                              </p>
+                            )}
+                            {selectedPersona.persona.email && (
+                              <p className="text-sm text-muted-foreground">
+                                Email: {selectedPersona.persona.email}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                          <div className="p-2 rounded bg-background text-center">
+                            <p className="text-lg font-bold text-foreground">{selectedPersona.stats.totalMenciones}</p>
+                            <p className="text-[10px] text-muted-foreground">Total menciones</p>
+                          </div>
+                          <div className="p-2 rounded bg-background text-center">
+                            <p className="text-lg font-bold text-foreground">{selectedPersona.stats.mencionesSemana}</p>
+                            <p className="text-[10px] text-muted-foreground">Esta semana</p>
+                          </div>
+                          <div className="p-2 rounded bg-background text-center">
+                            <p className="text-lg font-bold text-foreground">{selectedPersona.stats.mencionesMes}</p>
+                            <p className="text-[10px] text-muted-foreground">Este mes</p>
+                          </div>
+                          <div className="p-2 rounded bg-background text-center">
+                            <p className="text-lg font-bold text-foreground">{selectedPersona.stats.sentimientoPromedio.toFixed(1)}</p>
+                            <p className="text-[10px] text-muted-foreground">Sentimiento prom.</p>
+                          </div>
+                        </div>
+
+                        {selectedPersona.stats.temasPrincipales.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {selectedPersona.stats.temasPrincipales.map((t, i) => (
+                              <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0">
+                                {t}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Medios stats */}
+                      {selectedPersona.mediosStats.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-foreground mb-2">Medios con más presencia</p>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedPersona.mediosStats.slice(0, 8).map((ms) => (
+                              <div key={ms.medio} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-muted text-xs">
+                                <span className="font-medium text-foreground">{ms.medio}</span>
+                                <Badge variant="secondary" className="text-[9px] px-1 py-0">{ms.count}</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Menciones list */}
+                      <div>
+                        <p className="text-sm font-medium text-foreground mb-2">
+                          Menciones ({selectedPersona.menciones.length})
+                        </p>
+                        {selectedPersona.menciones.length > 0 ? (
+                          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                            {selectedPersona.menciones.map((m) => (
+                              <div
+                                key={m.id}
+                                className="p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-foreground line-clamp-1">
+                                      {m.titulo || m.texto?.substring(0, 80) || 'Sin título'}
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                      {m.medio?.nombre || '—'} ·{' '}
+                                      {m.fechaCaptura
+                                        ? new Date(m.fechaCaptura).toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' })
+                                        : '—'}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {/* Link status indicator */}
+                                    <div className="flex items-center gap-1" title={m.fechaVerificacion
+                                      ? (m.enlaceActivo ? 'Enlace activo' : 'Enlace roto')
+                                      : 'Sin verificar'}>
+                                      <div
+                                        className={`w-2 h-2 rounded-full ${
+                                          m.fechaVerificacion
+                                            ? (m.enlaceActivo ? 'bg-emerald-500' : 'bg-red-500')
+                                            : 'bg-stone-300 dark:bg-stone-600'
+                                        }`}
+                                      />
+                                    </div>
+                                    {/* Sentimiento badge */}
+                                    <span
+                                      className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                                        SENTIMIENTO_STYLES[m.sentimiento] || SENTIMIENTO_STYLES.no_clasificado
+                                      }`}
+                                    >
+                                      {m.sentimiento.replace('_', ' ')}
+                                    </span>
+                                    {/* Tipo badge */}
+                                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+                                      {TIPO_MENCION_LABELS[m.tipoMencion] || m.tipoMencion}
+                                    </Badge>
+                                  </div>
+                                </div>
+
+                                {/* Action buttons */}
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                  {m.url && (
+                                    <a
+                                      href={m.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-muted hover:bg-muted/80 text-muted-foreground transition-colors"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                      Verificar enlace
+                                    </a>
+                                  )}
+                                  {m.textoCompleto && (
+                                    <button
+                                      onClick={() => setExpandedTexto(expandedTexto === m.id ? null : m.id)}
+                                      className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-muted hover:bg-muted/80 text-muted-foreground transition-colors"
+                                    >
+                                      {expandedTexto === m.id ? (
+                                        <>
+                                          <ChevronUp className="h-3 w-3" />
+                                          Ocultar texto
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Eye className="h-3 w-3" />
+                                          Ver nota completa
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => loadComments(m.id, m.titulo || 'Nota')}
+                                    className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-muted hover:bg-muted/80 text-muted-foreground transition-colors"
+                                  >
+                                    <MessageSquare className="h-3 w-3" />
+                                    Comentarios ({m.comentariosCount || 0})
+                                  </button>
+                                </div>
+
+                                {/* Expanded full text */}
+                                {expandedTexto === m.id && m.textoCompleto && (
+                                  <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                                    {m.textoCompleto}
+                                  </div>
+                                )}
+
+                                {/* Comments summary */}
+                                {m.comentariosResumen && (
+                                  <p className="text-[10px] text-muted-foreground mt-1.5 italic">
+                                    Resumen comentarios: {m.comentariosResumen}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-6">
+                            No hay menciones registradas para este legislador
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <UsersRound className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                      <p className="text-sm">Selecciona un legislador para ver su detalle</p>
+                      <p className="text-xs mt-1">
+                        Usa el panel de la izquierda para buscar y seleccionar
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
+
+      {/* ─── Comments Modal ─── */}
+      {selectedMencionComments && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedMencionComments(null)}>
+          <div className="bg-background rounded-xl border border-border shadow-lg max-w-lg w-full max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Comentarios</h3>
+                <p className="text-xs text-muted-foreground truncate max-w-md">{selectedMencionComments.titulo}</p>
+              </div>
+              <button onClick={() => setSelectedMencionComments(null)} className="hover:opacity-70">
+                <XCircle className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {commentsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : selectedMencionComments.comentarios.length > 0 ? (
+                <div className="space-y-3">
+                  {selectedMencionComments.comentarios.map((c) => (
+                    <div key={c.id} className="p-3 rounded-lg border border-border">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-xs font-medium text-foreground">{c.autor || 'Anónimo'}</span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                              SENTIMIENTO_STYLES[c.sentimiento] || SENTIMIENTO_STYLES.no_clasificado
+                            }`}
+                          >
+                            {c.sentimiento.replace('_', ' ')}
+                          </span>
+                          {c.fechaComentario && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {new Date(c.fechaComentario).toLocaleDateString('es-BO', { day: '2-digit', month: 'short' })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{c.texto}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No hay comentarios registrados para esta nota</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Footer ─── */}
       <footer className="border-t border-border bg-card mt-auto">

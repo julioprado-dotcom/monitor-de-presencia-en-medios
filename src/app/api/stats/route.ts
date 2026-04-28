@@ -21,6 +21,14 @@ export async function GET() {
     // Reportes generados
     const totalReportes = await db.reporte.count();
 
+    // Enlaces rotos
+    const enlacesRotos = await db.mencion.count({
+      where: { enlaceActivo: false },
+    });
+
+    // Total comentarios
+    const totalComentarios = await db.comentario.count();
+
     // Top 10 personas con más menciones esta semana
     const topPersonas = await db.mencion.groupBy({
       by: ['personaId'],
@@ -80,6 +88,8 @@ export async function GET() {
       totalMedios,
       mencionesSemana,
       totalReportes,
+      enlacesRotos,
+      totalComentarios,
       topPersonas: topPersonasData,
       mencionesPorPartido: mencionesPorPartidoArray,
       ultimasMenciones,

@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
     const mencionesPorMedio: Record<string, number> = {};
     const mencionesPorPersona: Record<string, number> = {};
 
+    const mencionIds = menciones.map((m) => m.id);
+
     for (const m of menciones) {
       // Sentimiento
       const sentVal = sentimientoMap[m.sentimiento] || 3;
@@ -77,6 +79,44 @@ export async function POST(request: NextRequest) {
     }
 
     const sentimientoPromedio = sentimientoCount > 0 ? sentimientoSum / sentimientoCount : 0;
+
+    // Contar comentarios y analizar sentimiento de comentarios
+    let totalComentarios = 0;
+    const comentariosSentimientoCount: Record<string, number> = {};
+
+    if (mencionIds.length > 0) {
+      const comentariosStats = await db.comentario.groupBy({
+        by: ['mencionId', 'sentimiento'],
+        where: { mencionId: { in: mencionIds } },
+        _count: { id: true },
+      });
+
+      for (const cs of comentariosStats) {
+        totalComentarios += cs._count.id;
+        const sent = cs.sentimiento || 'no_clasificado';
+        comentariosSentimientoCount[sent] = (comentariosSentimientoCount[sent] || 0) + cs._count.id;
+      }
+    }
+
+    // Generar resumen de sentimiento de comentarios
+    let sentimientoComentarios = '';
+    if (totalComentarios > 0) {
+      const partes: string[] = [];
+      const totalCom = Object.values(comentariosSentimientoCount).reduce((a, b) => a + b, 0);
+      for (const [sent, count] of Object.entries(comentariosSentimientoCount).sort((a, b) => b[1] - a[1])) {
+        const pct = Math.round((count / totalCom) * 100);
+        partes.push(`${pct}% ${sent.replace('_', ' ')}`);
+      }
+      sentimientoComentarios = partes.join(', ');
+    }
+
+    // Enlaces rotos
+    const enlacesRotos = await db.mencion.count({
+      where: {
+        ...where,
+        enlaceActivo: false,
+      },
+    });
 
     // Top 5 medios
     const topMedios = Object.entries(mencionesPorMedio)
@@ -109,6 +149,9 @@ export async function POST(request: NextRequest) {
       temasPrincipales,
       topMedios,
       topPersonas: personaId ? null : topPersonas,
+      totalComentarios,
+      sentimientoComentarios,
+      enlacesRotos,
     });
 
     // Crear registro del reporte
@@ -122,6 +165,9 @@ export async function POST(request: NextRequest) {
         totalMenciones,
         sentimientoPromedio,
         temasPrincipales: temasPrincipales.join(', '),
+        totalComentarios,
+        sentimientoComentarios,
+        enlacesRotos,
       },
       include: {
         persona: { select: { nombre: true, partidoSigla: true } },
@@ -136,6 +182,9 @@ export async function POST(request: NextRequest) {
         temasPrincipales,
         topMedios,
         topPersonas,
+        totalComentarios,
+        sentimientoComentarios,
+        enlacesRotos,
       },
     });
   } catch (error: unknown) {
@@ -152,6 +201,9 @@ function generarResumen(params: {
   temasPrincipales: string[];
   topMedios: Array<{ nombre: string; count: number }>;
   topPersonas: Array<{ nombre: string; count: number }> | null;
+  totalComentarios: number;
+  sentimientoComentarios: string;
+  enlacesRotos: number;
 }): string {
   const target = params.personaNombre
     ? `el legislador ${params.personaNombre}`
@@ -187,10 +239,22 @@ function generarResumen(params: {
       const personasStr = params.topPersonas
         .map((p) => `${p.nombre} (${p.count})`)
         .join(', ');
-      resumen += `Legisladores más mencionados: ${personasStr}.\n`;
+      resumen += `Legisladores más mencionados: ${personasStr}.\n\n`;
     }
   } else {
-    resumen += 'No se registraron menciones en el período analizado.';
+    resumen += 'No se registraron menciones en el período analizado.\n\n';
+  }
+
+  // Sección de comentarios
+  if (params.totalComentarios > 0) {
+    resumen += `Se analizaron ${params.totalComentarios} comentarios en total.\n`;
+    resumen += `Distribución de sentimiento en comentarios: ${params.sentimientoComentarios}.\n\n`;
+  }
+
+  // Sección de enlaces
+  if (params.enlacesRotos > 0) {
+    resumen += `Se detectaron ${params.enlacesRotos} enlaces que ya no están disponibles, `;
+    resumen += `pero el texto completo está respaldado en el sistema.\n`;
   }
 
   return resumen;
