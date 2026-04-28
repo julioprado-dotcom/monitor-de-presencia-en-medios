@@ -19,3 +19,4 @@ prisma/migrations/
 .DS_Store
 *.log
 tmp/
+skills/

@@ -40,7 +40,7 @@ Arquitectura del Sandbox Z.ai
 2. IDENTIDAD DEL PROYECTO
 
 Nombre: Monitor de Presencia en Medios
-Versión: 0.3.0
+Versión: 0.4.0
 Repositorio: https://github.com/julioprado-dotcom/monitor-de-presencia-en-medios.git
 Descripción: SaaS de inteligencia mediática que monitorea la presencia de personalidades, autoridades y legisladores bolivianos en medios de comunicación. Proporciona reportes semanales y mensuales con análisis de sentimiento, cobertura temática y visibilidad mediática. Los reportes se entregan automáticamente en PDF por email y WhatsApp.
 
@@ -255,6 +255,22 @@ Archivos de datos:
     - Solo descargar texto plano (sin imagenes, CSS, JS)
     - Deteccion de medio por dominio (sin consultar BD por cada resultado)
 
+    Decision 7 — CAPTURA DE COMENTARIOS:
+    Los comentarios de cada nota periodistica deben ser capturados y almacenados.
+    Se analiza el sentimiento de los comentarios con GLM.
+    El resumen de sentimiento de comentarios se incluye en reportes semanales y mensuales.
+
+    Decision 8 — VERIFICACION DE ENLACES:
+    El sistema verifica periodicamente si los enlaces a notas siguen activos.
+    Si un enlace deja de funcionar, se registra la fecha/hora de verificacion.
+    El texto completo guardado sirve como respaldo — no se pierde informacion.
+    El dashboard muestra indicadores de estado (activo/roto) para cada mencion.
+
+    Decision 9 — DASHBOARD DE GESTION:
+    El tab de Gestion permite acceder a informacion completa de cada persona:
+    perfil, todas sus menciones, texto de notas, comentarios, estado de enlaces.
+    Es el centro de operacion del sistema para el equipo de gestion.
+
     PROYECCION DE RECURSOS (1 año, 173 personas):
     - Menciones estimadas: ~127,750/año (350/dia promedio)
     - Almacenamiento BD: ~1.1 GB/año (texto + metadatos)
@@ -276,18 +292,21 @@ Archivos de datos:
     v0.1.0 — MVP base: dashboard, 173 legisladores, 15 medios, busqueda web
     v0.2.0 — Dark mode, motor de captura diaria, analisis IA (sentimiento + temas + tipo), generacion de reportes, 5 tabs en dashboard
     v0.3.0 — Decisiones arquitectonicas: captura texto completo, analisis automatico con GLM, proyeccion de recursos
+    v0.4.0 — Captura de comentarios, verificacion de enlaces, dashboard de gestion, reportes mejorados
 
 12. ESTADO DEL SISTEMA
 
     Componente           | Estado     | Detalle
     ---------------------|------------|---------------------------
-    Base de datos        | Activa     | 173 legisladores + 15 medios en SQLite
-    Modelo de datos      | Completo   | 6 tablas Prisma
-    Dashboard            | v0.2.0     | Dark mode, 5 tabs (Resumen, Busqueda, Menciones, Captura, Reportes)
-    API Routes           | 8 endpoints | /api/seed, /api/stats, /api/personas, /api/menciones, /api/search, /api/capture, /api/analyze, /api/reportes/generate
+    Base de datos        | Activa     | 173 legisladores + 15 medios en SQLite (7 tablas Prisma)
+    Modelo de datos      | Completo   | 7 tablas: Persona, Medio, Mencion, Reporte, Comentario, Suscriptor, CapturaLog
+    Dashboard            | v0.4.0     | Dark mode, 6 tabs (Resumen, Busqueda, Menciones, Captura, Reportes, Gestion)
+    API Routes           | 11 endpoints | /api/seed, /api/stats, /api/personas, /api/personas/[id], /api/menciones, /api/menciones/[id], /api/search, /api/capture, /api/analyze, /api/reportes/generate, /api/verify-links
     Motor de captura     | v0.2.0     | Web search con dedup por URL, deteccion de medio por dominio
     Analisis IA          | v0.3.0     | GLM exclusivo, sentimiento + temas + tipo de mencion (z-ai-web-dev-sdk)
-    Reportes             | v0.2.0     | Semanal/mensual, global o por persona, con KPIs y resumen
+    Reportes             | v0.4.0     | Semanal/mensual, global o por persona, con comentarios y enlaces rotos
+    Verif. enlaces       | v0.4.0     | HEAD requests batch, estado activo/roto, tabla de verificados recientes
+    Comentarios          | v0.4.0     | Modelo Comentario, consulta por mencion, analisis de sentimiento
     Envio automatico     | Pendiente  | Email + WhatsApp (para proxima sesion)
 
 13. TAREAS PENDIENTES

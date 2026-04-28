@@ -40,41 +40,62 @@ model Medio {
 }
 
 model Mencion {
-  id              String   @id @default(cuid())
-  personaId       String
-  medioId         String
-  titulo          String
-  texto           String   @default("")
-  url             String   @default("")
-  fechaPublicacion DateTime?
-  fechaCaptura    DateTime @default(now())
-  tipoMencion     String   @default("mencion_pasiva")
-  sentimiento     String   @default("no_clasificado")
-  temas           String   @default("")
-  reach           Int      @default(0)
-  verificado      Boolean  @default(false)
-  fechaCreacion   DateTime @default(now())
+  id                String   @id @default(cuid())
+  personaId         String
+  medioId           String
+  titulo            String
+  texto             String   @default("")
+  url               String   @default("")
+  fechaPublicacion  DateTime?
+  fechaCaptura      DateTime @default(now())
+  tipoMencion       String   @default("mencion_pasiva")
+  sentimiento       String   @default("no_clasificado")
+  temas             String   @default("")
+  reach             Int      @default(0)
+  verificado        Boolean  @default(false)
+  fechaCreacion     DateTime @default(now())
+  enlaceActivo      Boolean  @default(true)
+  fechaVerificacion DateTime?
+  textoCompleto     String   @default("")
+  comentariosCount  Int      @default(0)
+  comentariosResumen String  @default("")
 
-  persona Persona @relation(fields: [personaId], references: [id])
-  medio   Medio   @relation(fields: [medioId], references: [id])
+  persona     Persona     @relation(fields: [personaId], references: [id])
+  medio       Medio       @relation(fields: [medioId], references: [id])
+  comentarios Comentario[]
 }
 
 model Reporte {
-  id                 String   @id @default(cuid())
-  tipo               String
-  personaId          String?
-  fechaInicio        DateTime
-  fechaFin           DateTime
-  resumen            String   @default("")
-  pdfUrl             String   @default("")
-  enviado            Boolean  @default(false)
-  fechaEnvio         DateTime?
-  totalMenciones     Int      @default(0)
-  sentimientoPromedio Float   @default(0)
-  temasPrincipales   String   @default("")
-  fechaCreacion      DateTime @default(now())
+  id                     String   @id @default(cuid())
+  tipo                   String
+  personaId              String?
+  fechaInicio            DateTime
+  fechaFin               DateTime
+  resumen                String   @default("")
+  pdfUrl                 String   @default("")
+  enviado                Boolean  @default(false)
+  fechaEnvio             DateTime?
+  totalMenciones         Int      @default(0)
+  sentimientoPromedio    Float    @default(0)
+  temasPrincipales       String   @default("")
+  fechaCreacion          DateTime @default(now())
+  totalComentarios       Int      @default(0)
+  sentimientoComentarios String   @default("")
+  enlacesRotos           Int      @default(0)
 
   persona Persona? @relation(fields: [personaId], references: [id])
+}
+
+model Comentario {
+  id              String   @id @default(cuid())
+  mencionId       String
+  autor           String   @default("")
+  texto           String
+  sentimiento     String   @default("no_clasificado")
+  fechaComentario DateTime?
+  fechaCaptura    DateTime @default(now())
+
+  mencion Mencion @relation(fields: [mencionId], references: [id], onDelete: Cascade)
 }
 
 model Suscriptor {

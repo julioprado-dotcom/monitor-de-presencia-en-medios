@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         const query = `"${persona.nombre}" Bolivia ${SITES_QUERY}`;
         const results = await zai.functions.invoke('web_search', { query, num: 10 });
 
-        const searchItems = (results?.results || results?.items || results || []) as Array<{
+        const searchItems = (Array.isArray(results) ? results : []) as Array<{
           title?: string;
           snippet?: string;
           url?: string;
