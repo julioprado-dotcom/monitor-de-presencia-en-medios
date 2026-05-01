@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     const menciones = await db.mencion.findMany({
       where,
       include: {
-        persona: { select: { nombre: true, partidoSigla: true, camara: true, departamento: true } },
+        persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
         medio: { select: { nombre: true, tipo: true, nivel: true } },
         ejesTematicos: { include: { ejeTematico: { select: { nombre: true, slug: true, color: true } } } },
       },

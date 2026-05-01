@@ -1166,7 +1166,7 @@ export default function Dashboard() {
                             </p>
                           </div>
                           <Badge variant="secondary" className="text-[10px] shrink-0">
-                            {r.totalMenciones || 0}
+                            {String(r.totalMenciones || 0)}
                           </Badge>
                         </div>
                       ))}
