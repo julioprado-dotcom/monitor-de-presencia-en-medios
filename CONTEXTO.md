@@ -39,10 +39,13 @@ Arquitectura del Sandbox Z.ai
 
 2. IDENTIDAD DEL PROYECTO
 
-Nombre: Monitor de Presencia en Medios
-Version: 0.5.0 (en desarrollo)
-Repositorio: https://github.com/julioprado-dotcom/monitor-de-presencia-en-medios.git
-Descripcion: SaaS de inteligencia mediatica que monitorea la presencia de legisladores bolivianos en medios de comunicacion y redes sociales. Proporciona boletin diario, resumen semanal e informe mensual con analisis de tendencias, visibilidad mediatica y pautas informativas. Orientado al pluralismo y la Constitucion del 2009.
+Nombre: CONNECT — News Connect Bolivia
+Motor Interno: ONION200
+Version: 0.6.0 (en desarrollo)
+Repositorio: https://github.com/julioprado-dotcom/connect
+Descripcion: SaaS de inteligencia mediatica que monitorea la presencia de legisladores bolivianos en medios de comunicacion y redes sociales. Proporciona boletines especializados con datos duros, indicadores macroeconomicos y analisis de tendencias. Orientado al pluralismo y la Constitucion del 2009.
+Subtitulo: "Conectate con inteligencia de senales del Sur Global"
+Definicion Visual: "Traduciendo senales en patrones de poder"
 
 3. CONTEXTO POLITICO ACTUAL (Abril 2026)
 
@@ -66,22 +69,43 @@ Descripcion: SaaS de inteligencia mediatica que monitorea la presencia de legisl
 
 4. VISION DEL PRODUCTO
 
-El Monitor de Presencia en Medios es un servicio de inteligencia mediatica que registra
-y analiza TENDENCIAS Y PAUTAS INFORMATIVAS, no el contenido de las notas.
+CONNECT es una herramienta de lectura de senales de medios que opera en el marco ONION200.
+Registra y analiza TENDENCIAS Y PAUTAS INFORMATIVAS, no el contenido de las notas.
 
-El sistema opera en tres capas:
+El sistema opera en cuatro capas:
 
     CAPTURA: Extraccion diaria de datos de medios, portales, redes sociales y organizaciones
-    PROCESAMIENTO: Clasificacion por ejes tematicos, deteccion de patrones y tendencias
-    ENTREGA: Boletin diario + resumen semanal + informe mensual
+    INDICADORES: Captura automatizada de datos macroeconomicos y sectoriales (capa ONION200)
+    PROCESAMIENTO: Clasificacion por ejes tematicos, deteccion de patrones, enriquecimiento con indicadores
+    ENTREGA: Suite de boletines especializados por frecuencia, profundidad y audiencia
 
-Productos:
-    Boletin diario (06:00): 1 pagina, 2 min lectura — para todos los suscriptores
-    Resumen semanal (lunes): 2 paginas, 5 min lectura — para todos los suscriptores
-    Informe mensual (1 de mes): 4-6 paginas, 10 min lectura — premium
-    Alerta inmediata: Notificacion push en tiempo real — equipos de comunicacion
-    Ficha del legislador: A solicitud, 1 pagina — el propio legislador
-    Monitor de agenda tematica: Dashboard vivo — admin + premium
+PRODUCTOS DE CONTENIDO (taxonomia ONION200):
+
+    [GRATUITOS — Awareness / Funnel de captacion]
+    El Radar (Lunes 8AM): Radar semanal de 11 ejes tematicos — masa extensa
+    Voz y Voto (Lunes 8AM): Resumen legislativo semanal — gratuito
+    El Hilo (Lunes 8AM): Recuento narrativo semanal — gratuito
+
+    [PREMIUM — Duo Diario]
+    El Termometro (7:00 AM): Abre el dia — clima mediatico, alertas tempranas
+    El Saldo del Dia (7:00 PM): Cierra el dia — balance de ejes tematicos contratados
+
+    [PREMIUM — Especializados]
+    El Foco (9:00 AM): Analisis profundo diario por eje tematico (1, 3, 5 o 11 ejes)
+    El Especializado (10:00 AM): Analisis experto sectorial con datos duros
+    El Informe Cerrado (Lunes 10AM): Analisis profundo semanal + prospectiva
+
+    [A SOLICITUD]
+    Ficha del Legislador: Informe individual de presencia mediatica
+
+FUNNEL COMERCIAL:
+    Awareness (El Radar) → Consideracion (Termometro/Saldo) → Premium Entry (El Foco)
+    → Premium Mid (Especializado) → Premium Alta (Institucional)
+
+INSTALACIONES WHITE-LABEL:
+    ENERGIA CONNECT (para ABEN)
+    HIDROCARBUROS CONNECT (para YPFB)
+    MACRO CONNECT (para CAINCO)
 
 5. MARCO FILOSOFICO — PRINCIPIOS FUNDAMENTALES
 
@@ -320,9 +344,24 @@ Indicadores derivados:
     Cada mencion se clasifica en ejes tematicos (max 3 por mencion).
     Indicadores derivados: brecha de visibilidad, índice de tension social.
 
-    Decision 12 — PRODUCTOS DE INFORMACIÓN:
-    Boletín diario + Resumen semanal + Informe mensual + Alertas + Fichas +
-    Monitor de agenda temática. Formatos pensados para humanos no expertos.
+    Decision 12 — PRODUCTOS DE INFORMACIÓN (taxonomia ONION200):
+    9 productos: El Radar, Voz y Voto, El Hilo (gratuitos) +
+    El Termometro, El Saldo del Día, El Foco, El Especializado, El Informe Cerrado (premium) +
+    Ficha del Legislador (a solicitud). Formatos pensados para humanos no expertos.
+
+    Decision 14 — CAPA DE INDICADORES ONION200:
+    Captura automatizada de indicadores macroeconómicos (TC, RIN, LME) y sectoriales.
+    Pipeline: Fuentes → Capturer (cron) → DB → Inyección en prompts GLM.
+    Enriquece los boletines con datos duros correlacionados con menciones mediáticas.
+    Tier 1 (TC, LME 4 metales): implementación inmediata.
+    Tier 2 (IPC, minería, clima): corto plazo.
+    Tier 3 (proxies derivados): mediano plazo.
+
+    Decision 15 — EL SALDO DEL DÍA:
+    Producto cliente-céntrico que cierra la jornada (7:00 PM). Resumen de evolución
+    en la jornada y balance de los ejes temáticos CONTRATADOS por el cliente.
+    No es un reporte nacional — es el balance del mapa temático del informe diario contratado.
+    Forma el "duo diario" con El Termómetro (7:00 AM → apertura vs 7:00 PM → cierre).
 
     Decision 13 — DASHBOARD CLIENTE:
     Vista publica/para suscriptores separada del admin. Acceso directo desde admin
@@ -347,51 +386,73 @@ Indicadores derivados:
     v0.5.0 — Base de datos actualizada: 173 legisladores 2025-2030, 30 medios en 5 niveles,
              11 ejes tematicos con keywords, seed mejorado con datos ricos.
              Pendiente: rediseño visual, dashboard cliente, motor GLM, reportes
+    v0.6.0 — ONION200: Taxonomia de 9 productos (tipos de boletín), modelos Indicador +
+             IndicadorValor + SuscriptorGratuito en Prisma, capturer Tier 1 (TC, LME),
+             injector de indicadores en prompts GLM, API routes para captura y generación
+             del Saldo del Día, 4 protocolos de producto documentados, combo pricing.
 
 14. ESTADO DEL SISTEMA
 
     Componente           | Estado        | Detalle
     ---------------------|---------------|---------------------------
-    Base de datos        | ACTUALIZADO   | 173 legisladores (137 dip + 36 sen) periodo 2025-2030
+    Base de datos        | v0.6.0        | 11 modelos: Persona, Medio, EjeTematico, Mencion, MencionTema,
+                       |               | Reporte, Comentario, Suscriptor, CapturaLog,
+                       |               | Indicador, IndicadorValor, SuscriptorGratuito
     Fuentes              | ACTUALIZADO   | 30 medios en 5 niveles (corporativos/regionales/alternativos)
     Clasificadores       | ACTUALIZADO   | 11 ejes tematicos con keywords para GLM
-    Modelo de datos      | ACTUALIZADO   | EjeTematico, MencionTema, niveles de medios
+    Productos ONION200    | v0.6.0        | 9 tipos de boletín definidos (tipos + constantes + generator)
+    Indicadores          | v0.6.0        | Capturer Tier 1 (TC, LME) + Injector en prompts GLM
     Dashboard admin      | v0.5.0        | Sidebar + 8 vistas (Resumen, Menciones, Personas, Medios, etc.)
     Dashboard cliente    | v0.5.0        | Vista publica en /dashboard con ranking + reportes
-    API Routes           | 15 endpoints  | +medios +ejes +mejorado stats/analyze/reportes
+    API Routes           | 18 endpoints  | +indicadores/capture, +admin/bulletins/generate-saldo
     Motor de captura     | v0.2.0        | (por adaptar a 5 niveles de fuentes)
     Analisis IA          | v0.5.0        | GLM clasifica por 11 ejes tematicos + tipo + sentimiento
-    Reportes             | v0.5.0        | Boletin diario + semanal + mensual con ejes y brecha visibilidad
+    Reportes             | v0.6.0        | Tipos ONION200, generation con indicadores, Saldo del Día
     Verif. enlaces       | v0.4.0        | Funcional
     Comentarios          | v0.4.0        | Funcional
     Envio automatico     | Pendiente     | Email + WhatsApp
+    Documentación         | v0.6.0        | docs/: 02_Saldo_Día, 03_El_Radar, 04_Indicadores, 05_El_Foco
 
 15. TAREAS PENDIENTES
 
-Prioridad 1 — COMPLETADO:
+Prioridad 1 — EN PROGRESO:
 
-    [v0.5.0] ✅ Actualizar CONTEXTO.md con nuevas decisiones
-    [v0.5.0] ✅ Actualizar Prisma schema (EjeTematico, niveles de medios)
-    [v0.5.0] ✅ Actualizar medios.json (5 niveles, 30 fuentes)
-    [v0.5.0] ✅ Obtener y cargar legisladores actuales (137 dip + 36 sen) del TSE
-    [v0.5.0] ⏳ Rediseño visual del dashboard admin ← PROXIMO
-    [v0.5.0] ⏳ Crear dashboard cliente
+    [v0.6.0] ✅ Taxonomia de 9 productos ONION200 (types + constants)
+    [v0.6.0] ✅ Modelos Indicador + IndicadorValor + SuscriptorGratuito
+    [v0.6.0] ✅ Capturer Tier 1 (TC BCB, LME 4 metales)
+    [v0.6.0] ✅ Injector de indicadores en prompts GLM
+    [v0.6.0] ✅ API route Saldo del Día con prompt GLM completo
+    [v0.6.0] ✅ Protocolos: Saldo del Día, El Radar, El Foco, Indicadores ONION200
+    [v0.6.0] ✅ Actualizar CONTEXTO.md con ONION200 y nueva arquitectura
+    [v0.6.0] ⏳ Rediseño visual del dashboard admin ← PROXIMO
+    [v0.6.0] ⏳ Crear dashboard cliente
 
 Prioridad 2 — POSTERIOR:
 
-    Motor de clasificacion GLM con 11 ejes tematicos
-    Sistema de reportes (boletín diario, resumen semanal, informe mensual)
-    Cron job automatico para captura diaria
-    Sistema de alertas en tiempo real
+    Implementar capturer real del TC Oficial BCB (scraping HTML)
+    Implementar capturer real LME (API Metal Price)
+    Implementar capturer RIN BCB
+    API route para El Termómetro con prompt GLM
+    API route para El Foco (análisis por eje)
+    API route para El Radar (semanal gratuito)
+    Cron jobs de captura y generación automática
+    Encabezado de coyuntura nacional en productos existentes
+    Implementar envio por email (Resend/Nodemailer)
+    Implementar envio por WhatsApp (Business API)
+    Sistema de suscripción gratuita para El Radar
 
 Prioridad 3 — FUTURO:
 
-    Implementar envio automatico por email
-    Implementar envio por WhatsApp
     Autenticacion de usuarios (NextAuth)
     Generacion de PDF real con Puppeteer
     Exportacion a Excel
     API publica para clientes institucionales
+    Panel contextual de medios con toggles
+    Previews de deliverables en admin
+    Identidad visual News Connect en páginas admin
+    Integración logo News Connect
+    Indicadores Tier 2 (IPC, SENAMHI, minería)
+    Indicadores Tier 3 (proxies derivados)
 
 16. PREFERENCIAS DEL USUARIO
 

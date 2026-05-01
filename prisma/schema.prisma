@@ -98,7 +98,7 @@ model MencionTema {
 
 model Reporte {
   id                     String   @id @default(cuid())
-  tipo                   String   // "boletin_diario", "resumen_semanal", "informe_mensual", "ficha_legislador"
+  tipo                   String   // ONION200: EL_TERMOMETRO, SALDO_DEL_DIA, EL_FOCO, EL_ESPECIALIZADO, EL_RADAR, EL_INFORME_CERRADO, VOZ_Y_VOTO, EL_HILO, ficha_legislador
   personaId              String?
   fechaInicio            DateTime
   fechaFin               DateTime
@@ -152,4 +152,56 @@ model CapturaLog {
   errores              String   @default("")
 
   medio Medio @relation(fields: [medioId], references: [id])
+}
+
+// ─── ONION200: Capa de Indicadores ───────────────────────────────
+
+model Indicador {
+  id              String   @id @default(cuid())
+  nombre          String                       // "Tipo de Cambio Oficial"
+  slug            String   @unique             // "tc-oficial-bcb"
+  categoria       String                       // "monetario", "minero", "climatico", "economico", "hidrocarburos", "social"
+  fuente          String                       // "Banco Central de Bolivia"
+  url             String   @default("")         // URL de la fuente
+  periodicidad    String   @default("diaria")   // "diaria", "semanal", "mensual"
+  unidad          String   @default("")         // "Bs/USD", "USD/ton"
+  formatoNumero   Int      @default(2)          // decimales a mostrar
+  activo          Boolean  @default(true)
+  orden           Int      @default(0)
+  ejesTematicos   String   @default("")         // slugs de ejes donde aplica, separados por coma
+  tier            Int      @default(1)           // 1=inmediato, 2=corto plazo, 3=mediano plazo
+  notas           String   @default("")         // notas del capturador
+  fechaCreacion   DateTime @default(now())
+  fechaActualizacion DateTime @updatedAt
+
+  valores IndicadorValor[]
+}
+
+model IndicadorValor {
+  id            String   @id @default(cuid())
+  indicadorId   String
+  fecha         DateTime                      // fecha del dato (no de captura)
+  valor         Float                         // valor numerico
+  valorTexto    String   @default("")          // representacion textual si aplica
+  confiable     Boolean  @default(true)        // false si la captura tuvo problemas
+  fechaCaptura  DateTime @default(now())       // momento en que ONION200 capturo el dato
+  metadata      String   @default("")          // JSON con info adicional
+
+  indicador Indicador @relation(fields: [indicadorId], references: [id], onDelete: Cascade)
+
+  @@index([indicadorId, fecha])
+}
+
+// ─── ONION200: Suscriptores Gratuitos (El Radar) ──────────────────
+
+model SuscriptorGratuito {
+  id               String   @id @default(cuid())
+  nombre           String   @default("")
+  email            String   @unique
+  whatsapp         String?
+  origen           String   @default("landing") // "landing", "redes", "referido", "evento"
+  activo           Boolean  @default(true)
+  fechaSuscripcion DateTime @default(now())
+
+  @@index([email])
 }
