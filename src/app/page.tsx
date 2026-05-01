@@ -560,7 +560,7 @@ export default function Dashboard() {
           {/* Logo */}
           <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border">
             <div className="h-9 w-9 rounded-lg flex items-center justify-center overflow-hidden" style={{backgroundColor: '#0A1628'}}>
-              <Image src="/logo-connect.png" alt="CONNECT" width={36} height={36} className="object-cover" />
+              <Image src="/logo.png" alt="CONNECT" width={36} height={36} className="object-cover" />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-bold text-sidebar-foreground truncate leading-tight">
