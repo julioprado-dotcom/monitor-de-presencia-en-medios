@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   title: "CONNECT Bolivia — Inteligencia Mediática",
   description:
     "CONNECT Bolivia: SaaS de inteligencia mediática que monitorea presencia de legisladores en medios. Pluralismo y transparencia conforme a la Constitución Política del Estado.",
+  icons: {
+    icon: '/favicon.png',
+  },
   keywords: [
     "CONNECT Bolivia",
     "inteligencia mediática",
