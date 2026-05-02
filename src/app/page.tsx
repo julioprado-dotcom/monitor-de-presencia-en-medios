@@ -73,6 +73,20 @@ interface PersonaStat {
   camara: string;
   departamento: string;
   mencionesCount: number;
+  sentimiento: {
+    dominante: string;
+    distribucion: Record<string, number>;
+  };
+  ejesTematicos: Array<{
+    nombre: string;
+    slug: string;
+    color: string;
+    count: number;
+  }>;
+  temasEspecificos: Array<{
+    tema: string;
+    count: number;
+  }>;
 }
 
 interface PartidoStat {
