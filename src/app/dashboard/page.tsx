@@ -48,12 +48,27 @@ interface PartidoStat {
   count: number;
 }
 
-interface PersonaStat {
+interface ActorStat {
   id: string;
   nombre: string;
   partidoSigla: string;
   camara: string;
+  departamento: string;
   mencionesCount: number;
+  sentimiento: {
+    dominante: string;
+    distribucion: Record<string, number>;
+  };
+  ejesTematicos: Array<{
+    nombre: string;
+    slug: string;
+    color: string;
+    count: number;
+  }>;
+  temasEspecificos: Array<{
+    tema: string;
+    count: number;
+  }>;
 }
 
 interface ReporteRow {
@@ -68,7 +83,7 @@ interface ClientData {
   totalMedios: number;
   mencionesSemana: number;
   totalEjes: number;
-  topPersonas: PersonaStat[];
+  topActores: ActorStat[];
   mencionesPorPartido: PartidoStat[];
   ultimasMenciones: MencionRow[];
   distribucionCamara: { diputados: number; senadores: number };
@@ -208,9 +223,9 @@ export default function DashboardCliente() {
           />
           <ClientKPICard
             icon={<TrendingUp className="h-5 w-5" />}
-            value={data?.topPersonas?.[0]?.mencionesCount || 0}
+            value={data?.topActores?.[0]?.mencionesCount || 0}
             label="Mayor presencia"
-            subtext={data?.topPersonas?.[0]?.nombre?.split(' ').slice(-1).join(' ') || ''}
+            subtext={data?.topActores?.[0]?.nombre?.split(' ').slice(-1).join(' ') || ''}
             colorClass="text-primary"
           />
           <ClientKPICard
@@ -240,9 +255,9 @@ export default function DashboardCliente() {
               <CardDescription className="text-xs">Top 10 esta semana</CardDescription>
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              {data?.topPersonas && data.topPersonas.length > 0 ? (
+              {data?.topActores && data.topActores.length > 0 ? (
                 <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
-                  {data.topPersonas.map((p, i) => (
+                  {data.topActores.map((p, i) => (
                     <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
                       <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                         i === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :

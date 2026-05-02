@@ -66,7 +66,7 @@ import Link from 'next/link';
    TYPES
    ═══════════════════════════════════════════════════════════ */
 
-interface PersonaStat {
+interface ActorStat {
   id: string;
   nombre: string;
   partidoSigla: string;
@@ -121,7 +121,7 @@ interface DashboardData {
   enlacesRotos: number;
   totalComentarios: number;
   totalEjes: number;
-  topPersonas: PersonaStat[];
+  topActores: ActorStat[];
   mencionesPorPartido: PartidoStat[];
   ultimasMenciones: MencionRow[];
   distribucionCamara: { diputados: number; senadores: number };
@@ -1295,12 +1295,12 @@ export default function Dashboard() {
                       Ver indicadores <ChevronRight className="h-3 w-3 ml-1" />
                     </Button>
                   </div>
-                  <CardDescription className="text-xs">Legisladores más mencionados esta semana</CardDescription>
+                  <CardDescription className="text-xs">Actores con mayor presencia mediática esta semana</CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                  {data?.topPersonas && data.topPersonas.length > 0 ? (
+                  {data?.topActores && data.topActores.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                      {data.topPersonas.slice(0, 10).map((p, i) => (
+                      {data.topActores.slice(0, 10).map((p, i) => (
                         <div key={p.id} className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/50 transition-colors">
                           <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground shrink-0">{i + 1}</span>
                           <div className="flex-1 min-w-0">
@@ -2810,7 +2810,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              {/* Top 10 presencia mediática — migrado desde Resumen */}
+              {/* Top 10 presencia mediática — enriquecido */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -2818,24 +2818,90 @@ export default function Dashboard() {
                     Top 10 presencia mediática
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Legisladores más mencionados esta semana
+                    Actores con mayor presencia mediática esta semana — sentimiento, ejes y temas
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                  {data?.topPersonas && data.topPersonas.length > 0 ? (
-                    <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
-                      {data.topPersonas.map((p, i) => (
-                        <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
-                          <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0">
-                            {i + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{p.nombre}</p>
-                            <p className="text-[11px] text-muted-foreground">{p.camara} · {p.partidoSigla}</p>
+                  {data?.topActores && data.topActores.length > 0 ? (
+                    <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar">
+                      {data.topActores.map((p, i) => {
+                        const sentDominante = p.sentimiento?.dominante || 'no_clasificado';
+                        const sentStyle = SENTIMIENTO_STYLES[sentDominante] || SENTIMIENTO_STYLES.no_clasificado;
+                        const sentLabel = sentDominante.replace(/_/g, ' ');
+                        const ejes = p.ejesTematicos || [];
+                        const temas = p.temasEspecificos || [];
+                        return (
+                          <div key={p.id} className="p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors">
+                            {/* Fila principal: rank, nombre, partido, menciones, sentimiento */}
+                            <div className="flex items-center gap-3">
+                              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                i < 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {i + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-foreground truncate">{p.nombre}</p>
+                                <p className="text-[11px] text-muted-foreground">{p.camara} · {p.partidoSigla} · {p.departamento}</p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${sentStyle}`}>
+                                  {sentLabel}
+                                </span>
+                                <Badge variant="secondary" className="text-[10px] font-bold">{p.mencionesCount} menciones</Badge>
+                              </div>
+                            </div>
+                            {/* Distribución de sentimiento */}
+                            {p.sentimiento?.distribucion && Object.keys(p.sentimiento.distribucion).length > 0 && (
+                              <div className="mt-2 flex items-center gap-2 pl-10">
+                                <span className="text-[9px] text-muted-foreground shrink-0">Sentimiento:</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {Object.entries(p.sentimiento.distribucion)
+                                    .sort(([, a], [, b]) => b - a)
+                                    .slice(0, 4)
+                                    .map(([s, c]) => (
+                                      <span key={s} className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${SENTIMIENTO_STYLES[s] || SENTIMIENTO_STYLES.no_clasificado}`}>
+                                        {s.replace(/_/g, ' ')} {c}
+                                      </span>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                            {/* Ejes temáticos */}
+                            {ejes.length > 0 && (
+                              <div className="mt-1.5 flex items-center gap-2 pl-10">
+                                <span className="text-[9px] text-muted-foreground shrink-0">Ejes:</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {ejes.slice(0, 3).map((e) => (
+                                    <span
+                                      key={e.slug}
+                                      className="text-[9px] px-1.5 py-0.5 rounded-full font-medium border border-border"
+                                      style={{ backgroundColor: (e.color || '#6B7280') + '15', color: e.color || 'inherit' }}
+                                    >
+                                      {e.nombre} ({e.count})
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {/* Temas específicos */}
+                            {temas.length > 0 && (
+                              <div className="mt-1.5 flex items-center gap-2 pl-10">
+                                <span className="text-[9px] text-muted-foreground shrink-0">Temas:</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {temas.slice(0, 4).map((t) => (
+                                    <span key={t.tema} className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+                                      {t.tema} ({t.count})
+                                    </span>
+                                  ))}
+                                  {temas.length > 4 && (
+                                    <span className="text-[9px] text-muted-foreground">+{temas.length - 4}</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <Badge variant="secondary" className="text-[10px] shrink-0">{p.mencionesCount}</Badge>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <EmptyState icon={<Users className="h-8 w-8" />} text="Sin menciones registradas esta semana" />

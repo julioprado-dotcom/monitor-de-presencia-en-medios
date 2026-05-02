@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       .slice(0, 5)
       .map(([nombre, count]) => ({ nombre, count }));
 
-    const topPersonas = Object.values(mencionesPorPersona)
+    const topActores = Object.values(mencionesPorPersona)
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
       .map(p => ({ nombre: p.nombre, partido: p.partido, camara: p.camara, count: p.count }));
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
       sentimientoPromedio,
       clasificadores,
       topMedios,
-      topPersonas: personaId ? null : topPersonas,
+      topActores: personaId ? null : topActores,
       totalComentarios,
       sentimientoComentarios,
       enlacesRotos,
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
         distribucion: sentimientoDistribucion,
       },
       topMedios,
-      topPersonas,
+      topActores,
       comentarios: {
         total: totalComentarios,
         sentimiento: sentimientoComentarios,
@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
         sentimientoPromedio,
         clasificadores,
         topMedios,
-        topPersonas,
+        topActores,
         totalComentarios,
         sentimientoComentarios,
         enlacesRotos,
@@ -242,15 +242,15 @@ function generarResumen(params: {
   sentimientoPromedio: number;
   clasificadores: Array<{ nombre: string; slug: string; color: string; menciones: number }>;
   topMedios: Array<{ nombre: string; count: number }>;
-  topPersonas: Array<{ nombre: string; partido: string; camara: string; count: number }> | null;
+  topActores: Array<{ nombre: string; partido: string; camara: string; count: number }> | null;
   totalComentarios: number;
   sentimientoComentarios: string;
   enlacesRotos: number;
   mencionesPorNivel: Record<string, number>;
 }): string {
   const target = params.personaNombre
-    ? `el legislador ${params.personaNombre}`
-    : 'los legisladores bolivianos';
+    ? `${params.personaNombre}`
+    : 'los actores monitoreados';
 
   const periodoLabels: Record<string, string> = {
     boletin_diario: 'las últimas 24 horas',
@@ -294,9 +294,9 @@ function generarResumen(params: {
       resumen += `Medios con más presencia: ${mediosStr}.\n\n`;
     }
 
-    if (params.topPersonas && params.topPersonas.length > 0) {
-      const personasStr = params.topPersonas.slice(0, 5).map(p => `${p.nombre} (${p.count})`).join(', ');
-      resumen += `Legisladores más mencionados: ${personasStr}.\n\n`;
+    if (params.topActores && params.topActores.length > 0) {
+      const actoresStr = params.topActores.slice(0, 5).map(p => `${p.nombre} (${p.count})`).join(', ');
+      resumen += `Actores con mayor presencia: ${actoresStr}.\n\n`;
     }
   } else {
     resumen += 'No se registraron menciones en el período analizado.\n\n';

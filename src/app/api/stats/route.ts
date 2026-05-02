@@ -44,8 +44,8 @@ export async function GET() {
     // Total ejes activos
     const totalEjes = await db.ejeTematico.count({ where: { activo: true } });
 
-    // Top 10 personas con más menciones esta semana
-    const topPersonas = await db.mencion.groupBy({
+    // Top 10 actores con más menciones esta semana
+    const topActores = await db.mencion.groupBy({
       by: ['personaId'],
       where: { fechaCaptura: { gte: inicioSemana } },
       _count: { id: true },
@@ -53,8 +53,8 @@ export async function GET() {
       take: 10,
     });
 
-    const topPersonasData = await Promise.all(
-      topPersonas.map(async (item) => {
+    const topActoresData = await Promise.all(
+      topActores.map(async (item) => {
         const persona = await db.persona.findUnique({
           where: { id: item.personaId },
           select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true },
@@ -238,7 +238,7 @@ export async function GET() {
       enlacesRotos,
       totalComentarios,
       totalEjes,
-      topPersonas: topPersonasData,
+      topActores: topActoresData,
       mencionesPorPartido,
       ultimasMenciones,
       distribucionCamara: { diputados, senadores },
