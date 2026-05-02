@@ -59,9 +59,58 @@ export async function GET() {
           where: { id: item.personaId },
           select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true },
         });
+
+        // Sentimiento de las menciones de esta persona esta semana
+        const mencionesPersona = await db.mencion.findMany({
+          where: { personaId: item.personaId, fechaCaptura: { gte: inicioSemana } },
+          select: { sentimiento: true, temas: true },
+        });
+
+        const sentimientoCount: Record<string, number> = {};
+        const temasCount: Record<string, number> = {};
+        for (const m of mencionesPersona) {
+          const s = m.sentimiento || 'no_clasificado';
+          sentimientoCount[s] = (sentimientoCount[s] || 0) + 1;
+          // temas es un string con temas separados por coma
+          if (m.temas) {
+            for (const t of m.temas.split(',').map((x) => x.trim()).filter(Boolean)) {
+              temasCount[t] = (temasCount[t] || 0) + 1;
+            }
+          }
+        }
+        const sentimientoTop = Object.entries(sentimientoCount)
+          .sort(([, a], [, b]) => b - a)[0] || ['no_clasificado', 0];
+        const temasTop = Object.entries(temasCount)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 5)
+          .map(([tema, count]) => ({ tema, count }));
+
+        // Ejes temáticos principales (via MencionTema → EjeTematico)
+        const ejesMenciones = await db.mencionTema.findMany({
+          where: { mencion: { personaId: item.personaId, fechaCaptura: { gte: inicioSemana } } },
+          include: { ejeTematico: { select: { id: true, nombre: true, slug: true, color: true } } },
+        });
+        const ejesCount: Record<string, { nombre: string; slug: string; color: string; count: number }> = {};
+        for (const em of ejesMenciones) {
+          const key = em.ejeTematico.id;
+          if (!ejesCount[key]) {
+            ejesCount[key] = { nombre: em.ejeTematico.nombre, slug: em.ejeTematico.slug, color: em.ejeTematico.color, count: 0 };
+          }
+          ejesCount[key].count++;
+        }
+        const ejesTop = Object.values(ejesCount)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 4);
+
         return {
           ...persona,
           mencionesCount: item._count.id,
+          sentimiento: {
+            dominante: sentimientoTop[0],
+            distribucion: sentimientoCount,
+          },
+          ejesTematicos: ejesTop,
+          temasEspecificos: temasTop,
         };
       })
     );
