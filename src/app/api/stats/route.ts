@@ -112,7 +112,40 @@ export async function GET() {
       },
     });
 
-    // Fuentes activas — últimas capturas
+    // Estado de fuentes — CapturaLog por nivel (última captura de cada nivel)
+    const fuentesPorNivel = await Promise.all(
+      ['1', '2', '3', '4', '5'].map(async (nivel) => {
+        const captura = await db.capturaLog.findFirst({
+          where: { nivel },
+          orderBy: { fecha: 'desc' },
+        });
+        const mediosCount = await db.medio.count({ where: { nivel, activo: true } });
+        const capturasHoy = await db.capturaLog.count({
+          where: {
+            nivel,
+            fecha: { gte: hoy, lt: manana },
+          },
+        });
+        return {
+          nivel,
+          mediosCount,
+          ultimaCaptura: captura?.fecha || null,
+          ultimaExitosa: captura?.exitosa || false,
+          ultimoTotalArticulos: captura?.totalArticulos || 0,
+          ultimoMencionesEncontradas: captura?.mencionesEncontradas || 0,
+          capturasHoy,
+        };
+      })
+    );
+
+    // Medios totales por nivel
+    const mediosPorNivel = await Promise.all(
+      ['1', '2', '3', '4', '5'].map(async (nivel) => ({
+        nivel,
+        total: await db.medio.count({ where: { nivel } }),
+        activos: await db.medio.count({ where: { nivel, activo: true } }),
+      }))
+    );
 
     return NextResponse.json({
       totalPersonas,
@@ -130,6 +163,8 @@ export async function GET() {
       clientesActivos,
       contratosVigentes,
       entregasHoy,
+      fuentesPorNivel,
+      mediosPorNivel,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error desconocido';
