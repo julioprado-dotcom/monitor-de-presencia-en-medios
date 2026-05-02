@@ -356,6 +356,25 @@ export default function Dashboard() {
   const [contratosTotal, setContratosTotal] = useState(0);
   const [contratosLoading, setContratosLoading] = useState(false);
 
+  // Indicadores económicos
+  const [indicadores, setIndicadores] = useState<Array<{
+    slug: string;
+    nombre: string;
+    categoria: string;
+    fuente: string;
+    periodicidad: string;
+    unidad: string;
+    ultimoValor: {
+      valor: string;
+      valorRaw: number;
+      fecha: string;
+      confiable: boolean;
+      fechaCaptura: string;
+    } | null;
+  }> | null>(null);
+  const [indicadoresLoading, setIndicadoresLoading] = useState(false);
+  const [capturaIndicadoresLoading, setCapturaIndicadoresLoading] = useState(false);
+
   // Medios toggle
   const [toggleMedioId, setToggleMedioId] = useState<string | null>(null);
 
@@ -410,6 +429,36 @@ export default function Dashboard() {
       setEjesLoading(false);
     }
   }, []);
+
+  const loadIndicadores = useCallback(async () => {
+    setIndicadoresLoading(true);
+    try {
+      const res = await fetch('/api/indicadores/capture');
+      const json = await res.json();
+      if (json.exito) {
+        setIndicadores(json.indicadores || []);
+      }
+    } catch {
+      // silent
+    } finally {
+      setIndicadoresLoading(false);
+    }
+  }, []);
+
+  const handleCapturaIndicadores = async () => {
+    setCapturaIndicadoresLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/indicadores/capture', { method: 'POST' });
+      const json = await res.json();
+      if (json.error) setError(json.error);
+      else await loadIndicadores();
+    } catch {
+      setError('Error al capturar indicadores');
+    } finally {
+      setCapturaIndicadoresLoading(false);
+    }
+  };
 
   const loadMenciones = useCallback(async () => {
     setMencionesLoading(true);
@@ -508,6 +557,8 @@ export default function Dashboard() {
       }
     };
     loadInitial();
+    // Cargar indicadores económicos al iniciar
+    loadIndicadores();
     return () => controller.abort();
   }, []);
 
@@ -790,6 +841,85 @@ export default function Dashboard() {
                   colorClass="text-amber-600 dark:text-amber-400"
                 />
               </div>
+
+              {/* Indicadores Económicos */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        Indicadores Económicos
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-0.5">
+                        Macroeconomía Bolivia · ONION200
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCapturaIndicadores}
+                        disabled={capturaIndicadoresLoading}
+                        className="text-xs gap-1"
+                      >
+                        {capturaIndicadoresLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                        Capturar ahora
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setActiveView('indicadores')} className="text-xs text-muted-foreground">
+                        Ver detalle <ChevronRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  {indicadoresLoading ? (
+                    <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                  ) : indicadores && indicadores.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                      {indicadores.map((ind) => {
+                        const esMonetario = ind.categoria === 'monetario';
+                        const tieneValor = ind.ultimoValor !== null;
+                        return (
+                          <div key={ind.slug} className={`p-2.5 rounded-lg border transition-colors ${
+                            esMonetario
+                              ? 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20'
+                              : 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20'
+                          }`}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                                esMonetario
+                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                              }`}>
+                                {esMonetario ? 'Monetario' : 'Minero'}
+                              </span>
+                              {tieneValor && (
+                                <span className={`text-[9px] ${ind.ultimoValor!.confiable ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                  {ind.ultimoValor!.confiable ? '✓' : '⚠'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-semibold text-foreground truncate">
+                              {tieneValor ? ind.ultimoValor!.valor : '—'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground truncate">{ind.nombre}</p>
+                            {tieneValor && ind.ultimoValor!.fechaCaptura && (
+                              <p className="text-[9px] text-muted-foreground/60 mt-0.5">
+                                {new Date(ind.ultimoValor!.fechaCaptura).toLocaleDateString('es-BO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <p className="text-xs text-muted-foreground">Sin datos de indicadores. Ejecuta el seed o captura indicadores.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Últimas menciones */}
               <Card>
