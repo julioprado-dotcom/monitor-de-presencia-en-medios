@@ -4,39 +4,93 @@ import db from '@/lib/db';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { personaId, tipo } = body;
+    const { personaId, tipo, fecha, ejesSeleccionados } = body;
     const tipoReporte = tipo || 'semanal';
 
     // Calcular rango de fechas según tipo
-    const fechaFin = new Date();
-    const fechaInicio = new Date();
+    let fechaFin = new Date();
+    let fechaInicio = new Date();
 
-    if (tipoReporte === 'diario' || tipoReporte === 'boletin_diario') {
+    if (tipoReporte === 'EL_TERMOMETRO' && fecha) {
+      // Ventana nocturna: 19:00 del día anterior a 07:00 del día seleccionado
+      const [year, month, day] = fecha.split('-').map(Number);
+      const selectedDate = new Date(year, month - 1, day);
+
+      fechaFin = new Date(selectedDate);
+      fechaFin.setHours(7, 0, 0, 0);
+
+      fechaInicio = new Date(selectedDate);
+      fechaInicio.setDate(fechaInicio.getDate() - 1);
+      fechaInicio.setHours(19, 0, 0, 0);
+    } else if (tipoReporte === 'SALDO_DEL_DIA' && fecha) {
+      // Ventana diurna: 07:00 a 19:00 del día seleccionado
+      const [year, month, day] = fecha.split('-').map(Number);
+      const selectedDate = new Date(year, month - 1, day);
+
+      fechaInicio = new Date(selectedDate);
+      fechaInicio.setHours(7, 0, 0, 0);
+
+      fechaFin = new Date(selectedDate);
+      fechaFin.setHours(19, 0, 0, 0);
+    } else if (tipoReporte === 'diario' || tipoReporte === 'boletin_diario') {
       fechaInicio.setDate(fechaFin.getDate() - 1);
+      fechaInicio.setHours(0, 0, 0, 0);
+      fechaFin.setHours(23, 59, 59, 999);
     } else if (tipoReporte === 'semanal') {
       fechaInicio.setDate(fechaFin.getDate() - 7);
+      fechaInicio.setHours(0, 0, 0, 0);
+      fechaFin.setHours(23, 59, 59, 999);
     } else if (tipoReporte === 'mensual') {
       fechaInicio.setMonth(fechaFin.getMonth() - 1);
+      fechaInicio.setHours(0, 0, 0, 0);
+      fechaFin.setHours(23, 59, 59, 999);
+    } else {
+      fechaInicio.setHours(0, 0, 0, 0);
+      fechaFin.setHours(23, 59, 59, 999);
     }
 
-    fechaInicio.setHours(0, 0, 0, 0);
-    fechaFin.setHours(23, 59, 59, 999);
-
-    // Consultar menciones en el rango
+    // Construir where clause para menciones
     const where: Record<string, unknown> = {
       fechaCaptura: { gte: fechaInicio, lte: fechaFin },
     };
     if (personaId) where.personaId = personaId;
 
-    const menciones = await db.mencion.findMany({
-      where,
-      include: {
-        persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
-        medio: { select: { nombre: true, tipo: true, nivel: true } },
-        ejesTematicos: { include: { ejeTematico: { select: { nombre: true, slug: true, color: true } } } },
-      },
-      orderBy: { fechaCaptura: 'desc' },
-    });
+    // Filtrar por ejes seleccionados si se proporcionan
+    const ejesSlugs: string[] = Array.isArray(ejesSeleccionados) ? ejesSeleccionados : [];
+    let menciones;
+    if (ejesSlugs.length > 0) {
+      // Obtener IDs de ejes temáticos por slug
+      const ejesDB = await db.ejeTematico.findMany({
+        where: { slug: { in: ejesSlugs } },
+        select: { id: true },
+      });
+      const ejesIds = ejesDB.map(e => e.id);
+
+      menciones = await db.mencion.findMany({
+        where: {
+          ...where,
+          ejesTematicos: {
+            some: { ejeTematicoId: { in: ejesIds } },
+          },
+        },
+        include: {
+          persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
+          medio: { select: { nombre: true, tipo: true, nivel: true } },
+          ejesTematicos: { include: { ejeTematico: { select: { nombre: true, slug: true, color: true } } } },
+        },
+        orderBy: { fechaCaptura: 'desc' },
+      });
+    } else {
+      menciones = await db.mencion.findMany({
+        where,
+        include: {
+          persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
+          medio: { select: { nombre: true, tipo: true, nivel: true } },
+          ejesTematicos: { include: { ejeTematico: { select: { nombre: true, slug: true, color: true } } } },
+        },
+        orderBy: { fechaCaptura: 'desc' },
+      });
+    }
 
     const totalMenciones = menciones.length;
 
@@ -162,6 +216,16 @@ export async function POST(request: NextRequest) {
       ? await db.persona.findUnique({ where: { id: personaId }, select: { nombre: true } })
       : null;
 
+    // Ventana descriptiva para productos específicos
+    let ventanaLabel = '';
+    if (tipoReporte === 'EL_TERMOMETRO' && fecha) {
+      const fechaStr = new Date(fecha + 'T12:00:00').toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
+      ventanaLabel = `la ventana nocturna (ayer 19:00 — hoy 07:00) del ${fechaStr}`;
+    } else if (tipoReporte === 'SALDO_DEL_DIA' && fecha) {
+      const fechaStr = new Date(fecha + 'T12:00:00').toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
+      ventanaLabel = `la jornada diurna (07:00 — 19:00) del ${fechaStr}`;
+    }
+
     const resumen = generarResumen({
       tipo: tipoReporte,
       personaNombre: personaTarget?.nombre,
@@ -174,6 +238,8 @@ export async function POST(request: NextRequest) {
       sentimientoComentarios,
       enlacesRotos,
       mencionesPorNivel,
+      ventanaLabel,
+      ejesSlugs: ejesSlugs,
     });
 
     // ─── Contenido estructurado JSON ───
@@ -191,12 +257,13 @@ export async function POST(request: NextRequest) {
       },
       enlacesRotos,
       mencionesPorNivel,
+      ejesSeleccionados: ejesSlugs,
     });
 
     // ─── Crear registro del reporte ───
     const reporte = await db.reporte.create({
       data: {
-        tipo: tipoReporte === 'boletin_diario' ? 'boletin_diario' : tipoReporte,
+        tipo: tipoReporte,
         personaId: personaId || null,
         fechaInicio,
         fechaFin,
@@ -247,10 +314,20 @@ function generarResumen(params: {
   sentimientoComentarios: string;
   enlacesRotos: number;
   mencionesPorNivel: Record<string, number>;
+  ventanaLabel?: string;
+  ejesSlugs?: string[];
 }): string {
   const target = params.personaNombre
     ? `${params.personaNombre}`
     : 'los actores monitoreados';
+
+  // Productos específicos con su propia narrativa
+  if (params.tipo === 'EL_TERMOMETRO') {
+    return generarResumenTermometro(params);
+  }
+  if (params.tipo === 'SALDO_DEL_DIA') {
+    return generarResumenSaldoDelDia(params);
+  }
 
   const periodoLabels: Record<string, string> = {
     boletin_diario: 'las últimas 24 horas',
@@ -309,6 +386,148 @@ function generarResumen(params: {
 
   if (params.enlacesRotos > 0) {
     resumen += `Enlaces rotos detectados: ${params.enlacesRotos}. Texto completo respaldado en el sistema.\n`;
+  }
+
+  return resumen;
+}
+
+function generarResumenTermometro(params: {
+  totalMenciones: number;
+  sentimientoPromedio: number;
+  clasificadores: Array<{ nombre: string; slug: string; color: string; menciones: number }>;
+  topActores: Array<{ nombre: string; partido: string; camara: string; count: number }> | null;
+  topMedios: Array<{ nombre: string; count: number }>;
+  totalComentarios: number;
+  sentimientoComentarios: string;
+  enlacesRotos: number;
+  mencionesPorNivel: Record<string, number>;
+  ventanaLabel?: string;
+  ejesSlugs?: string[];
+}): string {
+  const ventana = params.ventanaLabel || 'la ventana nocturna analizada';
+
+  let resumen = `EL TERMÓMETRO — Clima Mediático Matutino\n\n`;
+  resumen += `Ventana de análisis: ${ventana}\n\n`;
+
+  if (params.totalMenciones === 0) {
+    resumen += `No se registraron menciones durante la noche. El clima mediático se mantiene en calma.\n\n`;
+    return resumen;
+  }
+
+  // Indicador de clima
+  const sentLabel =
+    params.sentimientoPromedio >= 4 ? 'DESPEJADO ☀️' :
+    params.sentimientoPromedio >= 3.5 ? 'PARCIALMENTE DESPEJADO ⛅' :
+    params.sentimientoPromedio >= 3 ? 'NUBLADO ☁️' :
+    params.sentimientoPromedio >= 2 ? 'TORMENTOSO ⛈️' :
+    'CRÍTICO 🌩️';
+
+  resumen += `CLIMA MEDIÁTICO: ${sentLabel} (${params.sentimientoPromedio.toFixed(1)}/5)\n`;
+  resumen += `Total de menciones registradas: ${params.totalMenciones}\n\n`;
+
+  // Ejes temáticos que marcan la agenda
+  if (params.clasificadores.length > 0) {
+    resumen += `Ejes que marcan la agenda matutina:\n`;
+    for (const c of params.clasificadores.slice(0, 5)) {
+      resumen += `  - ${c.nombre}: ${c.menciones} menciones\n`;
+    }
+    resumen += '\n';
+  }
+
+  // Actores destacados de la noche
+  if (params.topActores && params.topActores.length > 0) {
+    resumen += `Actores destacados de la noche:\n`;
+    for (const a of params.topActores.slice(0, 5)) {
+      resumen += `  - ${a.nombre} (${a.partido}): ${a.count} menciones\n`;
+    }
+    resumen += '\n';
+  }
+
+  // Medios principales
+  if (params.topMedios.length > 0) {
+    const mediosStr = params.topMedios.slice(0, 3).map(m => `${m.nombre} (${m.count})`).join(', ');
+    resumen += `Medios con mayor actividad nocturna: ${mediosStr}.\n\n`;
+  }
+
+  // Comentarios
+  if (params.totalComentarios > 0) {
+    resumen += `Reacción ciudadana: ${params.totalComentarios} comentarios analizados. `;
+    resumen += `Sentimiento: ${params.sentimientoComentarios}.\n\n`;
+  }
+
+  if (params.enlacesRotos > 0) {
+    resumen += `Nota: ${params.enlacesRotos} enlace(s) roto(s) detectados. Texto completo respaldado.\n`;
+  }
+
+  return resumen;
+}
+
+function generarResumenSaldoDelDia(params: {
+  totalMenciones: number;
+  sentimientoPromedio: number;
+  clasificadores: Array<{ nombre: string; slug: string; color: string; menciones: number }>;
+  topActores: Array<{ nombre: string; partido: string; camara: string; count: number }> | null;
+  topMedios: Array<{ nombre: string; count: number }>;
+  totalComentarios: number;
+  sentimientoComentarios: string;
+  enlacesRotos: number;
+  mencionesPorNivel: Record<string, number>;
+  ventanaLabel?: string;
+  ejesSlugs?: string[];
+}): string {
+  const ventana = params.ventanaLabel || 'la jornada diurna analizada';
+
+  let resumen = `SALDO DEL DÍA — Balance de Jornada\n\n`;
+  resumen += `Ventana de análisis: ${ventana}\n\n`;
+
+  if (params.totalMenciones === 0) {
+    resumen += `Jornada sin actividad mediática significativa registrada.\n\n`;
+    return resumen;
+  }
+
+  // Balance del día
+  const sentLabel =
+    params.sentimientoPromedio >= 4 ? 'POSITIVO ✓' :
+    params.sentimientoPromedio >= 3.5 ? 'MODERADAMENTE POSITIVO' :
+    params.sentimientoPromedio >= 3 ? 'NEUTRAL ○' :
+    params.sentimientoPromedio >= 2 ? 'NEGATIVO ✗' :
+    'CRÍTICO ⚠';
+
+  resumen += `BALANCE DE SENTIMIENTO: ${sentLabel} (${params.sentimientoPromedio.toFixed(1)}/5)\n`;
+  resumen += `Total de menciones en la jornada: ${params.totalMenciones}\n\n`;
+
+  // Ejes temáticos del día
+  if (params.clasificadores.length > 0) {
+    resumen += `Ejes temáticos del día:\n`;
+    for (const c of params.clasificadores.slice(0, 5)) {
+      resumen += `  - ${c.nombre}: ${c.menciones} menciones\n`;
+    }
+    resumen += '\n';
+  }
+
+  // Actores principales de la jornada
+  if (params.topActores && params.topActores.length > 0) {
+    resumen += `Actores principales de la jornada:\n`;
+    for (const a of params.topActores.slice(0, 5)) {
+      resumen += `  - ${a.nombre} (${a.partido}): ${a.count} menciones\n`;
+    }
+    resumen += '\n';
+  }
+
+  // Medios que lideraron cobertura
+  if (params.topMedios.length > 0) {
+    const mediosStr = params.topMedios.slice(0, 3).map(m => `${m.nombre} (${m.count})`).join(', ');
+    resumen += `Medios con mayor cobertura: ${mediosStr}.\n\n`;
+  }
+
+  // Comentarios
+  if (params.totalComentarios > 0) {
+    resumen += `Reacción ciudadana: ${params.totalComentarios} comentarios. `;
+    resumen += `Sentimiento: ${params.sentimientoComentarios}.\n\n`;
+  }
+
+  if (params.enlacesRotos > 0) {
+    resumen += `Nota: ${params.enlacesRotos} enlace(s) roto(s) detectados.\n`;
   }
 
   return resumen;
