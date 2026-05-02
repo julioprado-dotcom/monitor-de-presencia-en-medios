@@ -3,49 +3,58 @@ import db from '@/lib/db';
 
 export async function GET() {
   try {
-    // Total personas monitoreadas
-    const totalPersonas = await db.persona.count({ where: { activa: true } });
-
-    // Total medios activos
-    const fuentesActivas = await db.medio.count({ where: { activo: true } });
-
-    // Menciones hoy
+    // ─── Parallel Phase 1: Counts independientes ───
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     const manana = new Date(hoy);
     manana.setDate(manana.getDate() + 1);
 
-    const mencionesHoy = await db.mencion.count({
-      where: {
-        fechaCaptura: { gte: hoy, lt: manana },
-      },
-    });
-
-    // Menciones esta semana
     const inicioSemana = new Date();
     inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay() + 1);
     inicioSemana.setHours(0, 0, 0, 0);
 
-    const mencionesSemana = await db.mencion.count({
-      where: { fechaCaptura: { gte: inicioSemana } },
-    });
+    const [
+      totalPersonas,
+      fuentesActivas,
+      mencionesHoy,
+      mencionesSemana,
+      totalReportes,
+      enlacesRotos,
+      totalComentarios,
+      totalEjes,
+      clientesActivos,
+      contratosVigentes,
+      entregasHoy,
+      diputados,
+      senadores,
+      alertasNegativas,
+      alertasPositivas,
+      alertasNeutras,
+      ultimaAlerta,
+    ] = await Promise.all([
+      db.persona.count({ where: { activa: true } }),
+      db.medio.count({ where: { activo: true } }),
+      db.mencion.count({ where: { fechaCaptura: { gte: hoy, lt: manana } } }),
+      db.mencion.count({ where: { fechaCaptura: { gte: inicioSemana } } }),
+      db.reporte.count(),
+      db.mencion.count({ where: { enlaceActivo: false } }),
+      db.comentario.count(),
+      db.ejeTematico.count({ where: { activo: true } }),
+      db.cliente.count({ where: { estado: 'activo' } }),
+      db.contrato.count({ where: { estado: 'activo' } }),
+      db.entrega.count({ where: { estado: 'enviado', fechaEnvio: { gte: hoy, lt: manana } } }),
+      db.persona.count({ where: { camara: 'Diputados', activa: true } }),
+      db.persona.count({ where: { camara: 'Senadores', activa: true } }),
+      db.reporte.count({ where: { tipo: 'ALERTA_TEMPRANA', sentimientoComentarios: { contains: 'negativo' }, fechaCreacion: { gte: hoy } } }),
+      db.reporte.count({ where: { tipo: 'ALERTA_TEMPRANA', sentimientoComentarios: { contains: 'positivo' }, fechaCreacion: { gte: hoy } } }),
+      db.reporte.count({ where: { tipo: 'ALERTA_TEMPRANA', fechaCreacion: { gte: hoy }, NOT: [{ sentimientoComentarios: { contains: 'positivo' } }, { sentimientoComentarios: { contains: 'negativo' } }] } }),
+      db.reporte.findFirst({ where: { tipo: 'ALERTA_TEMPRANA' }, orderBy: { fechaCreacion: 'desc' }, select: { id: true, fechaCreacion: true, resumen: true, sentimientoComentarios: true } }),
+    ]);
 
-    // Reportes generados
-    const totalReportes = await db.reporte.count();
+    // ─── Parallel Phase 2: Datos dependientes ───
 
-    // Enlaces rotos
-    const enlacesRotos = await db.mencion.count({
-      where: { enlaceActivo: false },
-    });
-
-    // Total comentarios
-    const totalComentarios = await db.comentario.count();
-
-    // Total ejes activos
-    const totalEjes = await db.ejeTematico.count({ where: { activo: true } });
-
-    // Top 10 actores con más menciones esta semana
-    const topActores = await db.mencion.groupBy({
+    // Top 10 actores con groupBy (1 query) + datos de persona en batch (1 query)
+    const topActoresGrouped = await db.mencion.groupBy({
       by: ['personaId'],
       where: { fechaCaptura: { gte: inicioSemana } },
       _count: { id: true },
@@ -53,87 +62,118 @@ export async function GET() {
       take: 10,
     });
 
-    const topActoresData = await Promise.all(
-      topActores.map(async (item) => {
-        const persona = await db.persona.findUnique({
-          where: { id: item.personaId },
+    const personaIds = topActoresGrouped.map(a => a.personaId);
+
+    // 1 query: todas las personas de una vez
+    const personasBatch = personaIds.length > 0
+      ? await db.persona.findMany({
+          where: { id: { in: personaIds } },
           select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true },
-        });
+        })
+      : [];
+    const personaMap = new Map(personasBatch.map(p => [p.id, p]));
 
-        // Sentimiento de las menciones de esta persona esta semana
-        const mencionesPersona = await db.mencion.findMany({
-          where: { personaId: item.personaId, fechaCaptura: { gte: inicioSemana } },
-          select: { sentimiento: true, temas: true },
-        });
+    // 1 query: todas las menciones de estos actores esta semana
+    const mencionesActores = personaIds.length > 0
+      ? await db.mencion.findMany({
+          where: { personaId: { in: personaIds }, fechaCaptura: { gte: inicioSemana } },
+          select: { personaId: true, sentimiento: true, temas: true },
+        })
+      : [];
 
-        const sentimientoCount: Record<string, number> = {};
-        const temasCount: Record<string, number> = {};
-        for (const m of mencionesPersona) {
-          const s = m.sentimiento || 'no_clasificado';
-          sentimientoCount[s] = (sentimientoCount[s] || 0) + 1;
-          // temas es un string con temas separados por coma
-          if (m.temas) {
-            for (const t of m.temas.split(',').map((x) => x.trim()).filter(Boolean)) {
-              temasCount[t] = (temasCount[t] || 0) + 1;
-            }
-          }
-        }
-        const sentimientoTop = Object.entries(sentimientoCount)
-          .sort(([, a], [, b]) => b - a)[0] || ['no_clasificado', 0];
-        const temasTop = Object.entries(temasCount)
-          .sort(([, a], [, b]) => b - a)
-          .slice(0, 5)
-          .map(([tema, count]) => ({ tema, count }));
-
-        // Ejes temáticos principales (via MencionTema → EjeTematico)
-        const ejesMenciones = await db.mencionTema.findMany({
-          where: { mencion: { personaId: item.personaId, fechaCaptura: { gte: inicioSemana } } },
-          include: { ejeTematico: { select: { id: true, nombre: true, slug: true, color: true } } },
-        });
-        const ejesCount: Record<string, { nombre: string; slug: string; color: string; count: number }> = {};
-        for (const em of ejesMenciones) {
-          const key = em.ejeTematico.id;
-          if (!ejesCount[key]) {
-            ejesCount[key] = { nombre: em.ejeTematico.nombre, slug: em.ejeTematico.slug, color: em.ejeTematico.color, count: 0 };
-          }
-          ejesCount[key].count++;
-        }
-        const ejesTop = Object.values(ejesCount)
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 4);
-
-        return {
-          ...persona,
-          mencionesCount: item._count.id,
-          sentimiento: {
-            dominante: sentimientoTop[0],
-            distribucion: sentimientoCount,
+    // 1 query: todos los ejes temáticos de estas menciones
+    const ejesMenciones = personaIds.length > 0
+      ? await db.mencionTema.findMany({
+          where: { mencion: { personaId: { in: personaIds }, fechaCaptura: { gte: inicioSemana } } },
+          include: {
+            ejeTematico: { select: { id: true, nombre: true, slug: true, color: true } },
+            mencion: { select: { personaId: true } },
           },
-          ejesTematicos: ejesTop,
-          temasEspecificos: temasTop,
-        };
-      })
-    );
+        })
+      : [];
 
-    // Menciones por partido
+    // ─── Process topActors en memoria (0 queries extra) ───
+    const actorMencionesMap = new Map<string, typeof mencionesActores>();
+    for (const m of mencionesActores) {
+      const list = actorMencionesMap.get(m.personaId) || [];
+      list.push(m);
+      actorMencionesMap.set(m.personaId, list);
+    }
+
+    const actorEjesMap = new Map<string, typeof ejesMenciones>();
+    for (const em of ejesMenciones) {
+      const pid = em.mencion.personaId;
+      const list = actorEjesMap.get(pid) || [];
+      list.push(em);
+      actorEjesMap.set(pid, list);
+    }
+
+    const topActoresData = topActoresGrouped.map((item) => {
+      const persona = personaMap.get(item.personaId);
+      if (!persona) return null;
+
+      const menciones = actorMencionesMap.get(item.personaId) || [];
+      const sentimientoCount: Record<string, number> = {};
+      const temasCount: Record<string, number> = {};
+
+      for (const m of menciones) {
+        const s = m.sentimiento || 'no_clasificado';
+        sentimientoCount[s] = (sentimientoCount[s] || 0) + 1;
+        if (m.temas) {
+          for (const t of m.temas.split(',').map(x => x.trim()).filter(Boolean)) {
+            temasCount[t] = (temasCount[t] || 0) + 1;
+          }
+        }
+      }
+
+      const sentimientoTop = Object.entries(sentimientoCount)
+        .sort(([, a], [, b]) => b - a)[0] || ['no_clasificado', 0];
+      const temasTop = Object.entries(temasCount)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([tema, count]) => ({ tema, count }));
+
+      const ejes = actorEjesMap.get(item.personaId) || [];
+      const ejesCountMap: Record<string, { nombre: string; slug: string; color: string; count: number }> = {};
+      for (const em of ejes) {
+        const key = em.ejeTematico.id;
+        if (!ejesCountMap[key]) {
+          ejesCountMap[key] = { nombre: em.ejeTematico.nombre, slug: em.ejeTematico.slug, color: em.ejeTematico.color, count: 0 };
+        }
+        ejesCountMap[key].count++;
+      }
+      const ejesTop = Object.values(ejesCountMap)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 4);
+
+      return {
+        ...persona,
+        mencionesCount: item._count.id,
+        sentimiento: {
+          dominante: sentimientoTop[0],
+          distribucion: sentimientoCount,
+        },
+        ejesTematicos: ejesTop,
+        temasEspecificos: temasTop,
+      };
+    }).filter(Boolean);
+
+    // ─── Menciones por partido (1 query con include) ───
     const mencionesPorPartidoRaw = await db.mencion.findMany({
       where: { fechaCaptura: { gte: inicioSemana } },
-      include: {
-        persona: { select: { partidoSigla: true } },
-      },
+      include: { persona: { select: { partidoSigla: true } } },
     });
 
     const partidoCount: Record<string, number> = {};
     for (const m of mencionesPorPartidoRaw) {
-      const sigla = m.persona.partidoSigla || 'Sin partido';
+      const sigla = m.persona?.partidoSigla || 'Sin partido';
       partidoCount[sigla] = (partidoCount[sigla] || 0) + 1;
     }
-
     const mencionesPorPartido = Object.entries(partidoCount)
       .map(([partido, count]) => ({ partido, count }))
       .sort((a, b) => b.count - a.count);
 
-    // Últimas menciones
+    // ─── Últimas menciones (1 query) ───
     const ultimasMenciones = await db.mencion.findMany({
       take: 15,
       orderBy: { fechaCaptura: 'desc' },
@@ -143,91 +183,54 @@ export async function GET() {
       },
     });
 
-    // Distribución por cámara
-    const diputados = await db.persona.count({ where: { camara: 'Diputados', activa: true } });
-    const senadores = await db.persona.count({ where: { camara: 'Senadores', activa: true } });
+    // ─── Fuentes por nivel (5 queries paralelizadas → 1 batch con groupBy) ───
+    const [capturaLogs, mediosAll] = await Promise.all([
+      db.capturaLog.findMany({
+        where: { fecha: { gte: hoy, lt: manana } },
+        select: { nivel: true, fecha: true, exitosa: true, totalArticulos: true, mencionesEncontradas: true },
+        orderBy: { fecha: 'desc' },
+      }),
+      db.medio.findMany({
+        select: { nivel: true, activo: true },
+      }),
+    ]);
 
-    // Clientes activos
-    const clientesActivos = await db.cliente.count({ where: { estado: 'activo' } });
+    // Process fuentes in memory
+    const ultimaCapturaPorNivel = new Map<string, typeof capturaLogs[0]>();
+    const capturasHoyPorNivel = new Map<string, number>();
 
-    // Contratos vigentes
-    const contratosVigentes = await db.contrato.count({ where: { estado: 'activo' } });
+    for (const cl of capturaLogs) {
+      if (!ultimaCapturaPorNivel.has(cl.nivel)) {
+        ultimaCapturaPorNivel.set(cl.nivel, cl);
+      }
+      capturasHoyPorNivel.set(cl.nivel, (capturasHoyPorNivel.get(cl.nivel) || 0) + 1);
+    }
 
-    // Entregas hoy (enviadas en las últimas 24h)
-    const entregasHoy = await db.entrega.count({
-      where: {
-        estado: 'enviado',
-        fechaEnvio: { gte: hoy, lt: manana },
-      },
-    });
+    const mediosCountMap: Record<string, { total: number; activos: number }> = {};
+    for (const m of mediosAll) {
+      if (!mediosCountMap[m.nivel]) mediosCountMap[m.nivel] = { total: 0, activos: 0 };
+      mediosCountMap[m.nivel].total++;
+      if (m.activo) mediosCountMap[m.nivel].activos++;
+    }
 
-    // Estado de fuentes — CapturaLog por nivel (última captura de cada nivel)
-    const fuentesPorNivel = await Promise.all(
-      ['1', '2', '3', '4', '5'].map(async (nivel) => {
-        const captura = await db.capturaLog.findFirst({
-          where: { nivel },
-          orderBy: { fecha: 'desc' },
-        });
-        const mediosCount = await db.medio.count({ where: { nivel, activo: true } });
-        const capturasHoy = await db.capturaLog.count({
-          where: {
-            nivel,
-            fecha: { gte: hoy, lt: manana },
-          },
-        });
-        return {
-          nivel,
-          mediosCount,
-          ultimaCaptura: captura?.fecha || null,
-          ultimaExitosa: captura?.exitosa || false,
-          ultimoTotalArticulos: captura?.totalArticulos || 0,
-          ultimoMencionesEncontradas: captura?.mencionesEncontradas || 0,
-          capturasHoy,
-        };
-      })
-    );
-
-    // Medios totales por nivel
-    const mediosPorNivel = await Promise.all(
-      ['1', '2', '3', '4', '5'].map(async (nivel) => ({
+    const fuentesPorNivel = ['1', '2', '3', '4', '5'].map(nivel => {
+      const last = ultimaCapturaPorNivel.get(nivel);
+      return {
         nivel,
-        total: await db.medio.count({ where: { nivel } }),
-        activos: await db.medio.count({ where: { nivel, activo: true } }),
-      }))
-    );
-
-    // Alertas por tipo (últimas 24h)
-    const alertasNegativas = await db.reporte.count({
-      where: {
-        tipo: 'ALERTA_TEMPRANA',
-        sentimientoComentarios: { contains: 'negativo' },
-        fechaCreacion: { gte: hoy },
-      },
-    });
-    const alertasPositivas = await db.reporte.count({
-      where: {
-        tipo: 'ALERTA_TEMPRANA',
-        sentimientoComentarios: { contains: 'positivo' },
-        fechaCreacion: { gte: hoy },
-      },
-    });
-    const alertasNeutras = await db.reporte.count({
-      where: {
-        tipo: 'ALERTA_TEMPRANA',
-        fechaCreacion: { gte: hoy },
-        NOT: [
-          { sentimientoComentarios: { contains: 'positivo' } },
-          { sentimientoComentarios: { contains: 'negativo' } },
-        ],
-      },
+        mediosCount: mediosCountMap[nivel]?.activos || 0,
+        ultimaCaptura: last?.fecha || null,
+        ultimaExitosa: last?.exitosa || false,
+        ultimoTotalArticulos: last?.totalArticulos || 0,
+        ultimoMencionesEncontradas: last?.mencionesEncontradas || 0,
+        capturasHoy: capturasHoyPorNivel.get(nivel) || 0,
+      };
     });
 
-    // Última alerta registrada
-    const ultimaAlerta = await db.reporte.findFirst({
-      where: { tipo: 'ALERTA_TEMPRANA' },
-      orderBy: { fechaCreacion: 'desc' },
-      select: { id: true, fechaCreacion: true, resumen: true, sentimientoComentarios: true },
-    });
+    const mediosPorNivel = ['1', '2', '3', '4', '5'].map(nivel => ({
+      nivel,
+      total: mediosCountMap[nivel]?.total || 0,
+      activos: mediosCountMap[nivel]?.activos || 0,
+    }));
 
     return NextResponse.json({
       totalPersonas,
