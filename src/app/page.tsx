@@ -877,7 +877,7 @@ export default function Dashboard() {
                     <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
                   ) : indicadores && indicadores.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-                      {indicadores.map((ind) => {
+                      {indicadores.filter(i => i.categoria === 'monetario' || i.categoria === 'minero').map((ind) => {
                         const esMonetario = ind.categoria === 'monetario';
                         const tieneValor = ind.ultimoValor !== null;
                         return (
@@ -920,6 +920,69 @@ export default function Dashboard() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Conflictividad */}
+              {(() => {
+                const indicadoresSocial = indicadores?.filter(i => i.categoria === 'social') || [];
+                return indicadoresSocial.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-red-500" />
+                            Conflictividad
+                          </CardTitle>
+                          <CardDescription className="text-xs mt-0.5">
+                            Tensión social y escalamiento regional · ONION200
+                          </CardDescription>
+                        </div>
+                        <span className="text-[10px] px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-medium">
+                          Captura pendiente
+                        </span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {indicadoresSocial.map((ind) => {
+                          const tieneValor = ind.ultimoValor !== null;
+                          const esEscalamiento = ind.slug === 'conflictividad-escalamiento';
+                          return (
+                            <div key={ind.slug} className={`p-3 rounded-lg border transition-colors ${
+                              esEscalamiento
+                                ? 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20'
+                                : 'border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20'
+                            }`}>
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                                  {esEscalamiento ? 'Global' : 'Análisis'}
+                                </span>
+                                {tieneValor && (
+                                  <span className={`text-[9px] ${ind.ultimoValor!.confiable ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                    {ind.ultimoValor!.confiable ? '✓' : '⚠'}
+                                  </span>
+                                )}
+                              </div>
+                              <p className={`text-lg font-bold truncate ${
+                                esEscalamiento
+                                  ? (tieneValor && ind.ultimoValor!.valor.toLowerCase().includes('alto') ? 'text-red-600 dark:text-red-400' : tieneValor ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')
+                                  : 'text-foreground'
+                              }`}>
+                                {tieneValor ? ind.ultimoValor!.valor : 'N/D'}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground truncate">{ind.nombre}</p>
+                              <p className="text-[9px] text-muted-foreground/50 mt-0.5">{ind.unidad}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/60 mt-3 text-center">
+                        Los indicadores de conflictividad se calculan a partir del análisis de menciones y keywords de protesta. Captura automática pendiente de implementación.
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
               {/* Últimas menciones */}
               <Card>
