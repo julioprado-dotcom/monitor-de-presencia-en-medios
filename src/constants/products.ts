@@ -22,6 +22,14 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     canales: ['whatsapp', 'email'],
     periodoDefault: 1,
     activo: true,
+    generador: {
+      tipo: 'dedicado',
+      ventana: 'nocturna',
+      filtros: ['fecha', 'ejes'],
+      requierePreview: true,
+      panelId: 'termometro_saldo',
+      descripcionVentana: 'Ayer 19:00 — Hoy 07:00',
+    },
   },
 
   SALDO_DEL_DIA: {
@@ -37,6 +45,14 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     canales: ['whatsapp', 'email'],
     periodoDefault: 1,
     activo: true,
+    generador: {
+      tipo: 'dedicado',
+      ventana: 'diurna',
+      filtros: ['fecha', 'ejes'],
+      requierePreview: true,
+      panelId: 'termometro_saldo',
+      descripcionVentana: 'Hoy 07:00 — 19:00',
+    },
   },
 
   // ── Productos Premium Especializados ──
@@ -53,6 +69,15 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     canales: ['whatsapp', 'email', 'pdf'],
     periodoDefault: 1,
     activo: true,
+    generador: {
+      tipo: 'dedicado',
+      ventana: 'dia_completo',
+      filtros: ['fecha', 'ejes'],
+      requierePreview: true,
+      panelId: 'foco',
+      tieneFases: true,
+      descripcionVentana: 'Día completo (00:00 — 23:59)',
+    },
   },
 
   EL_ESPECIALIZADO: {
@@ -67,7 +92,14 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     longitudMinLectura: 10,
     canales: ['email', 'pdf'],
     periodoDefault: 1,
-    activo: false, // pendiente de implementación
+    activo: false,
+    generador: {
+      tipo: 'generico',
+      ventana: 'estandar',
+      filtros: ['fecha', 'actores', 'ejes'],
+      requierePreview: false,
+      panelId: null,
+    },
   },
 
   EL_INFORME_CERRADO: {
@@ -83,6 +115,14 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     canales: ['email', 'pdf'],
     periodoDefault: 7,
     activo: true,
+    generador: {
+      tipo: 'generico',
+      ventana: 'semanal',
+      filtros: ['fecha', 'ejes', 'actores'],
+      requierePreview: false,
+      panelId: null,
+      descripcionVentana: 'Semana completa (lunes — domingo)',
+    },
   },
 
   // ── Productos Gratuitos (Awareness) ──
@@ -99,6 +139,14 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     canales: ['email', 'web'],
     periodoDefault: 7,
     activo: true,
+    generador: {
+      tipo: 'dedicado',
+      ventana: 'semanal',
+      filtros: ['fecha'],
+      requierePreview: true,
+      panelId: 'radar',
+      descripcionVentana: 'Semana completa (lunes — domingo)',
+    },
   },
 
   VOZ_Y_VOTO: {
@@ -114,6 +162,14 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     canales: ['email', 'web'],
     periodoDefault: 7,
     activo: true,
+    generador: {
+      tipo: 'generico',
+      ventana: 'semanal',
+      filtros: ['fecha'],
+      requierePreview: false,
+      panelId: null,
+      descripcionVentana: 'Semana completa (lunes — domingo)',
+    },
   },
 
   EL_HILO: {
@@ -129,6 +185,14 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     canales: ['email', 'web'],
     periodoDefault: 7,
     activo: true,
+    generador: {
+      tipo: 'generico',
+      ventana: 'semanal',
+      filtros: ['fecha'],
+      requierePreview: false,
+      panelId: null,
+      descripcionVentana: 'Semana completa (lunes — domingo)',
+    },
   },
 
   // ── Gratuitos (Awareness Temático) ──
@@ -145,6 +209,14 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     canales: ['email', 'web'],
     periodoDefault: 7,
     activo: true,
+    generador: {
+      tipo: 'generico',
+      ventana: 'semanal',
+      filtros: ['fecha', 'ejes'],
+      requierePreview: false,
+      panelId: null,
+      descripcionVentana: 'Semana completa (lunes — domingo)',
+    },
   },
 
   // ── Alertas en tiempo real ──
@@ -161,6 +233,13 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     canales: ['whatsapp'],
     periodoDefault: 30,
     activo: true,
+    generador: {
+      tipo: 'generico',
+      ventana: 'estandar',
+      filtros: ['fecha', 'ejes', 'actores'],
+      requierePreview: false,
+      panelId: null,
+    },
   },
 
   // ── A solicitud ──
@@ -177,6 +256,14 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     canales: ['email', 'pdf'],
     periodoDefault: 30,
     activo: true,
+    generador: {
+      tipo: 'generico',
+      ventana: 'estandar',
+      filtros: ['actores'],
+      requierePreview: false,
+      panelId: null,
+      descripcionVentana: 'Período personalizable',
+    },
   },
 }
 
@@ -289,3 +376,5 @@ export const ETIQUETAS_ENTREGA: Record<TipoBoletin, { whatsapp: string; email: s
 export const PRODUCTOS_ACTIVOS = Object.values(PRODUCTOS).filter(p => p.activo)
 export const PRODUCTOS_PREMIUM = Object.values(PRODUCTOS).filter(p => p.categoria !== 'gratuito')
 export const PRODUCTOS_GRATUITOS = Object.values(PRODUCTOS).filter(p => p.categoria === 'gratuito')
+export const PRODUCTOS_DEDICADOS = Object.values(PRODUCTOS).filter(p => p.generador.tipo === 'dedicado')
+export const PRODUCTOS_GENERICOS = Object.values(PRODUCTOS).filter(p => p.generador.tipo === 'generico')
