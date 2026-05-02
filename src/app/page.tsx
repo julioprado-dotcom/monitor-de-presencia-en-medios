@@ -113,6 +113,16 @@ interface DashboardData {
   clientesActivos: number;
   contratosVigentes: number;
   entregasHoy: number;
+  fuentesPorNivel: {
+    nivel: string;
+    mediosCount: number;
+    ultimaCaptura: string | null;
+    ultimaExitosa: boolean;
+    ultimoTotalArticulos: number;
+    ultimoMencionesEncontradas: number;
+    capturasHoy: number;
+  }[];
+  mediosPorNivel: { nivel: string; total: number; activos: number }[];
 }
 
 interface PersonaListItem {
@@ -850,22 +860,50 @@ export default function Dashboard() {
               {/* Fuentes status */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-muted-foreground" />
-                    Estado de fuentes
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-muted-foreground" />
+                      Estado de fuentes
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" onClick={() => setActiveView('indicadores')} className="text-xs text-muted-foreground">
+                      Ver indicadores <ChevronRight className="h-3 w-3 ml-1" />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                    {['1', '2', '3', '4', '5'].map((n) => (
-                      <div key={n} className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                        <div>
-                          <p className="text-xs font-medium text-foreground">{NIVEL_LABELS[n]}</p>
-                          <p className="text-[10px] text-muted-foreground">Nivel {n}</p>
+                    {(data?.fuentesPorNivel || []).map((fuente) => {
+                      const tieneCaptura = fuente.ultimaCaptura !== null;
+                      const esReciente = tieneCaptura && (Date.now() - new Date(fuente.ultimaCaptura!).getTime()) < 86400000;
+                      return (
+                        <div key={fuente.nivel} className={`p-3 rounded-lg border transition-colors ${
+                          esReciente && fuente.ultimaExitosa
+                            ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20'
+                            : tieneCaptura && !fuente.ultimaExitosa
+                            ? 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20'
+                            : 'border-border bg-muted/50'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            {esReciente && fuente.ultimaExitosa ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                            ) : tieneCaptura && !fuente.ultimaExitosa ? (
+                              <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+                            ) : (
+                              <div className="h-4 w-4 rounded-full border-2 border-stone-300 dark:border-stone-600 shrink-0" />
+                            )}
+                            <p className="text-xs font-medium text-foreground">{NIVEL_LABELS[fuente.nivel]}</p>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            {fuente.mediosCount} medios activos
+                          </p>
+                          {tieneCaptura && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              Última: {new Date(fuente.ultimaCaptura!).toLocaleDateString('es-BO', { day: '2-digit', month: 'short' })} · {fuente.ultimoMencionesEncontradas} menc.
+                            </p>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
