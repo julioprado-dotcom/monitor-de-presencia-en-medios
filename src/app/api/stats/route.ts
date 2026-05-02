@@ -147,6 +147,39 @@ export async function GET() {
       }))
     );
 
+    // Alertas por tipo (últimas 24h)
+    const alertasNegativas = await db.reporte.count({
+      where: {
+        tipo: 'ALERTA_TEMPRANA',
+        sentimientoComentarios: { contains: 'negativo' },
+        fechaCreacion: { gte: hoy },
+      },
+    });
+    const alertasPositivas = await db.reporte.count({
+      where: {
+        tipo: 'ALERTA_TEMPRANA',
+        sentimientoComentarios: { contains: 'positivo' },
+        fechaCreacion: { gte: hoy },
+      },
+    });
+    const alertasNeutras = await db.reporte.count({
+      where: {
+        tipo: 'ALERTA_TEMPRANA',
+        fechaCreacion: { gte: hoy },
+        NOT: [
+          { sentimientoComentarios: { contains: 'positivo' } },
+          { sentimientoComentarios: { contains: 'negativo' } },
+        ],
+      },
+    });
+
+    // Última alerta registrada
+    const ultimaAlerta = await db.reporte.findFirst({
+      where: { tipo: 'ALERTA_TEMPRANA' },
+      orderBy: { fechaCreacion: 'desc' },
+      select: { id: true, fechaCreacion: true, resumen: true, sentimientoComentarios: true },
+    });
+
     return NextResponse.json({
       totalPersonas,
       totalMedios: fuentesActivas,
@@ -165,6 +198,12 @@ export async function GET() {
       entregasHoy,
       fuentesPorNivel,
       mediosPorNivel,
+      alertas: {
+        negativasHoy: alertasNegativas,
+        positivasHoy: alertasPositivas,
+        neutrasHoy: alertasNeutras,
+        ultimaAlerta: ultimaAlerta || null,
+      },
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error desconocido';

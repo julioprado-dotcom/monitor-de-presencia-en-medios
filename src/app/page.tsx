@@ -123,6 +123,12 @@ interface DashboardData {
     capturasHoy: number;
   }[];
   mediosPorNivel: { nivel: string; total: number; activos: number }[];
+  alertas: {
+    negativasHoy: number;
+    positivasHoy: number;
+    neutrasHoy: number;
+    ultimaAlerta: { id: string; fechaCreacion: string; resumen: string; sentimientoComentarios: string } | null;
+  };
 }
 
 interface PersonaListItem {
@@ -983,6 +989,75 @@ export default function Dashboard() {
                   </Card>
                 );
               })()}
+
+              {/* Alertas */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Bell className="h-4 w-4 text-red-500" />
+                        Alertas
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-0.5">
+                        Crisis, oportunidades y monitoreo · tiempo real
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled
+                        className="text-xs gap-1 opacity-60"
+                        title="Captura automática pendiente de implementación"
+                      >
+                        <Zap className="h-3 w-3" />
+                        Generar alertas
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setActiveView('alertas')} className="text-xs text-muted-foreground">
+                        Ver historial <ChevronRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <div className="grid grid-cols-3 gap-3">
+                    {/* Negativas */}
+                    <div className="p-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20 text-center">
+                      <div className="text-2xl mb-1">🔴</div>
+                      <p className="text-xl font-bold text-red-600 dark:text-red-400">{data?.alertas?.negativasHoy || 0}</p>
+                      <p className="text-[10px] font-medium text-red-600/80 dark:text-red-400/80">Negativas</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">Crisis / Riesgo</p>
+                    </div>
+                    {/* Positivas */}
+                    <div className="p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 text-center">
+                      <div className="text-2xl mb-1">🟢</div>
+                      <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{data?.alertas?.positivasHoy || 0}</p>
+                      <p className="text-[10px] font-medium text-emerald-600/80 dark:text-emerald-400/80">Positivas</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">Oportunidades</p>
+                    </div>
+                    {/* Neutras */}
+                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/20 text-center">
+                      <div className="text-2xl mb-1">⚪</div>
+                      <p className="text-xl font-bold text-slate-600 dark:text-slate-300">{data?.alertas?.neutrasHoy || 0}</p>
+                      <p className="text-[10px] font-medium text-slate-600/80 dark:text-slate-400/80">Neutras</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">Informativas</p>
+                    </div>
+                  </div>
+                  {data?.alertas?.ultimaAlerta ? (
+                    <div className="mt-3 p-2.5 rounded-lg bg-muted/50 border border-border">
+                      <p className="text-[10px] text-muted-foreground">
+                        Última alerta: {new Date(data.alertas.ultimaAlerta.fechaCreacion).toLocaleDateString('es-BO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      <p className="text-xs text-foreground mt-0.5 line-clamp-1">{data.alertas.ultimaAlerta.resumen || 'Sin resumen'}</p>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground/60 mt-3 text-center">
+                      No hay alertas registradas. La captura automática de alertas está pendiente de implementación.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Últimas menciones */}
               <Card>
