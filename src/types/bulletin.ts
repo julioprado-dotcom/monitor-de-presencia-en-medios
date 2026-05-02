@@ -32,6 +32,37 @@ export type CanalEntrega = 'whatsapp' | 'email' | 'web' | 'pdf'
 
 // ─── Configuración de Producto ────────────────────────────────────
 
+export type VentanaTipo =
+  | 'nocturna'       // El Termómetro: ayer 19:00 → hoy 07:00
+  | 'diurna'         // Saldo del Día: 07:00 → 19:00
+  | 'dia_completo'   // El Foco: 00:00 → 23:59
+  | 'semanal'        // El Radar: lunes 00:00 → domingo 23:59
+  | 'quincenal'      // Informe Quincenal: 15 días
+  | 'mensual'        // Informe Mensual: 30 días
+  | 'estandar'       // Genérico: usa periodoDefault
+
+export type FiltroTipo = 'fecha' | 'ejes' | 'actores' | 'medios'
+
+export type PanelVariante =
+  | 'termometro_saldo'   // Ventana + ejes checkboxes + indicador + menciones
+  | 'foco'               // Fases: selección de eje → análisis profundo
+  | 'radar'              // Radar semanal + KPIs + evolución diaria + ejes
+  | 'informe_cerrado'    // [Futuro] Informe semanal con prospectiva
+  | 'especializado'      // [Futuro] Análisis sectorial
+  | 'ficha_legislador'   // [Futuro] Ficha individual por persona
+  | 'alerta_temprana'    // [Futuro] Alertas en tiempo real
+  | null                 // Genérico: sin preview, genera directamente
+
+export interface GeneradorConfig {
+  tipo: 'dedicado' | 'generico'
+  ventana: VentanaTipo
+  filtros: FiltroTipo[]
+  requierePreview: boolean
+  panelId: PanelVariante
+  tieneFases?: boolean           // El Foco: fase 'seleccion' → 'analisis'
+  descripcionVentana?: string    // Label legible para la ventana de tiempo
+}
+
 export interface ProductoConfig {
   tipo: TipoBoletin
   nombre: string
@@ -45,6 +76,7 @@ export interface ProductoConfig {
   canales: CanalEntrega[]
   periodoDefault: number         // días por defecto para la generación
   activo: boolean
+  generador: GeneradorConfig
 }
 
 // ─── Indicador ────────────────────────────────────────────────────

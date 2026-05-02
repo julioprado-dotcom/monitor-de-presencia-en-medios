@@ -461,19 +461,20 @@ export default function Dashboard() {
   }, [genPeriodo]);
 
   const handleGenerarProducto = async (tipo: string) => {
-    // El Termómetro, Saldo del Día y El Foco abren panel dedicado
-    if (tipo === 'EL_TERMOMETRO' || tipo === 'SALDO_DEL_DIA' || tipo === 'EL_FOCO' || tipo === 'EL_RADAR') {
+    const config = PRODUCTOS[tipo as keyof typeof PRODUCTOS]?.generador;
+
+    // Productos dedicados: abren panel con preview antes de generar
+    if (config?.tipo === 'dedicado' && config.requierePreview) {
       const today = new Date().toISOString().slice(0, 10);
       setSelectedGenerator(tipo);
       setGeneratorFecha(today);
       setGeneratorFiltros({});
       setGeneratorData(null);
-      // Load generator data directly (EL_FOCO without ejeSlug → shows axis selection; EL_RADAR → shows weekly radar)
       loadGeneratorData(tipo, today);
       return;
     }
 
-    // Otros productos: comportamiento genérico existente
+    // Productos genéricos: generan directamente sin preview
     setGenerandoTipo(tipo);
     setError('');
     try {
@@ -585,8 +586,9 @@ export default function Dashboard() {
   const handleGeneratorFechaChange = (newFecha: string) => {
     setGeneratorFecha(newFecha);
     if (selectedGenerator) {
-      // For EL_FOCO in analysis phase, preserve the selected ejeSlug
-      const currentEjeSlug = selectedGenerator === 'EL_FOCO' && generatorFiltros.eje?.length
+      // For products with phases (e.g., El Foco), preserve the selected ejeSlug
+      const config = PRODUCTOS[selectedGenerator as keyof typeof PRODUCTOS]?.generador;
+      const currentEjeSlug = config?.tieneFases && generatorFiltros.eje?.length
         ? generatorFiltros.eje[0]
         : undefined;
       loadGeneratorData(selectedGenerator, newFecha, currentEjeSlug);
@@ -2297,46 +2299,36 @@ export default function Dashboard() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={closeGeneratorPanel}>
                   <div className="bg-card rounded-xl shadow-xl border border-border max-w-3xl w-full mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
 
-                    {/* ── HEADER ── */}
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
-                          style={{
-                            backgroundColor: selectedGenerator === 'EL_TERMOMETRO' ? '#3B82F620'
-                              : selectedGenerator === 'SALDO_DEL_DIA' ? '#8B5CF620'
-                              : selectedGenerator === 'EL_FOCO' ? '#F59E0B20'
-                              : '#22C55E20',
-                          }}
-                        >
-                          {selectedGenerator === 'EL_TERMOMETRO'
-                            ? <Thermometer className="h-5 w-5" style={{ color: '#3B82F6' }} />
-                            : selectedGenerator === 'SALDO_DEL_DIA'
-                            ? <Scale className="h-5 w-5" style={{ color: '#8B5CF6' }} />
-                            : selectedGenerator === 'EL_FOCO'
-                            ? <Search className="h-5 w-5" style={{ color: '#F59E0B' }} />
-                            : <Radio className="h-5 w-5" style={{ color: '#22C55E' }} />
-                          }
+                    {/* ── HEADER (data-driven desde ALL_PRODUCTS) ── */}
+                    {(() => {
+                      const prod = ALL_PRODUCTS.find(p => p.tipo === selectedGenerator);
+                      const productColor = prod?.color || '#6B7280';
+                      const ProductIcon = prod?.icon || Zap;
+                      const productConfig = PRODUCTOS[selectedGenerator as keyof typeof PRODUCTOS];
+                      return (
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
+                              style={{ backgroundColor: productColor + '20' }}
+                            >
+                              <ProductIcon className="h-5 w-5" style={{ color: productColor }} />
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-bold text-foreground">
+                                {prod?.nombre || selectedGenerator} — Generador
+                              </h3>
+                              <p className="text-[10px] text-muted-foreground">
+                                {productConfig?.generador.descripcionVentana || productConfig?.descripcion || ''}
+                              </p>
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={closeGeneratorPanel} className="h-8 w-8 p-0">
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-foreground">
-                            {selectedGenerator === 'EL_TERMOMETRO' ? 'El Termómetro'
-                              : selectedGenerator === 'SALDO_DEL_DIA' ? 'Saldo del Día'
-                              : selectedGenerator === 'EL_FOCO' ? 'El Foco'
-                              : 'El Radar'} — Generador
-                          </h3>
-                          <p className="text-[10px] text-muted-foreground">
-                            {selectedGenerator === 'EL_TERMOMETRO' && 'Boletín matutino · Clima mediático nocturno'}
-                            {selectedGenerator === 'SALDO_DEL_DIA' && 'Boletín vespertino · Balance de jornada'}
-                            {selectedGenerator === 'EL_FOCO' && 'Análisis profundo de eje temático'}
-                            {selectedGenerator === 'EL_RADAR' && 'Radar semanal · 11 ejes temáticos'}
-                          </p>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={closeGeneratorPanel} className="h-8 w-8 p-0">
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
+                      );
+                    })()}
 
                     {/* ── BODY ── */}
                     <div className="flex-1 overflow-y-auto p-5 space-y-5">
@@ -2348,8 +2340,11 @@ export default function Dashboard() {
                       ) : generatorData ? (
                         <>
 
-                          {/* ═══ EL_FOCO: Fase de análisis (eje seleccionado) ═══ */}
-                          {selectedGenerator === 'EL_FOCO' && (generatorData.fase as string) === 'analisis' && (
+                          {/* ═══ Panel FASE ANALISIS (productos con tieneFases, eje seleccionado) ═══ */}
+                          {(() => {
+                            const config = PRODUCTOS[selectedGenerator as keyof typeof PRODUCTOS]?.generador;
+                            return config?.tieneFases && (generatorData.fase as string) === 'analisis';
+                          })() && (
                             <>
                               {/* Sub-header con eje seleccionado */}
                               <div className="flex items-center justify-between">
@@ -2544,8 +2539,11 @@ export default function Dashboard() {
                             </>
                           )}
 
-                          {/* ═══ EL_FOCO: Fase de selección de ejes ═══ */}
-                          {selectedGenerator === 'EL_FOCO' && (generatorData.fase as string) !== 'analisis' && (
+                          {/* ═══ Panel SELECCION DE EJE (productos con tieneFases, sin eje seleccionado) ═══ */}
+                          {(() => {
+                            const config = PRODUCTOS[selectedGenerator as keyof typeof PRODUCTOS]?.generador;
+                            return config?.tieneFases && (generatorData.fase as string) !== 'analisis';
+                          })() && (
                             <>
                               {/* Fecha */}
                               <div className="space-y-2">
@@ -2608,8 +2606,11 @@ export default function Dashboard() {
                             </>
                           )}
 
-                          {/* ═══ EL_RADAR: Radar semanal ═══ */}
-                          {selectedGenerator === 'EL_RADAR' && (
+                          {/* ═══ Panel RADAR SEMANAL (productos con panelId === 'radar') ═══ */}
+                          {(() => {
+                            const config = PRODUCTOS[selectedGenerator as keyof typeof PRODUCTOS]?.generador;
+                            return config?.panelId === 'radar';
+                          })() && (
                             <>
                               {/* Fecha + ventana semanal */}
                               <div className="space-y-2">
@@ -2809,8 +2810,11 @@ export default function Dashboard() {
                             </>
                           )}
 
-                          {/* ═══ EL_TERMOMETRO / SALDO_DEL_DIA: Panel original ═══ */}
-                          {selectedGenerator !== 'EL_FOCO' && selectedGenerator !== 'EL_RADAR' && (
+                          {/* ═══ Panel TERMOMETRO/SALDO (productos con panelId === 'termometro_saldo') ═══ */}
+                          {(() => {
+                            const config = PRODUCTOS[selectedGenerator as keyof typeof PRODUCTOS]?.generador;
+                            return config?.panelId === 'termometro_saldo';
+                          })() && (
                             <>
                               {/* Fecha */}
                               <div className="space-y-2">
@@ -3036,57 +3040,46 @@ export default function Dashboard() {
                       )}
                     </div>
 
-                    {/* ── FOOTER ── */}
-                    <div className="flex items-center justify-between px-5 py-4 border-t border-border shrink-0">
-                      <Button variant="ghost" size="sm" onClick={closeGeneratorPanel} className="text-xs">
-                        Cancelar
-                      </Button>
-                      {selectedGenerator === 'EL_FOCO' ? (
-                        <Button
-                          size="sm"
-                          onClick={handleGenerateFromPanel}
-                          disabled={generatorGenerating || generatorDataLoading || !generatorData || !(generatorData.fase as string) || (generatorData.fase as string) !== 'analisis'}
-                          className="text-xs gap-1.5"
-                          style={{ backgroundColor: '#F59E0B', borderColor: '#F59E0B' }}
-                        >
-                          {generatorGenerating
-                            ? <><Loader2 className="h-3 w-3 animate-spin" /> Generando...</>
-                            : <><Search className="h-3 w-3" /> Generar El Foco{generatorData?.ejeSeleccionado ? `: ${(generatorData.ejeSeleccionado as { nombre: string }).nombre}` : ''}</>
-                          }
-                        </Button>
-                      ) : selectedGenerator === 'EL_RADAR' ? (
-                        <Button
-                          size="sm"
-                          onClick={handleGenerateFromPanel}
-                          disabled={generatorGenerating || generatorDataLoading || !generatorData}
-                          className="text-xs gap-1.5"
-                          style={{ backgroundColor: '#22C55E', borderColor: '#22C55E' }}
-                        >
-                          {generatorGenerating
-                            ? <><Loader2 className="h-3 w-3 animate-spin" /> Generando...</>
-                            : <><Radio className="h-3 w-3" /> Generar El Radar</>
-                          }
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          onClick={handleGenerateFromPanel}
-                          disabled={generatorGenerating || generatorDataLoading}
-                          className="text-xs gap-1.5"
-                          style={{
-                            backgroundColor: selectedGenerator === 'EL_TERMOMETRO' ? '#3B82F6' : '#8B5CF6',
-                            borderColor: selectedGenerator === 'EL_TERMOMETRO' ? '#3B82F6' : '#8B5CF6',
-                          }}
-                        >
-                          {generatorGenerating
-                            ? <><Loader2 className="h-3 w-3 animate-spin" /> Generando...</>
-                            : selectedGenerator === 'EL_TERMOMETRO'
-                              ? <><Thermometer className="h-3 w-3" /> Generar Termómetro</>
-                              : <><Scale className="h-3 w-3" /> Generar Saldo del Día</>
-                          }
-                        </Button>
-                      )}
-                    </div>
+                    {/* ── FOOTER (data-driven) ── */}
+                    {(() => {
+                      const prod = ALL_PRODUCTS.find(p => p.tipo === selectedGenerator);
+                      const productColor = prod?.color || '#6B7280';
+                      const ProductIcon = prod?.icon || Zap;
+                      const productConfig = PRODUCTOS[selectedGenerator as keyof typeof PRODUCTOS];
+                      const tieneFases = productConfig?.generador?.tieneFases;
+                      const inAnalisis = tieneFases && (generatorData?.fase as string) === 'analisis';
+
+                      // Determine button disabled state
+                      const disabled = generatorGenerating || generatorDataLoading
+                        || !generatorData
+                        || (tieneFases && !inAnalisis);
+
+                      // Button label: append context for phased products
+                      let buttonLabel = `Generar ${prod?.nombre || selectedGenerator}`;
+                      if (tieneFases && generatorData?.ejeSeleccionado) {
+                        buttonLabel += `: ${(generatorData.ejeSeleccionado as { nombre: string }).nombre}`;
+                      }
+
+                      return (
+                        <div className="flex items-center justify-between px-5 py-4 border-t border-border shrink-0">
+                          <Button variant="ghost" size="sm" onClick={closeGeneratorPanel} className="text-xs">
+                            Cancelar
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleGenerateFromPanel}
+                            disabled={disabled}
+                            className="text-xs gap-1.5"
+                            style={{ backgroundColor: productColor, borderColor: productColor }}
+                          >
+                            {generatorGenerating
+                              ? <><Loader2 className="h-3 w-3 animate-spin" /> Generando...</>
+                              : <><ProductIcon className="h-3 w-3" /> {buttonLabel}</>
+                            }
+                          </Button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
