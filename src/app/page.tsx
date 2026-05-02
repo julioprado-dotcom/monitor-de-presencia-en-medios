@@ -236,7 +236,7 @@ const PARTIDOS = [
    ═══════════════════════════════════════════════════════════ */
 
 const NAV_ITEMS = [
-  { id: 'resumen', label: 'Resumen', icon: BarChart3 },
+  { id: 'resumen', label: 'Centro de Comando', icon: BarChart3 },
   { id: 'clientes', label: 'Clientes', icon: UserCircle },
   { id: 'contratos', label: 'Contratos', icon: FileCheck },
   { id: 'menciones', label: 'Menciones', icon: Newspaper },
@@ -769,7 +769,7 @@ export default function Dashboard() {
               </button>
               <div>
                 <h1 className="text-base sm:text-lg font-bold text-foreground">
-                  {NAV_ITEMS.find((n) => n.id === activeView)?.label || 'Resumen'}
+                  {NAV_ITEMS.find((n) => n.id === activeView)?.label || 'Centro de Comando'}
                 </h1>
                 <p className="text-[11px] text-muted-foreground hidden sm:block">
                   CONNECT Bolivia — Motor ONION200
@@ -802,7 +802,7 @@ export default function Dashboard() {
           )}
 
           {/* ═══════════════════════════════════════════════════════
-              VIEW: RESUMEN
+              VIEW: CENTRO DE COMANDO
               ═══════════════════════════════════════════════════════ */}
           {activeView === 'resumen' && (
             <div className="space-y-6">
