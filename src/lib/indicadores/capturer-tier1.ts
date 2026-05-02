@@ -98,6 +98,17 @@ const INDICADORES_TIER1 = [
     formatoNumero: 2,
     tier: 1,
   },
+  {
+    slug: 'lme-plomo',
+    nombre: 'LME Plomo',
+    categoria: 'minero',
+    fuente: 'London Metal Exchange',
+    url: 'https://www.lme.com/en/metals/non-ferrous/lead',
+    periodicidad: 'diaria',
+    unidad: 'USD/ton',
+    formatoNumero: 2,
+    tier: 1,
+  },
 ]
 
 // ─── Seed de indicadores (ejecutar una vez) ──────────────────────
@@ -215,6 +226,7 @@ async function capturarLme(metal: string): Promise<CapturaResult> {
       'lme-zinc': 'https://www.lme.com/en/metals/non-ferrous/zinc',
       'lme-estano': 'https://www.lme.com/en/metals/non-ferrous/tin',
       'lme-plata': 'https://www.lme.com/en/metals/precious-metals/silver',
+      'lme-plomo': 'https://www.lme.com/en/metals/non-ferrous/lead',
     }
 
     const nombres: Record<string, string> = {
@@ -222,6 +234,7 @@ async function capturarLme(metal: string): Promise<CapturaResult> {
       'lme-zinc': 'Zinc',
       'lme-estano': 'Estano',
       'lme-plata': 'Plata',
+      'lme-plomo': 'Plomo',
     }
 
     const url = urls[metal]
@@ -237,6 +250,7 @@ async function capturarLme(metal: string): Promise<CapturaResult> {
       'lme-zinc': 2800,
       'lme-estano': 32000,
       'lme-plata': 11500,
+      'lme-plomo': 2100,
     }
 
     // Simular variación aleatoria de ±3% para desarrollo
@@ -288,7 +302,7 @@ export async function capturarTier1(): Promise<{
   }
 
   // LME Metales
-  const metales = ['lme-cobre', 'lme-zinc', 'lme-estano', 'lme-plata']
+  const metales = ['lme-cobre', 'lme-zinc', 'lme-estano', 'lme-plata', 'lme-plomo']
   for (const metal of metales) {
     const resultado = await capturarLme(metal)
     if (resultado.valor > 0) {

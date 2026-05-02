@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { seedIndicadores } from '@/lib/indicadores/capturer-tier1';
 
 // 11 Ejes Temáticos aprobados — CONTEXTO.md v0.5.0
 const EJES_TEMATICOS = [
@@ -198,6 +199,10 @@ export async function POST(request: Request) {
     }
 
     const totalPersonas = senadoresCount + diputadosCount;
+
+    // 5. Seed indicadores macroeconómicos (Tier 1)
+    console.log('Seeding indicadores Tier 1...');
+    await seedIndicadores();
 
     return NextResponse.json({
       message: `Seed ejecutado correctamente (v0.5.0) — ${force ? 'FORCE RESET' : 'nuevo'}`,
