@@ -624,7 +624,7 @@ async function handleElRadar(selectedDate: Date, fecha: string) {
     hallazgoClave += ` "${ejeMasCritico.nombre}" registra el clima más crítico.`;
   }
   if (totalEjesActivos <= 3) {
-    hallazgoClave += ` Solo ${totalEjesActivos} de 11 ejes con actividad.`;
+    hallazgoClave += ` Solo ${totalEjesActivos} de ${ejesTematicos.length} ejes con actividad.`;
   } else if (totalEjesActivos >= 9) {
     hallazgoClave += ` Alta dispersión temática: ${totalEjesActivos} ejes activos.`;
   }

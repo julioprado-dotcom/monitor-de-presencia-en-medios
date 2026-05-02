@@ -42,6 +42,20 @@ export async function POST(request: NextRequest) {
 
       fechaFin = new Date(selectedDate);
       fechaFin.setHours(23, 59, 59, 999);
+    } else if (tipoReporte === 'EL_RADAR' && fecha) {
+      // Ventana semanal: lunes 00:00 → domingo 23:59 de la semana de la fecha
+      const [year, month, day] = fecha.split('-').map(Number);
+      const selectedDate = new Date(year, month - 1, day);
+      const dayOfWeek = selectedDate.getDay(); // 0=dom, 1=lun...
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+
+      fechaInicio = new Date(selectedDate);
+      fechaInicio.setDate(fechaInicio.getDate() + mondayOffset);
+      fechaInicio.setHours(0, 0, 0, 0);
+
+      fechaFin = new Date(fechaInicio);
+      fechaFin.setDate(fechaFin.getDate() + 6);
+      fechaFin.setHours(23, 59, 59, 999);
     } else if (tipoReporte === 'diario' || tipoReporte === 'boletin_diario') {
       fechaInicio.setDate(fechaFin.getDate() - 1);
       fechaInicio.setHours(0, 0, 0, 0);
@@ -238,6 +252,17 @@ export async function POST(request: NextRequest) {
       const fechaStr = new Date(fecha + 'T12:00:00').toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' });
       const ejeNombre = ejesSlugs.length > 0 ? `eje «${ejesSlugs[0]}»` : 'eje temático';
       ventanaLabel = `el día completo del ${fechaStr} para el ${ejeNombre}`;
+    } else if (tipoReporte === 'EL_RADAR' && fecha) {
+      const [year, month, day] = fecha.split('-').map(Number);
+      const selectedDate = new Date(year, month - 1, day);
+      const dayOfWeek = selectedDate.getDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(selectedDate);
+      monday.setDate(monday.getDate() + mondayOffset);
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
+      const fmt = (d: Date) => d.toLocaleDateString('es-BO', { day: '2-digit', month: 'long' });
+      ventanaLabel = `la semana del ${fmt(monday)} al ${fmt(sunday)}`;
     }
 
     const resumen = generarResumen({
@@ -344,6 +369,9 @@ function generarResumen(params: {
   }
   if (params.tipo === 'EL_FOCO') {
     return generarResumenElFoco(params);
+  }
+  if (params.tipo === 'EL_RADAR') {
+    return generarResumenElRadar(params);
   }
 
   const periodoLabels: Record<string, string> = {
@@ -620,6 +648,91 @@ function generarResumenElFoco(params: {
 
   if (params.enlacesRotos > 0) {
     resumen += `Nota: ${params.enlacesRotos} enlace(s) roto(s) detectados.\n`;
+  }
+
+  return resumen;
+}
+
+function generarResumenElRadar(params: {
+  totalMenciones: number;
+  sentimientoPromedio: number;
+  clasificadores: Array<{ nombre: string; slug: string; color: string; menciones: number }>;
+  topActores: Array<{ nombre: string; partido: string; camara: string; count: number }> | null;
+  topMedios: Array<{ nombre: string; count: number }>;
+  totalComentarios: number;
+  sentimientoComentarios: string;
+  enlacesRotos: number;
+  mencionesPorNivel: Record<string, number>;
+  ventanaLabel?: string;
+  ejesSlugs?: string[];
+}): string {
+  const ventana = params.ventanaLabel || 'la semana analizada';
+
+  let resumen = `EL RADAR — Radar Semanal de Ejes Temáticos\n\n`;
+  resumen += `Ventana de análisis: ${ventana}\n\n`;
+
+  if (params.totalMenciones === 0) {
+    resumen += `Semana sin actividad mediática registrada en los ejes temáticos monitoreados.\n\n`;
+    return resumen;
+  }
+
+  const sentLabel =
+    params.sentimientoPromedio >= 4 ? 'FAVORABLE' :
+    params.sentimientoPromedio >= 3.5 ? 'MODERADAMENTE FAVORABLE' :
+    params.sentimientoPromedio >= 3 ? 'NEUTRO' :
+    params.sentimientoPromedio >= 2 ? 'TENSO' :
+    'CRÍTICO';
+
+  const ejesActivos = params.clasificadores.filter(c => c.menciones > 0).length;
+
+  resumen += `CLIMA SEMANAL: ${sentLabel} (${params.sentimientoPromedio.toFixed(1)}/5)\n`;
+  resumen += `Total menciones: ${params.totalMenciones} | Ejes activos: ${ejesActivos} de ${params.clasificadores.length}\n\n`;
+
+  if (params.clasificadores.length > 0) {
+    resumen += `RADAR DE EJES TEMÁTICOS:\n`;
+    const activos = params.clasificadores.filter(c => c.menciones > 0);
+    for (const c of activos) {
+      const tendencia = c.menciones >= 10 ? '(alta actividad)' : c.menciones >= 5 ? '(actividad moderada)' : '(baja actividad)';
+      resumen += `  - ${c.nombre}: ${c.menciones} menciones ${tendencia}\n`;
+    }
+    const inactivos = params.clasificadores.filter(c => c.menciones === 0);
+    if (inactivos.length > 0) {
+      resumen += `  Ejes sin actividad: ${inactivos.map(c => c.nombre).join(', ')}\n`;
+    }
+    resumen += '\n';
+  }
+
+  if (params.clasificadores.length > 0 && params.clasificadores[0].menciones > 0) {
+    const dominante = params.clasificadores[0];
+    resumen += `EJE DOMINANTE: ${dominante.nombre} (${dominante.menciones} menciones)\n\n`;
+  }
+
+  if (params.topActores && params.topActores.length > 0) {
+    resumen += `ACTORES DESTACADOS DE LA SEMANA:\n`;
+    for (const a of params.topActores.slice(0, 7)) {
+      resumen += `  - ${a.nombre} (${a.partido}): ${a.count} menciones\n`;
+    }
+    resumen += '\n';
+  }
+
+  if (params.topMedios.length > 0) {
+    const mediosStr = params.topMedios.slice(0, 5).map(m => `${m.nombre} (${m.count})`).join(', ');
+    resumen += `Medios con mayor cobertura: ${mediosStr}.\n\n`;
+  }
+
+  const corporativos = (params.mencionesPorNivel['1'] || 0) + (params.mencionesPorNivel['2'] || 0);
+  const alternativos = (params.mencionesPorNivel['3'] || 0) + (params.mencionesPorNivel['4'] || 0) + (params.mencionesPorNivel['5'] || 0);
+  if (corporativos > 0 && alternativos > 0) {
+    resumen += `Distribución por nivel: corporativos/regionales ${corporativos} | alternativos/redes ${alternativos}.\n\n`;
+  }
+
+  if (params.totalComentarios > 0) {
+    resumen += `Reacción ciudadana: ${params.totalComentarios} comentarios. `;
+    resumen += `Sentimiento: ${params.sentimientoComentarios}.\n\n`;
+  }
+
+  if (params.enlacesRotos > 0) {
+    resumen += `Nota: ${params.enlacesRotos} enlace(s) roto(s) detectados. Texto completo respaldado.\n`;
   }
 
   return resumen;
