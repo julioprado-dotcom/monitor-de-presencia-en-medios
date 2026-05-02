@@ -109,6 +109,51 @@ const INDICADORES_TIER1 = [
     formatoNumero: 2,
     tier: 1,
   },
+  // ─── Tier 2: Indicadores de Conflictividad ──────────────────────
+  {
+    slug: 'conflictividad-tns',
+    nombre: 'Índice de Tensión Social',
+    categoria: 'social',
+    fuente: 'ONION200 (análisis de menciones)',
+    url: '',
+    periodicidad: 'diaria',
+    unidad: 'escala 1-10',
+    formatoNumero: 1,
+    tier: 2,
+  },
+  {
+    slug: 'conflictividad-bloqueos',
+    nombre: 'Bloqueos / Marchas Activas',
+    categoria: 'social',
+    fuente: 'ONION200 (análisis de menciones)',
+    url: '',
+    periodicidad: 'diaria',
+    unidad: 'eventos',
+    formatoNumero: 0,
+    tier: 2,
+  },
+  {
+    slug: 'conflictividad-puntos',
+    nombre: 'Puntos de Conflicto',
+    categoria: 'social',
+    fuente: 'ONION200 (análisis de menciones)',
+    url: '',
+    periodicidad: 'diaria',
+    unidad: 'puntos',
+    formatoNumero: 0,
+    tier: 2,
+  },
+  {
+    slug: 'conflictividad-escalamiento',
+    nombre: 'Nivel de Escalamiento',
+    categoria: 'social',
+    fuente: 'ONION200 (evaluación general)',
+    url: '',
+    periodicidad: 'diaria',
+    unidad: 'categoría',
+    formatoNumero: 0,
+    tier: 2,
+  },
 ]
 
 // ─── Seed de indicadores (ejecutar una vez) ──────────────────────
@@ -146,6 +191,11 @@ function getEjesForIndicador(slug: string): string {
     'lme-zinc': 'medio-ambiente,economia',
     'lme-estano': 'medio-ambiente,economia',
     'lme-plata': 'medio-ambiente,economia',
+    'lme-plomo': 'medio-ambiente,economia',
+    'conflictividad-tns': 'movimientos-sociales,gobierno-oposicion,corrupcion-impunidad',
+    'conflictividad-bloqueos': 'movimientos-sociales,educacion-cultura,salud-servicios',
+    'conflictividad-puntos': 'movimientos-sociales,gobierno-oposicion',
+    'conflictividad-escalamiento': 'movimientos-sociales,gobierno-oposicion,procesos-electorales',
   }
   return mapping[slug] ?? ''
 }
