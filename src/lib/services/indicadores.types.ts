@@ -69,7 +69,7 @@ export interface IndicadorReal {
 // ─── Configuración de fuentes ──────────────────────────────────────────────
 
 /** Tipo de fuente de datos */
-export type TipoFuente = 'scraping' | 'api' | 'fallback';
+export type TipoFuente = 'scraping' | 'api' | 'stooq' | 'investing_com' | 'fallback';
 
 /**
  * Configuración de una fuente de datos individual.

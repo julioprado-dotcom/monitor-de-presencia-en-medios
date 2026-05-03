@@ -2,6 +2,44 @@
 
 ---
 
+## [v0.13.0] — 2026-05-04
+
+### LME Datos Reales — Fuentes Vivas (Zero Mock)
+
+**Antes**: `capturarLme()` generaba precios aleatorios con variacion +-3% sobre valores hardcodeados.
+**Ahora**: Conectado a fuentes reales con fallback chain de 3 niveles.
+
+#### Fuentes de Datos LME
+
+| Metal | Primaria | Secundaria | Fallback |
+|-------|----------|------------|----------|
+| Cobre | Yahoo Finance HG=F (COMEX) | Stooq LCOP.UK | knownValues |
+| Zinc | Investing.com scraping | Stooq LZIN.UK | knownValues |
+| Estano | Investing.com scraping | Stooq TIN.UK | knownValues |
+| Plata | Yahoo Finance SI=F (COMEX) | Stooq XAGUSD | knownValues |
+| Plomo | Investing.com scraping | Stooq LEAD.UK | knownValues |
+
+#### Conversiones de Unidades
+
+- **Cobre**: USD/lb (Yahoo) -> USD/ton (x 2,204.62)
+- **Plata**: USD/oz (Yahoo) -> USD/ton (x 32,150.7)
+- **Plomo**: USD/lb (Yahoo) -> USD/ton (x 2,204.62)
+- **Stooq LME**: USD/kg -> USD/ton (x 1,000)
+
+#### Archivos Modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/lib/services/indicadores.ts` | +`fetchFromStooq()`, +`fetchFromInvestingCom()`, conversores por fuente |
+| `src/lib/services/indicadores.types.ts` | +`stooq`, `investing_com` a TipoFuente |
+| `src/lib/indicadores/capturer-tier1.ts` | `capturarLme()` -> `capturarLmeReal()` usando `fetchIndicadores()` |
+
+#### Compilacion
+
+- `tsc --noEmit`: 0 errores
+
+---
+
 ## [v0.12.0] — 2026-05-04
 
 ### Security Wiring — Zod + Rate Limit Activos en Produccion
