@@ -46,14 +46,19 @@ model Medio {
 
 model EjeTematico {
   id            String   @id @default(cuid())
+  parentId      String?
   nombre        String
   slug          String   @unique
   icono         String   @default("")
   color         String   @default("")
   descripcion   String   @default("")
-  keywords      String   @default("") // palabras clave separadas por coma
+  keywords      String   @default("")
+  dimension     String   @default("")   // produccion, precio, conflicto, regulacion, infraestructura
   activo        Boolean  @default(true)
   orden         Int      @default(0)
+
+  parent        EjeTematico?  @relation("EjeTematicoHierarchy", fields: [parentId], references: [id])
+  children      EjeTematico[] @relation("EjeTematicoHierarchy")
 
   menciones MencionTema[]
 }

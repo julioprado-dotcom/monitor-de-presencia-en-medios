@@ -105,15 +105,18 @@ export interface MedioItem {
 
 export interface EjeItem {
   id: string;
+  parentId: string | null;
   nombre: string;
   slug: string;
   icono: string;
   color: string;
   descripcion: string;
   keywords: string;
+  dimension: string;
   activo: boolean;
   orden: number;
   mencionesCount: number;
+  children?: EjeItem[];
 }
 
 export interface MediosHealthData {

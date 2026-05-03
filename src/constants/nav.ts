@@ -25,7 +25,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'clientes', label: 'Clientes', icon: UserCircle },
   { id: 'contratos', label: 'Contratos', icon: FileCheck },
   { id: 'menciones', label: 'Menciones', icon: Newspaper },
-  { id: 'clasificadores', label: 'Clasificadores', icon: Tag },
+  { id: 'clasificadores', label: 'Ejes Temáticos', icon: Tag },
   { id: 'boletines', label: 'Boletines', icon: Mail },
   { id: 'alertas', label: 'Alertas', icon: Bell },
   { id: 'estrategia', label: 'Estrategia', icon: Rocket },
