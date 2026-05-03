@@ -91,9 +91,10 @@ export async function POST(request: Request) {
     // 2. Obtener indicadores relevantes
     let bloqueIndicadores = ''
     if (indicadores && ejesTematicos.length > 0) {
-      const contextuales = await getIndicadoresParaEjes(ejesTematicos, { maximo: 5 })
-      if (contextuales.length > 0) {
-        bloqueIndicadores = formatearIndicadoresPrompt(contextuales, new Date())
+      const indicadoresPorEje = await getIndicadoresParaEjes(ejesTematicos)
+      const todasLasIndicadores = Object.values(indicadoresPorEje).flat()
+      if (todasLasIndicadores.length > 0) {
+        bloqueIndicadores = formatearIndicadoresPrompt(todasLasIndicadores)
       }
     }
 
@@ -130,7 +131,7 @@ REGLA: Compara la evolución del día. Si hay datos del Termómetro (apertura), 
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.3, // bajo para consistencia factual
+      temperature: 0.3,
     })
 
     const contenido = completion.choices[0]?.message?.content ?? 'Error: no se generó contenido'
