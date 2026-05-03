@@ -14,6 +14,8 @@ import { getProductConfig, getMencionesForBulletin, getDateRange, formatFechaBol
 import { getIndicadoresParaEjes, formatearIndicadoresMultiplesPrompt } from '@/lib/indicadores/injector';
 import { formatearMencionesPrompt, construirPrompt, registrarReporte, generarTituloProducto, getDedicatedResumen } from '@/lib/reportes-utils';
 import { PRODUCTOS } from '@/constants/products';
+import { guardedParse, RATE } from '@/lib/rate-guard';
+import { generateTermometroSchema } from '@/lib/validations';
 
 // ============================================
 // Ejes para indicadores generales del clima
@@ -34,8 +36,9 @@ const EJES_CLIMA = [
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}));
-    const temperaturaOverride = body.temperatura as number | undefined;
+    const parsed = await guardedParse(request, generateTermometroSchema, RATE.AI);
+    if (parsed instanceof NextResponse) return parsed;
+    const { temperatura: temperaturaOverride } = parsed.body;
 
     // 1. Obtener configuracion del producto
     const config = getProductConfig('EL_TERMOMETRO');

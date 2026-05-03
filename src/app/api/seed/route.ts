@@ -1,6 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { seedIndicadores } from '@/lib/indicadores/capturer-tier1';
+import { guardedParse, RATE } from '@/lib/rate-guard';
+import { seedSchema } from '@/lib/validations';
 
 // ─── Guard: API Key para operaciones destructivas ─────────────────
 // En producción, definir SEED_API_KEY en .env
@@ -151,10 +153,12 @@ function normalizarDepartamento(dep: string): string {
   return mapa[d] || d;
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}));
-    const force = body?.force === true;
+    const parsed = await guardedParse(request, seedSchema, RATE.DESTRUCTIVE);
+    if (parsed instanceof NextResponse) return parsed;
+    const body = parsed.body;
+    const force = body.force;
 
     // Protección: operaciones con force requieren API key (siempre excepto SEED_API_KEY=dev)
     if (force && !validateSeedKey(request)) {
@@ -166,7 +170,7 @@ export async function POST(request: Request) {
 
     const existing = await db.persona.count();
 
-    const seedOnly = body?.seed_only === 'subs';
+    const seedOnly = body.seed_only === 'subs';
 
     // Mode: seed only sub-clasificaciones (no wipe needed)
     if (seedOnly) {

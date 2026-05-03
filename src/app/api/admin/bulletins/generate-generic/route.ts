@@ -17,6 +17,8 @@ import { formatearMencionesPrompt, construirPrompt, registrarReporte, generarTit
 import { regenerateWithRetry } from '@/lib/quality/regeneration';
 import { validateContent } from '@/lib/quality/validator';
 import { type TipoBoletin } from '@/types/bulletin';
+import { guardedParse, RATE } from '@/lib/rate-guard';
+import { generateGenericSchema } from '@/lib/validations';
 
 // ============================================
 // Mapa de ejes tematicos sugeridos por tipo de producto.
@@ -44,36 +46,18 @@ const DEFAULT_EJES_BY_TYPE: Partial<Record<TipoBoletin, string[]>> = {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-
+    const parsed = await guardedParse(request, generateGenericSchema, RATE.AI);
+    if (parsed instanceof NextResponse) return parsed;
     const {
-      tipo,
+      tipo: tipoRaw,
       ejeSlug,
       personaId,
       temperatura: temperaturaOverride,
       fechaInicio: fechaInicioStr,
       fechaFin: fechaFinStr,
       clienteId,
-    } = body as {
-      tipo: TipoBoletin;
-      ejeSlug?: string;
-      personaId?: string;
-      temperatura?: number;
-      fechaInicio?: string;
-      fechaFin?: string;
-      clienteId?: string;
-    };
-
-    // 1. Validar tipo de producto
-    if (!tipo || !(tipo in PRODUCTOS)) {
-      return NextResponse.json(
-        {
-          exito: false,
-          error: `Tipo de producto invalido: "${tipo}". Tipos validos: ${Object.keys(PRODUCTOS).join(', ')}`,
-        },
-        { status: 400 }
-      );
-    }
+    } = parsed.body;
+    const tipo = tipoRaw as TipoBoletin;
 
     // 2. Obtener configuracion
     const config = getProductConfig(tipo);

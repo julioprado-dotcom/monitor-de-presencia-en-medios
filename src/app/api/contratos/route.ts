@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { contratoCreateSchema } from '@/lib/validations';
+import { guardedParse, RATE } from '@/lib/rate-guard';
 
 export async function GET(request: NextRequest) {
   try {
@@ -86,16 +88,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const parsed = await guardedParse(request, contratoCreateSchema, RATE.WRITE);
+    if (parsed instanceof NextResponse) return parsed;
+    const body = parsed.body;
+
     const {
       clienteId, tipoProducto, mediosAsignados, ejesTematicos,
       parlamentarios, frecuencia, formatoEntrega, fechaInicio,
       fechaFin, montoMensual, moneda, estado, notas,
     } = body;
-
-    if (!clienteId || !tipoProducto || !fechaInicio) {
-      return NextResponse.json({ error: 'Cliente, tipo de producto y fecha inicio son obligatorios' }, { status: 400 });
-    }
 
     // Verificar que el cliente existe
     const cliente = await db.cliente.findUnique({ where: { id: clienteId } });

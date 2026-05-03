@@ -15,6 +15,8 @@ import { db } from '@/lib/db';
 import { getProductConfig, getDateRange, formatFechaBolivia } from '@/lib/bulletin/product-generator';
 import { getIndicadoresParaEjes, formatearIndicadoresMultiplesPrompt } from '@/lib/indicadores/injector';
 import { formatearMencionesPorEje, construirPrompt, registrarReporte, generarTituloProducto, getDedicatedResumen, getSemanaAnho } from '@/lib/reportes-utils';
+import { guardedParse, RATE } from '@/lib/rate-guard';
+import { generateRadarSchema } from '@/lib/validations';
 
 // ============================================
 // Los 11 Ejes Tematicos de DECODEX
@@ -40,8 +42,9 @@ const EJES_TEOMATICOS = [
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}));
-    const temperaturaOverride = body.temperatura as number | undefined;
+    const parsed = await guardedParse(request, generateRadarSchema, RATE.AI);
+    if (parsed instanceof NextResponse) return parsed;
+    const { temperatura: temperaturaOverride } = parsed.body;
 
     // 1. Obtener configuracion del producto
     const config = getProductConfig('EL_RADAR');

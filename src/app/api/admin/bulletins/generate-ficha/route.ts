@@ -16,6 +16,8 @@ import { getProductConfig, getDateRange, formatFechaBolivia } from '@/lib/bullet
 import { getIndicadoresParaEjes, formatearIndicadoresPrompt } from '@/lib/indicadores/injector';
 import { formatearMencionesPrompt, construirPrompt, registrarReporte, generarTituloProducto, getDedicatedResumen } from '@/lib/reportes-utils';
 import { type MencionEnriquecida } from '@/types/bulletin';
+import { guardedParse, RATE } from '@/lib/rate-guard';
+import { generateFichaSchema } from '@/lib/validations';
 
 // ============================================
 // POST Handler
@@ -23,19 +25,9 @@ import { type MencionEnriquecida } from '@/types/bulletin';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}));
-    const { personaId, temperatura: temperaturaOverride } = body as {
-      personaId?: string;
-      temperatura?: number;
-    };
-
-    // 1. Validar parametro obligatorio personaId
-    if (!personaId || typeof personaId !== 'string') {
-      return NextResponse.json(
-        { exito: false, error: 'Parametro "personaId" es obligatorio para FICHA_LEGISLADOR' },
-        { status: 400 }
-      );
-    }
+    const parsed = await guardedParse(request, generateFichaSchema, RATE.AI);
+    if (parsed instanceof NextResponse) return parsed;
+    const { personaId, temperatura: temperaturaOverride } = parsed.body;
 
     // 2. Obtener datos de la persona
     const persona = await db.persona.findUnique({

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { personaCreateSchema } from '@/lib/validations';
+import { guardedParse, RATE } from '@/lib/rate-guard';
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,7 +43,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const parsed = await guardedParse(request, personaCreateSchema, RATE.WRITE);
+    if (parsed instanceof NextResponse) return parsed;
+    const body = parsed.body;
+
     const persona = await db.persona.create({
       data: {
         nombre: body.nombre,

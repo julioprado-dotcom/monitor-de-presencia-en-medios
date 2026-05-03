@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { guardedParse, RATE } from '@/lib/rate-guard';
+import { authSetupSchema } from '@/lib/validations';
 
 // POST /api/auth/setup — Crear usuario admin inicial
 // Solo funciona si NO existe ningún usuario en la base de datos
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     // Verificar si ya hay usuarios
     const existingUsers = await db.user.count();
@@ -15,23 +17,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
-    const { name, email, password, role } = body;
-
-    if (!name || !email || !password) {
-      return NextResponse.json(
-        { error: 'Nombre, email y contraseña son obligatorios' },
-        { status: 400 }
-      );
-    }
-
-    // Validar longitud de contraseña
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: 'La contraseña debe tener al menos 8 caracteres' },
-        { status: 400 }
-      );
-    }
+    const parsed = await guardedParse(request, authSetupSchema, RATE.DESTRUCTIVE);
+    if (parsed instanceof NextResponse) return parsed;
+    const { name, email, password, role } = parsed.body;
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
