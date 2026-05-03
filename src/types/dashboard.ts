@@ -111,6 +111,8 @@ export interface EjeItem {
   color: string;
   descripcion: string;
   keywords: string;
+  activo: boolean;
+  orden: number;
   mencionesCount: number;
 }
 
