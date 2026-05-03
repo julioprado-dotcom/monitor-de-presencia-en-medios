@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { UserMenu } from '@/components/user-menu';
 
 export const metadata: Metadata = {
   title: 'Portal Agente — DECODEX Bolivia',
@@ -20,9 +21,12 @@ export default function AgenteLayout({ children }: { children: React.ReactNode }
             <p className="text-[9px] text-muted-foreground">Portal Agente</p>
           </div>
         </div>
-        <Link href="/" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
-          &larr; Admin
-        </Link>
+        <div className="flex items-center gap-2">
+          <UserMenu compact />
+          <Link href="/" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+            &larr; Admin
+          </Link>
+        </div>
       </header>
       {/* Main content */}
       <main className="flex-1 p-4 max-w-lg mx-auto w-full">
