@@ -38,6 +38,16 @@ export async function GET(request: NextRequest) {
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { fechaSuscripcion: 'desc' },
+        select: {
+          id: true,
+          nombre: true,
+          origen: true,
+          activo: true,
+          fechaSuscripcion: true,
+          // PII solo visible con header de autorización
+          email: request.headers.get('authorization') ? true : false,
+          whatsapp: request.headers.get('authorization') ? true : false,
+        },
       }),
       db.suscriptorGratuito.count({ where }),
     ]);

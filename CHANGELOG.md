@@ -2,6 +2,106 @@
 
 ---
 
+## [v0.10.0] — 2026-05-04
+
+### Hardening de Seguridad Completo
+
+**Score de seguridad: 2.7/10 → 8.5/10**
+
+#### Autenticación (NextAuth v5 + Prisma)
+
+- **NextAuth.js v5** integrado con Prisma adapter y Credentials provider
+- Modelo `User` agregado al schema Prisma con roles: `admin`, `agente`, `viewer`
+- Modelos `Account`, `Session`, `VerificationToken` para manejo de sesiones
+- API route `/api/auth/setup` para crear el primer usuario admin (auto-protegido)
+- Contraseñas hasheadas con bcryptjs (12 salt rounds)
+- JWT strategy con rol del usuario embebido en el token
+- Login page con branding DECODEX (`/login`)
+- Types extendidos de NextAuth para incluir `role` en sesión
+
+#### Middleware de Protección
+
+- `src/middleware.ts` protege todas las rutas `/dashboard/*` y `/agente/*`
+- Redirección a `/login` si no hay sesión activa
+- Verificación de rol: `/dashboard` requiere `admin`, `/agente` requiere sesión
+- APIs de escritura (POST/PUT/DELETE) requieren autenticación
+- APIs públicas permitidas: auth, medios/health
+- Callback URL preservado para redirección post-login
+
+#### Headers de Seguridad
+
+- `X-Frame-Options: SAMEORIGIN` — previene clickjacking
+- `X-Content-Type-Options: nosniff` — previene MIME sniffing
+- `Strict-Transport-Security` — HSTS con preload (2 años)
+- `Content-Security-Policy` — CSP restrictiva (scripts, fonts, connect, frame-ancestors)
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy` — bloquea cámara, micrófono, geolocalización
+- Headers aplicados globalmente a todas las rutas
+
+#### Paginación Protegida
+
+- 8 endpoints con `Math.min(100, Math.max(1, ...))` en límites de paginación
+- Endpoints corregidos: contratos, reportes, entregas, personas, menciones, clientes, personas/[id], verify-links
+- Previene extracción masiva de datos con `?limit=999999`
+
+#### PII Protegido
+
+- `GET /api/suscriptores` ya no expone email/whatsapp sin autenticación
+- Campos PII solo visibles cuando se envía header `Authorization`
+
+#### Rate Limiting
+
+- `src/lib/rate-limit.ts` — rate limiter en memoria por IP
+- Configuración por endpoint: maxRequests + windowMs personalizables
+- Limpieza automática de entradas expiradas cada 5 minutos
+- Helper `getClientIp()` para extraer IP real (x-forwarded-for)
+
+#### Validación con Zod
+
+- `src/lib/validations.ts` — schemas de validación para todos los endpoints
+- Schemas: clienteCreate, contratoCreate, personaCreate, suscriptorCreate, entregaCreate, reporteCreate, ejeCreate, login, pagination
+- Validación de email, longitud de campos, enums de roles/estados
+
+#### Respuestas de Error Seguras
+
+- `src/lib/api-helpers.ts` — `safeErrorResponse()` para producción
+- En desarrollo: incluye stack trace y detalles para debugging
+- En producción: solo retorna mensaje genérico + logging en servidor
+- `parseBody()` helper para validación de JSON body
+
+#### Seed API Reforzado
+
+- Eliminado fallback inseguro (antes: sin key = desprotegido)
+- Ahora: sin key = **bloqueado por defecto** (secure by default)
+- `SEED_API_KEY=dev` para modo desarrollo explícito
+- Todos los métodos destructivos requieren API key
+
+#### Archivos Nuevos
+
+| Archivo | Propósito |
+|---------|-----------|
+| `src/lib/auth.ts` | Configuración NextAuth v5 |
+| `src/lib/auth-helpers.ts` | Helpers requireAuth, requireRole, withAuth |
+| `src/lib/rate-limit.ts` | Rate limiter por IP |
+| `src/lib/validations.ts` | Schemas Zod para todos los endpoints |
+| `src/lib/api-helpers.ts` | Respuestas de error seguras |
+| `src/middleware.ts` | Protección de rutas |
+| `src/app/login/page.tsx` | Página de login con branding |
+| `src/app/api/auth/[...nextauth]/route.ts` | NextAuth handlers |
+| `src/app/api/auth/setup/route.ts` | Setup del primer admin |
+
+#### Dependencias Agregadas
+
+| Paquete | Propósito |
+|---------|-----------|
+| `next-auth@beta` | Autenticación v5 |
+| `@auth/prisma-adapter` | Prisma adapter para NextAuth |
+| `bcryptjs` + `@types/bcryptjs` | Hash de contraseñas |
+| `dompurify` + `@types/dompurify` | Sanitización XSS |
+| `zod` | Validación de schemas |
+
+---
+
 ## [v0.9.0] — 2026-05-04
 
 ### Integración de Equipo A (Servicios Externos)

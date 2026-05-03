@@ -5,16 +5,19 @@ import { seedIndicadores } from '@/lib/indicadores/capturer-tier1';
 // ─── Guard: API Key para operaciones destructivas ─────────────────
 // En producción, definir SEED_API_KEY en .env
 // GET (lectura) siempre es público; POST con force=true requiere API key
+const SEED_KEY = process.env.SEED_API_KEY;
+
 function isSeedProtected(): boolean {
-  return !!process.env.SEED_API_KEY;
+  // Siempre protegido: sin key = bloqueado (seguridad por defecto)
+  // Usar SEED_API_KEY=dev para modo desarrollo sin protección
+  return SEED_KEY !== 'dev';
 }
 
 function validateSeedKey(request: Request): boolean {
-  const key = process.env.SEED_API_KEY;
-  if (!key) return true; // sin key configurado = desprotegido (dev mode)
+  if (!SEED_KEY || SEED_KEY === 'dev') return true; // modo dev explícito
   const authHeader = request.headers.get('authorization');
   const queryKey = new URL(request.url).searchParams.get('key');
-  return authHeader === `Bearer ${key}` || queryKey === key;
+  return authHeader === `Bearer ${SEED_KEY}` || queryKey === SEED_KEY;
 }
 
 // 12 Ejes Temáticos aprobados — CONTEXTO.md v0.5.0
@@ -153,8 +156,8 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const force = body?.force === true;
 
-    // Protección: operaciones con force requieren API key
-    if (force && isSeedProtected() && !validateSeedKey(request)) {
+    // Protección: operaciones con force requieren API key (siempre excepto SEED_API_KEY=dev)
+    if (force && !validateSeedKey(request)) {
       return NextResponse.json(
         { error: 'Operación no autorizada. Se requiere SEED_API_KEY.' },
         { status: 403 }
