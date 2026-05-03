@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { clienteCreateSchema } from '@/lib/validations';
+import { guardedParse, RATE } from '@/lib/rate-guard';
 
 export async function GET(request: NextRequest) {
   try {
@@ -85,15 +87,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const parsed = await guardedParse(request, clienteCreateSchema, RATE.WRITE);
+    if (parsed instanceof NextResponse) return parsed;
+    const body = parsed.body;
+
     const {
       nombre, nombreContacto, email, telefono, whatsapp,
       organizacion, segmento, plan, estado, parlamentarios, ejesContratados, notas,
     } = body;
-
-    if (!nombre || !email) {
-      return NextResponse.json({ error: 'Nombre y email son obligatorios' }, { status: 400 });
-    }
 
     const cliente = await db.cliente.create({
       data: {

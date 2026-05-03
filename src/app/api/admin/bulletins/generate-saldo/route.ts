@@ -7,28 +7,26 @@
  * Compara la situación de apertura (Termómetro 7AM) con el cierre (7PM).
  */
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import ZAI from 'z-ai-web-dev-sdk'
 import { PRODUCTOS } from '@/constants/products'
 import { getMencionesForBulletin, formatFechaBolivia, getProductConfig } from '@/lib/bulletin/product-generator'
 import { getIndicadoresParaEjes, formatearIndicadoresPrompt } from '@/lib/indicadores/injector'
+import { guardedParse, RATE } from '@/lib/rate-guard'
+import { generateSaldoSchema } from '@/lib/validations'
 
 // ─── Endpoint POST ────────────────────────────────────────────────
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const parsed = await guardedParse(request, generateSaldoSchema, RATE.AI);
+    if (parsed instanceof NextResponse) return parsed;
     const {
       ejesTematicos = [],
       personaId,
       nombreCliente = 'Cliente',
       indicadores = true,
-    } = body as {
-      ejesTematicos?: string[]
-      personaId?: string
-      nombreCliente?: string
-      indicadores?: boolean
-    }
+    } = parsed.body;
 
     const inicio = Date.now()
     const config = getProductConfig('SALDO_DEL_DIA')

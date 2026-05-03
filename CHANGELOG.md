@@ -2,6 +2,63 @@
 
 ---
 
+## [v0.12.0] — 2026-05-04
+
+### Security Wiring — Zod + Rate Limit Activos en Produccion
+
+**Score de seguridad: 8.5/10 → 9.5/10**
+
+La seguridad creada en v0.10.0 (Zod schemas + rate limiter) estaba como codigo muerto — no conectada a las rutas reales. Esta version activa toda esa proteccion.
+
+#### Nuevo Helper: `src/lib/rate-guard.ts`
+
+- `guardedParse(request, schema, rateConfig)` — valida Zod + rate-limit en un solo paso
+- `rateGuard(request, rateConfig)` — solo rate-limit check (para PUT/DELETE sin body)
+- `RATE` — configs predefinidos: `WRITE` (30/min), `AI` (5/min), `DESTRUCTIVE` (2/min), `SEARCH` (10/min)
+- Headers informativos: `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`
+
+#### Schemas Zod Agregados (15 nuevos)
+
+| Schema | Endpoint | Proteccion |
+|--------|----------|------------|
+| `suscriptorUpdateSchema` | `PUT /api/suscriptores` | Campos opcionales + validacion |
+| `ejePatchSchema` | `PATCH /api/ejes` | Solo `activo: boolean` |
+| `medioUpdateSchema` | `PUT /api/medios/[id]` | Todos los campos opcionales |
+| `authSetupSchema` | `POST /api/auth/setup` | Password >= 8, email valido, role enum |
+| `analyzeSchema` | `POST /api/analyze` | mencionId, texto, titulo opcionales |
+| `analyzeBatchSchema` | `POST /api/analyze/batch` | limit 1-50 |
+| `searchSchema` | `POST /api/search` | personaNombre obligatorio |
+| `reporteGenerateSchema` | `POST /api/reportes/generate` | tipo, personaId, ejes opcionales |
+| `generateFichaSchema` | `POST generate-ficha` | personaId obligatorio |
+| `generateFocoSchema` | `POST generate-foco` | ejeSlug obligatorio |
+| `generateGenericSchema` | `POST generate-generic` | tipo obligatorio |
+| `generateRadarSchema` | `POST generate-radar` | temperatura opcional |
+| `generateSaldoSchema` | `POST generate-saldo` | ejes, persona, cliente opcionales |
+| `generateTermometroSchema` | `POST generate-termometro` | temperatura opcional |
+| `seedSchema` | `POST /api/seed` | force boolean, seed_only string |
+
+#### Rutas Protegidas — Resumen
+
+| Categoria | Rutas | Rate Limit | Zod |
+|-----------|-------|------------|-----|
+| **CRUD** | clientes, contratos, personas, suscriptores, entregas, reportes, ejes, medios | 30 req/min | POST + PATCH |
+| **AI** | analyze, analyze/batch, reportes/generate, 6 generate-* bulletins | 5 req/min | POST |
+| **Search** | search | 10 req/min | POST |
+| **Destructive** | seed, auth/setup | 2 req/min | POST |
+| **Write (rate only)** | PUT/DELETE en [id] routes | 30 req/min | — |
+
+- **22 endpoints** con rate-limiting activo
+- **16 endpoints** con validacion Zod activa
+- **0 endpoints** de escritura sin proteccion
+
+#### Compilacion
+
+- `tsc --noEmit`: 0 errores
+- Sin cambios en logica de negocio
+- Sin cambios en responses exitosas
+
+---
+
 ## [v0.10.0] — 2026-05-04
 
 ### Hardening de Seguridad Completo

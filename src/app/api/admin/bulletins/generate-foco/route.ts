@@ -16,6 +16,8 @@ import { db } from '@/lib/db';
 import { getProductConfig, getMencionesForBulletin, getDateRange } from '@/lib/bulletin/product-generator';
 import { getIndicadoresParaEje, formatearIndicadoresPrompt } from '@/lib/indicadores/injector';
 import { formatearMencionesPrompt, construirPrompt, registrarReporte, generarTituloProducto, getDedicatedResumen, formatFechaBolivia } from '@/lib/reportes-utils';
+import { guardedParse, RATE } from '@/lib/rate-guard';
+import { generateFocoSchema } from '@/lib/validations';
 
 // ============================================
 // POST Handler
@@ -23,19 +25,9 @@ import { formatearMencionesPrompt, construirPrompt, registrarReporte, generarTit
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}));
-    const { ejeSlug, temperatura: temperaturaOverride } = body as {
-      ejeSlug?: string;
-      temperatura?: number;
-    };
-
-    // 1. Validar parametro obligatorio ejeSlug
-    if (!ejeSlug || typeof ejeSlug !== 'string') {
-      return NextResponse.json(
-        { exito: false, error: 'Parametro "ejeSlug" es obligatorio para EL_FOCO' },
-        { status: 400 }
-      );
-    }
+    const parsed = await guardedParse(request, generateFocoSchema, RATE.AI);
+    if (parsed instanceof NextResponse) return parsed;
+    const { ejeSlug, temperatura: temperaturaOverride } = parsed.body;
 
     // 2. Obtener configuracion del producto
     const config = getProductConfig('EL_FOCO');
