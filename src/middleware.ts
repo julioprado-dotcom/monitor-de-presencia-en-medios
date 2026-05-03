@@ -14,6 +14,8 @@ const PROTECTED_API_METHODS = ['POST', 'PUT', 'DELETE', 'PATCH'];
 const PUBLIC_API_ROUTES = [
   '/api/auth/',
   '/api/medios/health',
+  '/api/seed',
+  '/api/indicadores/capture',
 ];
 
 export async function middleware(request: NextRequest) {

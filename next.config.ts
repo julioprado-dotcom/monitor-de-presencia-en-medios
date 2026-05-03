@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
+  // output: 'standalone', // Disabled: causes crashes in this environment
 
   images: {
     formats: ['image/avif', 'image/webp'],
