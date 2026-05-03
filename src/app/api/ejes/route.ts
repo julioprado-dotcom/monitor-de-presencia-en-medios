@@ -10,11 +10,14 @@ function generateSlug(text: string): string {
     .slice(0, 50);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const showAll = searchParams.get('all') === 'true';
+
     const ejes = await db.ejeTematico.findMany({
-      where: { activo: true },
-      orderBy: { orden: 'asc' },
+      where: showAll ? undefined : { activo: true },
+      orderBy: [{ activo: 'desc' }, { orden: 'asc' }],
     });
 
     // Single groupBy query instead of N+1 per eje
@@ -33,6 +36,42 @@ export async function GET() {
     return NextResponse.json({
       ejes: ejesConConteo,
       totalEjes: ejes.length,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error desconocido';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'El parámetro "id" es requerido' }, { status: 400 });
+    }
+
+    const body = await request.json();
+    const activo = body.activo;
+
+    if (typeof activo !== 'boolean') {
+      return NextResponse.json({ error: 'El campo "activo" debe ser true o false' }, { status: 400 });
+    }
+
+    const existing = await db.ejeTematico.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: 'Eje temático no encontrado' }, { status: 404 });
+    }
+
+    const eje = await db.ejeTematico.update({
+      where: { id },
+      data: { activo },
+    });
+
+    return NextResponse.json({
+      eje,
+      message: activo ? 'Clasificador habilitado' : 'Clasificador deshabilitado',
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error desconocido';
