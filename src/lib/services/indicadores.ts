@@ -69,6 +69,8 @@ interface IndicadorMeta {
   moneda?: string;
   categoria: CategoriaIndicador;
   yahooSymbol?: string;
+  stooqSymbol?: string;
+  unitConversion?: 'oz_to_ton';
 }
 
 /** Metadatos estáticos por indicador */
@@ -78,33 +80,42 @@ const INDICADOR_META: Readonly<Record<SlugIndicador, IndicadorMeta>> = {
     unidad: 'USD/t',
     moneda: 'USD',
     categoria: 'minerales',
-    yahooSymbol: 'CMCU3',
+    yahooSymbol: 'HG=F',
+    stooqSymbol: 'LCOP.UK',
   },
   'lme-zinc': {
     nombre: 'Zinc (LME)',
     unidad: 'USD/t',
     moneda: 'USD',
     categoria: 'minerales',
-    yahooSymbol: 'LZN3',
+    yahooSymbol: 'CMZS3',
+    stooqSymbol: 'LZIN.UK',
   },
   'lme-estano': {
     nombre: 'Estaño (LME)',
     unidad: 'USD/t',
     moneda: 'USD',
     categoria: 'minerales',
-    yahooSymbol: 'MSN3',
+    yahooSymbol: 'CMST3',
+    stooqSymbol: 'LTIN.UK',
   },
   'lme-plata': {
     nombre: 'Plata (LME)',
     unidad: 'USD/t',
     moneda: 'USD',
     categoria: 'minerales',
+    yahooSymbol: 'SI=F',
+    stooqSymbol: 'XAGUSD',
+    /** Plata viene en USD/oz desde las APIs — se convierte a USD/ton */
+    unitConversion: 'oz_to_ton' as const,
   },
   'lme-plomo': {
     nombre: 'Plomo (LME)',
     unidad: 'USD/t',
     moneda: 'USD',
     categoria: 'minerales',
+    yahooSymbol: 'PB=F',
+    stooqSymbol: 'LLEA.UK',
   },
   'tc-oficial-bcb': {
     nombre: 'Tipo de Cambio Oficial (BCB)',
@@ -158,83 +169,83 @@ const INDICADOR_META: Readonly<Record<SlugIndicador, IndicadorMeta>> = {
 const FUENTES_POR_INDICADOR: Readonly<
   Record<SlugIndicador, FuenteConfig[]>
 > = {
-  // Minerales LME
+  // Minerales LME — 3 fuentes por metal: scraping LME, Yahoo Finance, Stooq CSV
   'lme-cobre': [
     {
-      nombre: 'LME Official',
-      url: 'https://www.lme.com/en/metals/non-ferrous/copper',
-      tipo: 'scraping',
+      nombre: 'Yahoo Finance (COMEX Cu)',
+      url: 'https://query1.finance.yahoo.com/v8/finance/chart/HG=F?interval=1d&range=2d',
+      tipo: 'api',
       activa: true,
       timeout: DEFAULT_TIMEOUT,
     },
     {
-      nombre: 'Yahoo Finance',
-      url: 'https://query1.finance.yahoo.com/v8/finance/chart/CMCU3?interval=1d&range=1d',
-      tipo: 'api',
+      nombre: 'Stooq (LME Copper)',
+      url: 'https://stooq.com/q/l/?s=lcop.uk&i=d',
+      tipo: 'stooq',
       activa: true,
       timeout: DEFAULT_TIMEOUT,
     },
   ],
   'lme-zinc': [
     {
-      nombre: 'LME Official',
-      url: 'https://www.lme.com/en/metals/non-ferrous/zinc',
-      tipo: 'scraping',
+      nombre: 'Investing.com (Zinc)',
+      url: 'https://www.investing.com/commodities/zinc',
+      tipo: 'investing_com',
       activa: true,
       timeout: DEFAULT_TIMEOUT,
     },
     {
-      nombre: 'Yahoo Finance',
-      url: 'https://query1.finance.yahoo.com/v8/finance/chart/LZN3?interval=1d&range=1d',
-      tipo: 'api',
+      nombre: 'Stooq (LME Zinc)',
+      url: 'https://stooq.com/q/l/?s=lzin.uk&i=d',
+      tipo: 'stooq',
       activa: true,
       timeout: DEFAULT_TIMEOUT,
     },
   ],
   'lme-estano': [
     {
-      nombre: 'LME Official',
-      url: 'https://www.lme.com/en/metals/non-ferrous/tin',
-      tipo: 'scraping',
+      nombre: 'Investing.com (Tin)',
+      url: 'https://www.investing.com/commodities/tin',
+      tipo: 'investing_com',
       activa: true,
       timeout: DEFAULT_TIMEOUT,
     },
     {
-      nombre: 'Yahoo Finance',
-      url: 'https://query1.finance.yahoo.com/v8/finance/chart/MSN3?interval=1d&range=1d',
-      tipo: 'api',
+      nombre: 'Stooq (LME Tin)',
+      url: 'https://stooq.com/q/l/?s=tin.uk&i=d',
+      tipo: 'stooq',
       activa: true,
       timeout: DEFAULT_TIMEOUT,
     },
   ],
   'lme-plata': [
     {
-      nombre: 'Kitco Silver',
-      url: 'https://www.kitco.com/silver-price-today-usa/',
-      tipo: 'scraping',
+      nombre: 'Yahoo Finance (COMEX Ag)',
+      url: 'https://query1.finance.yahoo.com/v8/finance/chart/SI=F?interval=1d&range=2d',
+      tipo: 'api',
       activa: true,
       timeout: DEFAULT_TIMEOUT,
     },
     {
-      nombre: 'Yahoo Finance (XAGUSD)',
-      url: 'https://query1.finance.yahoo.com/v8/finance/chart/XAGUSD=X?interval=1d&range=1d',
-      tipo: 'api',
+      nombre: 'Stooq (Silver USD/oz)',
+      url: 'https://stooq.com/q/l/?s=xagusd&i=d',
+      tipo: 'stooq',
       activa: true,
       timeout: DEFAULT_TIMEOUT,
     },
   ],
   'lme-plomo': [
     {
-      nombre: 'LME Official',
-      url: 'https://www.lme.com/en/metals/non-ferrous/lead',
-      tipo: 'scraping',
+      nombre: 'Investing.com (Lead)',
+      url: 'https://www.investing.com/commodities/lead',
+      tipo: 'investing_com',
       activa: true,
       timeout: DEFAULT_TIMEOUT,
     },
     {
-      nombre: 'Yahoo Finance (Lead)',
-      url: 'https://query1.finance.yahoo.com/v8/finance/chart/PB3',
-      tipo: 'api',
+      nombre: 'Stooq (LME Lead)',
+      url: 'https://stooq.com/q/l/?s=lead.uk&i=d',
+      tipo: 'stooq',
       activa: true,
       timeout: DEFAULT_TIMEOUT,
     },
@@ -365,11 +376,11 @@ const cache = new Map<SlugIndicador, CacheEntry>();
 
 /** Valores conocidos como fallback (últimos valores cacheados históricos) */
 const knownValues: Readonly<Record<SlugIndicador, number>> = {
-  'lme-cobre': 9_250,
-  'lme-zinc': 2_680,
-  'lme-estano': 31_500,
-  'lme-plata': 29_800,
-  'lme-plomo': 2_150,
+  'lme-cobre': 13_187,    // COMEX Cu ~$5.98/lb = ~$13,187/ton (May 2026)
+  'lme-zinc': 2_850,      // LME Zinc ~$2,850/ton (est.)
+  'lme-estano': 35_000,   // LME Tin ~$35,000/ton (est.)
+  'lme-plata': 2_446_668, // COMEX Ag ~$76.1/oz = ~$2,446,668/ton (May 2026)
+  'lme-plomo': 2_350,     // LME Lead ~$2,350/ton (est.)
   'tc-oficial-bcb': 6.91,
   'tc-paralelo': 7.12,
   'reservas-internacionales': 18_500,
@@ -547,6 +558,43 @@ function createFallbackIndicador(
   };
 }
 
+// ─── Constantes de conversión ──────────────────────────────────────────────
+
+/** Factor de conversión: 1 tonelada métrica = 32,150.7 troy oz */
+const TROY_OZ_PER_TON = 32_150.7;
+/** Factor de conversión: 1 tonelada métrica = 2,204.62 libras */
+const LB_PER_TON = 2_204.62;
+
+/**
+ * Multiplicadores por fuente para convertir a USD/ton.
+ * - Yahoo Finance: HG=F (cobre) viene en USD/lb, SI=F (plata) en USD/oz
+ * - Stooq: XAGUSD (plata) viene en USD/oz, LCOP.UK (cobre) en USD/kg
+ */
+const YAHOO_MULTIPLIER: Partial<Record<SlugIndicador, number>> = {
+  'lme-cobre': LB_PER_TON,       // HG=F: USD/lb → USD/ton
+  'lme-plata': TROY_OZ_PER_TON,  // SI=F: USD/oz → USD/ton
+  'lme-plomo': LB_PER_TON,       // PB=F: USD/lb → USD/ton
+};
+
+const STOOQ_MULTIPLIER: Partial<Record<SlugIndicador, number>> = {
+  'lme-plata': TROY_OZ_PER_TON,  // XAGUSD: USD/oz → USD/ton
+  'lme-cobre': 1_000,             // LCOP.UK: USD/kg → USD/ton
+  'lme-zinc': 1_000,              // LZIN.UK: USD/kg → USD/ton
+  'lme-estano': 1_000,            // LTIN.UK: USD/kg → USD/ton
+  'lme-plomo': 1_000,             // LLEA.UK: USD/kg → USD/ton
+};
+
+/**
+ * Convierte un valor según la configuración del indicador (legacy — ya no se usa directamente).
+ */
+function convertUnit(value: number, slug: SlugIndicador): number {
+  const meta = INDICADOR_META[slug];
+  if (meta.unitConversion === 'oz_to_ton') {
+    return Number((value * TROY_OZ_PER_TON).toFixed(2));
+  }
+  return value;
+}
+
 // ─── Fetchers por fuente ───────────────────────────────────────────────────
 
 /**
@@ -587,19 +635,25 @@ async function fetchFromYahooFinance(
       return null;
     }
 
+    // Aplicar conversión de unidades según la fuente Yahoo
+    const multiplier = YAHOO_MULTIPLIER[slug] ?? 1;
+    const convertedPrice = Number((price * multiplier).toFixed(2));
+    const rawPrev = prevClose ?? price;
+    const convertedPrev = Number((rawPrev * multiplier).toFixed(2));
+
     const previousEntry = cache.get(slug);
-    const previousValor = previousEntry?.indicador.valor ?? prevClose ?? price;
+    const previousValor = previousEntry?.indicador.valor ?? convertedPrev;
 
     return {
       slug,
       nombre: meta.nombre,
-      valor: Number(price.toFixed(2)),
+      valor: convertedPrice,
       unidad: meta.unidad,
       moneda: meta.moneda,
       fecha: todayISO(),
       fuente: sourceName,
       confiable: true,
-      variacion: calcularVariacion(price, previousValor),
+      variacion: calcularVariacion(convertedPrice, previousValor),
       categoria: meta.categoria,
     };
   } catch {
@@ -647,6 +701,142 @@ async function fetchFromScraping(
             slug,
             nombre: meta.nombre,
             valor,
+            unidad: meta.unidad,
+            moneda: meta.moneda,
+            fecha: todayISO(),
+            fuente: sourceName,
+            confiable: true,
+            variacion: calcularVariacion(valor, previousValor),
+            categoria: meta.categoria,
+          };
+        }
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Intenta obtener el precio de un metal desde Stooq.com (CSV gratuito, sin API key).
+ *
+ * Stooq devuelve CSV con columnas: Symbol, Date, Time, Open, High, Low, Close, Volume.
+ * Parseamos la fila más reciente para obtener el precio de cierre.
+ */
+async function fetchFromStooq(
+  url: string,
+  slug: SlugIndicador,
+  sourceName: string,
+): Promise<IndicadorReal | null> {
+  const meta = INDICADOR_META[slug];
+
+  try {
+    const response = await fetchWithTimeout(url, serviceConfig.defaultTimeout);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const csv = await response.text();
+
+    const lines = csv.trim().split('\n');
+    if (lines.length < 2) return null;
+
+    const recentLine = lines[1];
+    if (!recentLine) return null;
+
+    const cols = recentLine.split(',');
+
+    // Close price: try col 6 first (Symbol,Date,Time,O,H,L,C,Vol), fallback col 4
+    let closePrice = NaN;
+    if (cols[6] !== undefined) {
+      closePrice = parseFloat(cols[6]);
+    }
+    if (!Number.isFinite(closePrice) || closePrice <= 0) {
+      closePrice = cols[4] !== undefined ? parseFloat(cols[4]) : NaN;
+    }
+
+    // N/D check — Stooq returns "N/D" for unavailable data
+    if (!Number.isFinite(closePrice) || closePrice <= 0) {
+      return null;
+    }
+
+    // Previous row for variation
+    let prevClosePrice = NaN;
+    if (lines[2]) {
+      const prevCols = lines[2].split(',');
+      prevClosePrice = prevCols[6] !== undefined ? parseFloat(prevCols[6]) : (prevCols[4] !== undefined ? parseFloat(prevCols[4]) : NaN);
+    }
+
+    const multiplier = STOOQ_MULTIPLIER[slug] ?? 1;
+    const convertedPrice = Number((closePrice * multiplier).toFixed(2));
+    const convertedPrev = Number.isFinite(prevClosePrice) && prevClosePrice > 0
+      ? Number((prevClosePrice * multiplier).toFixed(2))
+      : convertedPrice;
+
+    const previousEntry = cache.get(slug);
+    const previousValor = previousEntry?.indicador.valor ?? convertedPrev;
+
+    return {
+      slug,
+      nombre: meta.nombre,
+      valor: convertedPrice,
+      unidad: meta.unidad,
+      moneda: meta.moneda,
+      fecha: todayISO(),
+      fuente: sourceName,
+      confiable: true,
+      variacion: calcularVariacion(convertedPrice, previousValor),
+      categoria: meta.categoria,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Intenta obtener el precio de un metal desde Investing.com (scraping).
+ * Investing.com muestra precios de commodities en páginas dedicadas.
+ */
+async function fetchFromInvestingCom(
+  url: string,
+  slug: SlugIndicador,
+  sourceName: string,
+): Promise<IndicadorReal | null> {
+  const meta = INDICADOR_META[slug];
+
+  try {
+    const response = await fetchWithTimeout(url, serviceConfig.defaultTimeout);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const html = await response.text();
+
+    // Investing.com commodity pages embed prices in data-test attributes or JSON
+    const patterns = [
+      /data-test="instrument-header-last"[^>]*>([^<]+)/i,
+      /class="[^"]*instrument-price[^"]*"[^>]*>([^<]+)/i,
+      /class="[^"]*last-price[^"]*"[^>]*>([^<]+)/i,
+      /"last":\s*"?([\d,.]+)"?/,
+      /class="[^"]*key-info[^"]*"[^>]*data-value="([\d,.]+)"/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match?.[1]) {
+        const valor = parseNumber(match[1]);
+        if (valor !== null && valor > 0) {
+          const previousEntry = cache.get(slug);
+          const previousValor = previousEntry?.indicador.valor ?? valor;
+
+          return {
+            slug,
+            nombre: meta.nombre,
+            valor: Number(valor.toFixed(2)),
             unidad: meta.unidad,
             moneda: meta.moneda,
             fecha: todayISO(),
@@ -738,6 +928,20 @@ async function fetchIndicadorWithFallback(slug: SlugIndicador): Promise<{
         // Yahoo Finance API
         indicador = await fetchFromYahooFinance(
           meta.yahooSymbol,
+          slug,
+          fuente.nombre,
+        );
+      } else if (fuente.tipo === 'stooq') {
+        // Stooq CSV
+        indicador = await fetchFromStooq(
+          fuente.url,
+          slug,
+          fuente.nombre,
+        );
+      } else if (fuente.tipo === 'investing_com') {
+        // Investing.com scraping
+        indicador = await fetchFromInvestingCom(
+          fuente.url,
           slug,
           fuente.nombre,
         );

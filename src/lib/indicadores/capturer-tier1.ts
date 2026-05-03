@@ -2,10 +2,14 @@
  * Capturer Tier 1 — ONION200 Indicadores
  * Captura diaria de indicadores macroeconómicos de Bolivia y metales LME.
  *
- * Tier 1: TC Oficial BCB, TC Paralelo, RIN, LME (4 metales)
+ * Tier 1: TC Oficial BCB, TC Paralelo, RIN, LME (5 metales)
+ *
+ * v0.13.0 — LME datos reales via Yahoo Finance + Stooq
  */
 
 import { db as prisma } from '@/lib/db'
+import { fetchIndicadores } from '@/lib/services/indicadores'
+import type { SlugIndicador } from '@/lib/services/indicadores.types'
 
 // ─── Tipos ────────────────────────────────────────────────────────
 
@@ -413,69 +417,53 @@ async function capturarTcOficial(): Promise<CapturaResult> {
   }
 }
 
-async function capturarLme(metal: string): Promise<CapturaResult> {
+/**
+ * Captura precios LME reales usando el servicio de indicadores (Yahoo Finance + Stooq).
+ * Ya NO usa datos mock — conecta a fuentes reales con fallback chain.
+ */
+async function capturarLmeReal(
+  lmeSlugs: SlugIndicador[]
+): Promise<CapturaResult[]> {
   const fecha = new Date()
+  const resultados: CapturaResult[] = []
 
   try {
-    const urls: Record<string, string> = {
-      'lme-cobre': 'https://www.lme.com/en/metals/non-ferrous/copper',
-      'lme-zinc': 'https://www.lme.com/en/metals/non-ferrous/zinc',
-      'lme-estano': 'https://www.lme.com/en/metals/non-ferrous/tin',
-      'lme-plata': 'https://www.lme.com/en/metals/precious-metals/silver',
-      'lme-plomo': 'https://www.lme.com/en/metals/non-ferrous/lead',
+    const response = await fetchIndicadores(lmeSlugs)
+
+    for (const ind of response.indicadores) {
+      resultados.push({
+        slug: ind.slug,
+        valor: ind.valor,
+        valorTexto: `${Math.round(ind.valor).toLocaleString('es-BO')} ${ind.unidad}`,
+        confiable: ind.confiable,
+        fecha,
+        metadata: JSON.stringify({
+          fuente: ind.fuente,
+          metodo: ind.confiable ? 'api_real' : 'fallback',
+          valorRaw: ind.valor,
+          variacionPct: ind.variacion,
+          fuentesUsadas: response.fuentesUsadas,
+          timestamp: response.timestamp,
+        }),
+      })
     }
 
-    const nombres: Record<string, string> = {
-      'lme-cobre': 'Cobre',
-      'lme-zinc': 'Zinc',
-      'lme-estano': 'Estano',
-      'lme-plata': 'Plata',
-      'lme-plomo': 'Plomo',
+    // Log errores para debugging
+    if (response.errores.length > 0) {
+      console.warn('[LME capturer] Errores parciales:', response.errores.map(e => e.mensaje))
     }
 
-    const url = urls[metal]
-    if (!url) {
-      throw new Error(`Metal no configurado: ${metal}`)
-    }
-
-    // Nota: LME usa JavaScript para renderizar precios, scraping directo
-    // puede no funcionar. Este es un placeholder que usa un proxy o API alternativa.
-    // En producción, se usaría Metal Price API o similar.
-    const preciosBase: Record<string, number> = {
-      'lme-cobre': 9500,
-      'lme-zinc': 2800,
-      'lme-estano': 32000,
-      'lme-plata': 11500,
-      'lme-plomo': 2100,
-    }
-
-    // Simular variación aleatoria de ±3% para desarrollo
-    const base = preciosBase[metal] ?? 0
-    const variacion = 1 + (Math.random() * 0.06 - 0.03)
-    const valor = Math.round(base * variacion)
-
-    return {
-      slug: metal,
-      valor,
-      valorTexto: `${valor.toLocaleString('es-BO')} USD/ton`,
-      confiable: false, // marcado como no confiable hasta implementar API real
-      fecha,
-      metadata: JSON.stringify({
-        fuente: 'proxy',
-        metodo: 'estimado',
-        metal: nombres[metal] ?? metal,
-        nota: 'Requiere implementar Metal Price API o scraping LME real',
-      }),
-    }
+    return resultados
   } catch (error) {
-    return {
-      slug: metal,
+    console.error('[LME capturer] Error obteniendo datos reales:', error)
+    return lmeSlugs.map(slug => ({
+      slug,
       valor: 0,
       valorTexto: 'N/D',
       confiable: false,
       fecha,
       metadata: JSON.stringify({ error: error instanceof Error ? error.message : 'unknown' }),
-    }
+    }))
   }
 }
 
@@ -497,10 +485,10 @@ export async function capturarTier1(): Promise<{
     fallidos.push(tcOficial)
   }
 
-  // LME Metales
-  const metales = ['lme-cobre', 'lme-zinc', 'lme-estano', 'lme-plata', 'lme-plomo']
-  for (const metal of metales) {
-    const resultado = await capturarLme(metal)
+  // LME Metales — datos reales via Yahoo Finance + Stooq
+  const lmeSlugs: SlugIndicador[] = ['lme-cobre', 'lme-zinc', 'lme-estano', 'lme-plata', 'lme-plomo']
+  const lmeResultados = await capturarLmeReal(lmeSlugs)
+  for (const resultado of lmeResultados) {
     if (resultado.valor > 0) {
       exitosos.push(resultado)
     } else {
