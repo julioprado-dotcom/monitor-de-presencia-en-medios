@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -56,7 +56,23 @@ export function GeneradoresView() {
   const [generatorDataLoading, setGeneratorDataLoading] = useState(false);
   const [generatorGenerating, setGeneratorGenerating] = useState(false);
 
-  // Reload trigger (replaces loadedViews.current.delete('generadores'))
+  // Memoize operational products count
+  const operationalCount = useMemo(
+    () => ALL_PRODUCTS.filter((p) => p.estado === 'operativo').length,
+    [],
+  );
+
+  // Memoize max count for bar chart
+  const maxPorTipoCount = useMemo(
+    () => Math.max(...(genStats?.porTipo.map((t) => t.count) || [1]), 1),
+    [genStats?.porTipo],
+  );
+
+  // Memoize max trend value
+  const maxTendencia = useMemo(
+    () => Math.max(...(genStats?.tendencias.map((x) => x.total) || [1]), 1),
+    [genStats?.tendencias],
+  );
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
   // ─── Callbacks ───
@@ -236,7 +252,7 @@ export function GeneradoresView() {
         <KPICard icon={<FileBarChart className="h-5 w-5" />} value={genStats?.totalPeriodo || 0} label="Este periodo" colorClass="text-primary" />
         <KPICard icon={<CheckCircle2 className="h-5 w-5" />} value={genStats?.enviadosPeriodo || 0} label="Enviados" colorClass="text-emerald-600 dark:text-emerald-400" />
         <KPICard icon={<FileCheck className="h-5 w-5" />} value={genStats?.totalHistorico || 0} label="Total historico" colorClass="text-purple-600 dark:text-purple-400" />
-        <KPICard icon={<Package className="h-5 w-5" />} value={ALL_PRODUCTS.filter(p => p.estado === 'operativo').length} label="Productos operativos" colorClass="text-amber-600 dark:text-amber-400" />
+        <KPICard icon={<Package className="h-5 w-5" />} value={operationalCount} label="Productos operativos" colorClass="text-amber-600 dark:text-amber-400" />
       </div>
 
       {/* Filtros de periodo + distribución por tipo */}
@@ -299,7 +315,7 @@ export function GeneradoresView() {
                 {genStats.porTipo.map((item) => {
                   const prodInfo = ALL_PRODUCTS.find(p => p.tipo === item.tipo);
                   const ProdIcon = prodInfo?.icon || FileText;
-                  const maxCount = Math.max(...genStats.porTipo.map(t => t.count), 1);
+                  const maxCount = maxPorTipoCount;
                   const histItem = genStats.porTipoHistorico.find(h => h.tipo === item.tipo);
                   return (
                     <div key={item.tipo} className="flex items-center gap-3">
@@ -348,8 +364,7 @@ export function GeneradoresView() {
           <CardContent className="p-4 pt-0">
             <div className="flex items-end gap-2 h-20">
               {genStats.tendencias.map((t) => {
-                const maxT = Math.max(...genStats.tendencias.map(x => x.total), 1);
-                const h = Math.max((t.total / maxT) * 100, 4);
+                const h = Math.max((t.total / maxTendencia) * 100, 4);
                 return (
                   <div key={t.fecha} className="flex-1 flex flex-col items-center gap-1">
                     <span className="text-[9px] font-bold text-foreground">{t.total}</span>

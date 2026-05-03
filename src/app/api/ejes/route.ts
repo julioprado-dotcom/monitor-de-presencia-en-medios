@@ -8,18 +8,18 @@ export async function GET() {
       orderBy: { orden: 'asc' },
     });
 
-    // Contar menciones asociadas por eje
-    const ejesConConteo = await Promise.all(
-      ejes.map(async (eje) => {
-        const mencionesCount = await db.mencionTema.count({
-          where: { ejeTematicoId: eje.id },
-        });
-        return {
-          ...eje,
-          mencionesCount,
-        };
-      })
-    );
+    // Single groupBy query instead of N+1 per eje
+    const conteosRaw = await db.mencionTema.groupBy({
+      by: ['ejeTematicoId'],
+      _count: { id: true },
+    });
+
+    const conteoMap = new Map(conteosRaw.map((c) => [c.ejeTematicoId, c._count.id]));
+
+    const ejesConConteo = ejes.map((eje) => ({
+      ...eje,
+      mencionesCount: conteoMap.get(eje.id) || 0,
+    }));
 
     return NextResponse.json({
       ejes: ejesConConteo,

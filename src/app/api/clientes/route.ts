@@ -38,29 +38,43 @@ export async function GET(request: NextRequest) {
       db.cliente.count({ where }),
     ]);
 
-    // Enriquecer con nombres de parlamentarios
-    const enriched = await Promise.all(
-      clientes.map(async (c) => {
-        let parlamentariosList: Array<{ id: string; nombre: string; camara: string }> = [];
-        try {
-          const ids = JSON.parse(c.parlamentarios || '[]');
-          if (Array.isArray(ids) && ids.length > 0) {
-            const personas = await db.persona.findMany({
-              where: { id: { in: ids } },
-              select: { id: true, nombre: true, camara: true },
-            });
-            parlamentariosList = personas;
-          }
-        } catch { /* JSON parse error */ }
+    // Batch parlamentarios lookup — collect ALL IDs, single query
+    const allPersonaIds = new Set<string>();
+    const clientePersonaMap = new Map<string, string[]>(); // clienteId -> personaIds
 
-        return {
-          ...c,
-          parlamentariosList,
-          parlamentariosCount: parlamentariosList.length,
-          contratosActivos: c.contratos.length,
-        };
-      })
-    );
+    for (const c of clientes) {
+      try {
+        const ids: string[] = JSON.parse(c.parlamentarios || '[]');
+        if (Array.isArray(ids) && ids.length > 0) {
+          clientePersonaMap.set(c.id, ids);
+          for (const id of ids) allPersonaIds.add(id);
+        }
+      } catch { /* JSON parse error */ }
+    }
+
+    // Single query for ALL parlamentarios
+    const allPersonas = allPersonaIds.size > 0
+      ? await db.persona.findMany({
+          where: { id: { in: [...allPersonaIds] } },
+          select: { id: true, nombre: true, camara: true },
+        })
+      : [];
+
+    const personaMap = new Map(allPersonas.map((p) => [p.id, p]));
+
+    const enriched = clientes.map((c) => {
+      const pIds = clientePersonaMap.get(c.id) || [];
+      const parlamentariosList = pIds
+        .map((id) => personaMap.get(id))
+        .filter(Boolean) as Array<{ id: string; nombre: string; camara: string }>;
+
+      return {
+        ...c,
+        parlamentariosList,
+        parlamentariosCount: parlamentariosList.length,
+        contratosActivos: c.contratos.length,
+      };
+    });
 
     return NextResponse.json({ clientes: enriched, total, page, limit });
   } catch (error) {

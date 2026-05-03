@@ -26,41 +26,56 @@ export async function GET(request: NextRequest) {
       db.contrato.count({ where }),
     ]);
 
-    // Enriquecer con nombres de medios y parlamentarios
-    const enriched = await Promise.all(
-      contratos.map(async (c) => {
-        let mediosList: Array<{ id: string; nombre: string; activo: boolean }> = [];
-        let parlList: Array<{ id: string; nombre: string; camara: string }> = [];
+    // Batch enrichment — collect ALL IDs, single queries each
+    const allMedioIds = new Set<string>();
+    const allPersonaIds = new Set<string>();
+    const contratoMedioIds = new Map<string, string[]>();
+    const contratoPersonaIds = new Map<string, string[]>();
 
-        try {
-          const mIds = JSON.parse(c.mediosAsignados || '[]');
-          if (Array.isArray(mIds) && mIds.length > 0) {
-            mediosList = await db.medio.findMany({
-              where: { id: { in: mIds } },
-              select: { id: true, nombre: true, activo: true },
-            });
-          }
-        } catch { /* parse error */ }
+    for (const c of contratos) {
+      try {
+        const mIds: string[] = JSON.parse(c.mediosAsignados || '[]');
+        if (Array.isArray(mIds) && mIds.length > 0) {
+          contratoMedioIds.set(c.id, mIds);
+          for (const id of mIds) allMedioIds.add(id);
+        }
+      } catch { /* parse error */ }
+      try {
+        const pIds: string[] = JSON.parse(c.parlamentarios || '[]');
+        if (Array.isArray(pIds) && pIds.length > 0) {
+          contratoPersonaIds.set(c.id, pIds);
+          for (const id of pIds) allPersonaIds.add(id);
+        }
+      } catch { /* parse error */ }
+    }
 
-        try {
-          const pIds = JSON.parse(c.parlamentarios || '[]');
-          if (Array.isArray(pIds) && pIds.length > 0) {
-            parlList = await db.persona.findMany({
-              where: { id: { in: pIds } },
-              select: { id: true, nombre: true, camara: true },
-            });
-          }
-        } catch { /* parse error */ }
+    // 2 queries total instead of N×2
+    const [allMedios, allPersonas] = await Promise.all([
+      allMedioIds.size > 0
+        ? db.medio.findMany({ where: { id: { in: [...allMedioIds] } }, select: { id: true, nombre: true, activo: true } })
+        : Promise.resolve([]),
+      allPersonaIds.size > 0
+        ? db.persona.findMany({ where: { id: { in: [...allPersonaIds] } }, select: { id: true, nombre: true, camara: true } })
+        : Promise.resolve([]),
+    ]);
 
-        return {
-          ...c,
-          mediosList,
-          mediosCount: mediosList.length,
-          parlamentariosList: parlList,
-          parlamentariosCount: parlList.length,
-        };
-      })
-    );
+    const medioMap = new Map(allMedios.map((m) => [m.id, m]));
+    const personaMap = new Map(allPersonas.map((p) => [p.id, p]));
+
+    const enriched = contratos.map((c) => {
+      const mIds = contratoMedioIds.get(c.id) || [];
+      const pIds = contratoPersonaIds.get(c.id) || [];
+      const mediosList = mIds.map((id) => medioMap.get(id)).filter(Boolean) as Array<{ id: string; nombre: string; activo: boolean }>;
+      const parlList = pIds.map((id) => personaMap.get(id)).filter(Boolean) as Array<{ id: string; nombre: string; camara: string }>;
+
+      return {
+        ...c,
+        mediosList,
+        mediosCount: mediosList.length,
+        parlamentariosList: parlList,
+        parlamentariosCount: parlList.length,
+      };
+    });
 
     return NextResponse.json({ contratos: enriched, total, page, limit });
   } catch (error) {

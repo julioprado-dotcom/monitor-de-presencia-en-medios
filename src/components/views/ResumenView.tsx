@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,8 +17,23 @@ import { PRODUCTOS } from '@/constants/products';
 import { ALL_PRODUCTS } from '@/constants/nav';
 
 export function ResumenView() {
-  const { data, mediosHealth, setError, setActiveView, setData } = useDashboardStore();
+  // Fine-grained store selectors — avoid re-renders on unrelated store changes
+  const data = useDashboardStore((s) => s.data);
+  const mediosHealth = useDashboardStore((s) => s.mediosHealth);
+  const setError = useDashboardStore((s) => s.setError);
+  const setActiveView = useDashboardStore((s) => s.setActiveView);
+  const setData = useDashboardStore((s) => s.setData);
   const [seedLoading, setSeedLoading] = useState(false);
+
+  // Memoize filtered unhealthy medios (used 3x in health banner)
+  const mediosConProblema = useMemo(
+    () => mediosHealth?.medios.filter((m) => m.salud !== 'sano') || [],
+    [mediosHealth],
+  );
+  const mediosConProblemaNames = useMemo(
+    () => mediosConProblema.slice(0, 3).map((m) => m.nombre).join(', '),
+    [mediosConProblema],
+  );
 
   const handleSeed = async () => {
     setSeedLoading(true);
@@ -96,8 +111,8 @@ export function ResumenView() {
               }
             </p>
             <p className="text-[10px] text-muted-foreground mt-0.5">
-              {mediosHealth.medios.filter(m => m.salud !== 'sano').slice(0, 3).map(m => m.nombre).join(', ')}
-              {mediosHealth.medios.filter(m => m.salud !== 'sano').length > 3 ? ` y ${mediosHealth.medios.filter(m => m.salud !== 'sano').length - 3} más` : ''}
+              {mediosConProblemaNames}
+              {mediosConProblema.length > 3 ? ` y ${mediosConProblema.length - 3} más` : ''}
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setActiveView('captura')} className="text-xs text-muted-foreground shrink-0">

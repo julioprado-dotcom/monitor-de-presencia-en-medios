@@ -4,7 +4,7 @@ import db from '@/lib/db';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const periodo = searchParams.get('periodo') || 'hoy'; // hoy | semana | mes | historico
+    const periodo = searchParams.get('periodo') || 'hoy';
 
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
@@ -26,77 +26,71 @@ export async function GET(request: NextRequest) {
         ? { gte: inicioSemana }
         : periodo === 'mes'
           ? { gte: inicioMes }
-          : {}; // historico = sin filtro
+          : {};
 
-    // Total en el periodo
-    const totalPeriodo = await db.reporte.count({
-      where: { fechaCreacion: rangoFecha },
-    });
+    // Parallel independent counts
+    const [totalPeriodo, totalHistorico, enviadosPeriodo, porTipoRaw, porTipoHistoricoRaw] = await Promise.all([
+      db.reporte.count({ where: { fechaCreacion: rangoFecha } }),
+      db.reporte.count(),
+      db.reporte.count({ where: { fechaCreacion: rangoFecha, enviado: true } }),
+      db.reporte.groupBy({
+        by: ['tipo'],
+        where: { fechaCreacion: rangoFecha },
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+      }),
+      db.reporte.groupBy({
+        by: ['tipo'],
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+      }),
+    ]);
 
-    // Total histórico (siempre)
-    const totalHistorico = await db.reporte.count();
+    const porTipo = porTipoRaw.map((r) => ({ tipo: r.tipo, count: r._count.id }));
+    const porTipoHistorico = porTipoHistoricoRaw.map((r) => ({ tipo: r.tipo, count: r._count.id }));
 
-    // Enviados en el periodo
-    const enviadosPeriodo = await db.reporte.count({
-      where: { fechaCreacion: rangoFecha, enviado: true },
-    });
+    // Build lookup map from porTipoHistorico for O(1) access
+    const historicoMap = new Map(porTipoHistorico.map((r) => [r.tipo, r.count]));
 
-    // Distribución por tipo de producto
-    const porTipoRaw = await db.reporte.groupBy({
-      by: ['tipo'],
-      where: { fechaCreacion: rangoFecha },
-      _count: { id: true },
-      orderBy: { _count: { id: 'desc' } },
-    });
-
-    const porTipo = porTipoRaw.map((r) => ({
-      tipo: r.tipo,
-      count: r._count.id,
-    }));
-
-    // Distribución por tipo histórica
-    const porTipoHistoricoRaw = await db.reporte.groupBy({
-      by: ['tipo'],
-      _count: { id: true },
-      orderBy: { _count: { id: 'desc' } },
-    });
-
-    const porTipoHistorico = porTipoHistoricoRaw.map((r) => ({
-      tipo: r.tipo,
-      count: r._count.id,
-    }));
-
-    // Último generado por tipo (solo para los operativos)
+    // Batch: single groupBy for all types + latest per type
+    // Replaced 22 queries (11 types × 2) with 2 queries
     const tiposActivos = [
       'EL_TERMOMETRO', 'SALDO_DEL_DIA', 'EL_FOCO', 'EL_RADAR',
       'VOZ_Y_VOTO', 'EL_HILO', 'EL_INFORME_CERRADO', 'FOCO_DE_LA_SEMANA',
       'ALERTA_TEMPRANA', 'FICHA_LEGISLADOR', 'EL_ESPECIALIZADO',
     ];
 
-    const ultimoPorTipo = await Promise.all(
-      tiposActivos.map(async (tipo) => {
-        const ultimo = await db.reporte.findFirst({
-          where: { tipo },
-          orderBy: { fechaCreacion: 'desc' },
-          select: {
-            id: true,
-            fechaCreacion: true,
-            totalMenciones: true,
-            sentimientoPromedio: true,
-            resumen: true,
-            enviado: true,
-          },
-        });
-        const countTipo = await db.reporte.count({ where: { tipo } });
-        return {
-          tipo,
-          ultimo: ultimo || null,
-          totalGenerados: countTipo,
-        };
-      })
-    );
+    const [countsByType, latestReports] = await Promise.all([
+      db.reporte.groupBy({
+        by: ['tipo'],
+        _count: { id: true },
+      }),
+      db.reporte.findMany({
+        where: { tipo: { in: tiposActivos } },
+        distinct: ['tipo'],
+        orderBy: [{ tipo: 'asc' }, { fechaCreacion: 'desc' }],
+        select: {
+          tipo: true,
+          id: true,
+          fechaCreacion: true,
+          totalMenciones: true,
+          sentimientoPromedio: true,
+          resumen: true,
+          enviado: true,
+        },
+      }),
+    ]);
 
-    // Tendencia: reportes por día últimos 7 días
+    const countMap = new Map(countsByType.map((c) => [c.tipo, c._count.id]));
+    const latestMap = new Map(latestReports.map((r) => [r.tipo, r]));
+
+    const ultimoPorTipo = tiposActivos.map((tipo) => ({
+      tipo,
+      ultimo: latestMap.get(tipo) || null,
+      totalGenerados: countMap.get(tipo) || 0,
+    }));
+
+    // Tendencia: 7 daily counts in parallel
     const tendencias = await Promise.all(
       Array.from({ length: 7 }, (_, i) => {
         const d = new Date();
@@ -104,19 +98,10 @@ export async function GET(request: NextRequest) {
         d.setHours(0, 0, 0, 0);
         const dFin = new Date(d);
         dFin.setDate(dFin.getDate() + 1);
-        return {
-          fecha: d.toISOString().slice(0, 10),
-          promesa: db.reporte.count({
-            where: { fechaCreacion: { gte: d, lt: dFin } },
-          }),
-        };
-      })
-    );
-    const tendenciasData = await Promise.all(
-      tendencias.map(async (t) => ({
-        fecha: t.fecha,
-        total: await t.promesa,
-      }))
+        return db.reporte
+          .count({ where: { fechaCreacion: { gte: d, lt: dFin } } })
+          .then((total) => ({ fecha: d.toISOString().slice(0, 10), total }));
+      }),
     );
 
     return NextResponse.json({
@@ -127,7 +112,7 @@ export async function GET(request: NextRequest) {
       porTipo,
       porTipoHistorico,
       ultimoPorTipo,
-      tendencias: tendenciasData,
+      tendencias,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error desconocido';

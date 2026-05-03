@@ -6,9 +6,22 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { AlertCircle, Menu, X, Globe } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useMemo } from 'react';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
-  const { activeView, sidebarOpen, setSidebarOpen, setActiveView, error, clearError } = useDashboardStore();
+  // Fine-grained selectors
+  const activeView = useDashboardStore((s) => s.activeView);
+  const sidebarOpen = useDashboardStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useDashboardStore((s) => s.setSidebarOpen);
+  const setActiveView = useDashboardStore((s) => s.setActiveView);
+  const error = useDashboardStore((s) => s.error);
+  const clearError = useDashboardStore((s) => s.clearError);
+
+  // Memoize current nav item lookup
+  const currentNavItem = useMemo(
+    () => NAV_ITEMS.find((n) => n.id === activeView),
+    [activeView],
+  );
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -102,7 +115,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </button>
               <div>
                 <h1 className="text-base sm:text-lg font-bold text-foreground">
-                  {NAV_ITEMS.find((n) => n.id === activeView)?.label || 'Centro de Comando'}
+                  {currentNavItem?.label || 'Centro de Comando'}
                 </h1>
                 <p className="text-[11px] text-muted-foreground hidden sm:block">DECODEX — Motor ONION200</p>
               </div>
