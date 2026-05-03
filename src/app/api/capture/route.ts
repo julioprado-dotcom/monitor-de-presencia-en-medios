@@ -71,12 +71,23 @@ export async function POST(request: NextRequest) {
 
         let nuevasParaPersona = 0;
 
+        // Batch URL check — single query for all URLs instead of N+1
+        const allUrls = searchItems
+          .map((item) => item.url || item.link || '')
+          .filter(Boolean);
+        const existingUrls = new Set<string>();
+        if (allUrls.length > 0) {
+          const existingMenciones = await db.mencion.findMany({
+            where: { url: { in: allUrls } },
+            select: { url: true },
+          });
+          for (const m of existingMenciones) existingUrls.add(m.url);
+        }
+
         for (const item of searchItems) {
           const itemUrl = item.url || item.link || '';
           if (!itemUrl) continue;
-
-          const existing = await db.mencion.findFirst({ where: { url: itemUrl } });
-          if (existing) continue;
+          if (existingUrls.has(itemUrl)) continue;
 
           const medioNombre = detectMedioByDomain(itemUrl);
           const medioId = medioNombre ? (medioMap.get(medioNombre) || null) : null;

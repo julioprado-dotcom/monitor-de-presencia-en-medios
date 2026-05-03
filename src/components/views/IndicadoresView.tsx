@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDashboardStore } from '@/stores/useDashboardStore';
 import { KPICard } from '@/components/shared/KPICard';
 import { PARTIDO_COLORS, PARTIDO_TEXT_COLORS } from '@/constants/ui';
@@ -99,30 +99,54 @@ export function IndicadoresView() {
 
   const reloadTrigger = useState(0)[1];
 
+  // Memoize filtered social indicadores for conflictividad tab
+  const indicadoresSocial = useMemo(
+    () => indicadores?.filter((i) => i.categoria === 'social') || [],
+    [indicadores],
+  );
+  const indicadoresSocialConDatos = useMemo(
+    () => indicadoresSocial.filter((i) => i.ultimoValor !== null).length,
+    [indicadoresSocial],
+  );
+
+  // Memoize social indicadores from historico for conflictividad tab
+  const indicadoresHistoricoSocial = useMemo(
+    () => indicadoresHistorico?.indicadores.filter((i) => i.categoria === 'social') || [],
+    [indicadoresHistorico],
+  );
+
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       setIndicadoresLoading(true);
       try {
-        const [resCapture, params] = await Promise.all([
-          fetch('/api/indicadores/capture'),
-          (async () => {
-            const p = new URLSearchParams({ periodo: indicadoresPeriodo });
-            if (indicadoresCategoria) p.set('categoria', indicadoresCategoria);
-            return p;
-          })(),
-        ]);
-        const jsonCapture = await resCapture.json();
-        if (!cancelled && jsonCapture.exito) setIndicadores(jsonCapture.indicadores || []);
+        // Fully parallel: capture + historico via Promise.all
+        const params = new URLSearchParams({ periodo: indicadoresPeriodo });
+        if (indicadoresCategoria) params.set('categoria', indicadoresCategoria);
 
-        const resHist = await fetch(`/api/indicadores/historico?${params}`);
-        const jsonHist = await resHist.json();
-        if (!cancelled && !jsonHist.error) setIndicadoresHistorico(jsonHist);
-      } catch { /* silent */ } finally {
+        const [resCapture, resHist] = await Promise.all([
+          fetch('/api/indicadores/capture', { signal: controller.signal }),
+          fetch(`/api/indicadores/historico?${params}`, { signal: controller.signal }),
+        ]);
+
+        const [jsonCapture, jsonHist] = await Promise.all([
+          resCapture.json(),
+          resHist.json(),
+        ]);
+
+        if (!cancelled) {
+          if (jsonCapture.exito) setIndicadores(jsonCapture.indicadores || []);
+          if (!jsonHist.error) setIndicadoresHistorico(jsonHist);
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        /* silent */
+      } finally {
         if (!cancelled) setIndicadoresLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); };
   }, [indicadoresPeriodo, indicadoresCategoria, reloadTrigger]);
 
   // ── Callbacks ──
@@ -482,7 +506,6 @@ export function IndicadoresView() {
           {/* KPIs de conflictividad */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {(() => {
-              const indicadoresSocial = indicadores?.filter(i => i.categoria === 'social') || [];
               const escalamiento = indicadoresSocial.find(i => i.slug === 'conflictividad-escalamiento');
               const escValor = escalamiento?.ultimoValor?.valor || 'N/D';
               const esAlto = escValor.toLowerCase().includes('alto');
@@ -497,7 +520,7 @@ export function IndicadoresView() {
                     <p className="text-[10px] font-medium text-muted-foreground mb-1">Indicadores sociales</p>
                     <p className="text-xl font-bold text-foreground">{indicadoresSocial.length}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {indicadoresSocial.filter(i => i.ultimoValor !== null).length} con datos
+                      {indicadoresSocialConDatos} con datos
                     </p>
                   </div>
                   <div className="p-4 rounded-lg border border-border bg-muted/30">
@@ -545,9 +568,9 @@ export function IndicadoresView() {
             <CardContent className="p-4 pt-0">
               {indicadoresLoading ? (
                 <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-              ) : indicadoresHistorico && indicadoresHistorico.indicadores.filter(i => i.categoria === 'social').length > 0 ? (
+              ) : indicadoresHistoricoSocial.length > 0 ? (
                 <div className="space-y-3">
-                  {indicadoresHistorico.indicadores.filter(i => i.categoria === 'social').map((ind) => {
+                  {indicadoresHistoricoSocial.map((ind) => {
                     const tieneValor = ind.ultimoValor !== null;
                     const stats = ind.estadisticas;
                     const esEscalamiento = ind.slug === 'conflictividad-escalamiento';

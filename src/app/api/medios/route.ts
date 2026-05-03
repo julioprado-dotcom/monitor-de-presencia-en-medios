@@ -15,25 +15,27 @@ export async function GET(request: NextRequest) {
     if (departamento) where.departamento = departamento;
     if (activo !== null && activo !== undefined) where.activo = activo === 'true';
 
-    const medios = await db.medio.findMany({
-      where,
-      orderBy: [{ nivel: 'asc' }, { nombre: 'asc' }],
-    });
+    // Fetch medios and mention counts in a single groupBy — no N+1
+    const [medios, conteosRaw] = await Promise.all([
+      db.medio.findMany({
+        where,
+        orderBy: [{ nivel: 'asc' }, { nombre: 'asc' }],
+      }),
+      db.mencion.groupBy({
+        by: ['medioId'],
+        _count: { id: true },
+      }),
+    ]);
 
-    // Contar menciones por medio
-    const mediosConConteo = await Promise.all(
-      medios.map(async (medio) => {
-        const mencionesCount = await db.mencion.count({
-          where: { medioId: medio.id },
-        });
-        return {
-          ...medio,
-          mencionesCount,
-        };
-      })
-    );
+    // Build O(1) lookup map for mention counts
+    const conteoMap = new Map(conteosRaw.map((c) => [c.medioId, c._count.id]));
 
-    // Resumen por nivel
+    const mediosConConteo = medios.map((medio) => ({
+      ...medio,
+      mencionesCount: conteoMap.get(medio.id) || 0,
+    }));
+
+    // Resumen por nivel — batched: 1 count + 1 groupBy instead of 15 queries
     const nivelLabels: Record<string, string> = {
       '1': 'Corporativos',
       '2': 'Regionales',
@@ -42,24 +44,47 @@ export async function GET(request: NextRequest) {
       '5': 'Extendidos',
     };
 
-    const resumenPorNivel = await Promise.all(
-      ['1', '2', '3', '4', '5'].map(async (n) => {
-        const count = await db.medio.count({ where: { nivel: n, activo: true } });
-        const menciones = await db.medio.findMany({
-          where: { nivel: n, activo: true },
-          select: { id: true },
-        });
-        const mencionesCount = await db.mencion.count({
-          where: { medioId: { in: menciones.map((m) => m.id) } },
-        });
-        return {
-          nivel: n,
-          etiqueta: nivelLabels[n] || `Nivel ${n}`,
-          totalMedios: count,
-          mencionesCount,
-        };
-      })
-    );
+    const [mediosActivos, mencionesPorMedio] = await Promise.all([
+      db.medio.groupBy({
+        by: ['nivel'],
+        where: { activo: true },
+        _count: { id: true },
+      }),
+      // Get all medios activos IDs and count their mentions in one query
+      db.medio.findMany({
+        where: { activo: true },
+        select: { id: true, nivel: true },
+      }),
+    ]);
+
+    const activosMap = new Map(mediosActivos.map((m) => [m.nivel, m._count.id]));
+    const activosIds = new Set(mencionesPorMedio.map((m) => m.id));
+
+    // Count menciones for all active medios in a single groupBy
+    const mencionesActivasRaw = activosIds.size > 0
+      ? await db.mencion.groupBy({
+          by: ['medioId'],
+          where: { medioId: { in: [...activosIds] } },
+          _count: { id: true },
+        })
+      : [];
+
+    const mencionesActivasMap = new Map(mencionesPorMedio.map((m) => [m.id, m.nivel]));
+    const conteoActivasMap = new Map(mencionesActivasRaw.map((c) => [c.medioId, c._count.id]));
+
+    // Aggregate by level
+    const conteosPorNivel = new Map<string, number>();
+    for (const [medioId, nivel] of mencionesActivasMap) {
+      const count = conteoActivasMap.get(medioId) || 0;
+      conteosPorNivel.set(nivel, (conteosPorNivel.get(nivel) || 0) + count);
+    }
+
+    const resumenPorNivel = ['1', '2', '3', '4', '5'].map((n) => ({
+      nivel: n,
+      etiqueta: nivelLabels[n] || `Nivel ${n}`,
+      totalMedios: activosMap.get(n) || 0,
+      mencionesCount: conteosPorNivel.get(n) || 0,
+    }));
 
     return NextResponse.json({
       medios: mediosConConteo,

@@ -5,6 +5,7 @@
  */
 import { create } from 'zustand';
 import type { DashboardData, MediosHealthData } from '@/types/dashboard';
+import { fetchWithTimeout, FETCH_TIMEOUT } from '@/lib/fetch-utils';
 
 interface DashboardStore {
   // Shell state
@@ -26,7 +27,8 @@ interface DashboardStore {
   mediosHealth: MediosHealthData | null;
   setMediosHealth: (data: MediosHealthData) => void;
 
-  // Initialization
+  // Initialization (deduplicated — only runs once)
+  _initialized: boolean;
   initialize: () => Promise<void>;
 }
 
@@ -50,29 +52,42 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   mediosHealth: null,
   setMediosHealth: (data) => set({ mediosHealth: data }),
 
-  // Initialize — load global data once
+  // Initialization guard
+  _initialized: false,
+
+  // Initialize — load global data once (deduplicated)
   initialize: async () => {
-    try {
-      const res = await fetch('/api/stats');
-      if (!res.ok) throw new Error('Error al cargar datos');
-      const json = await res.json();
-      set({ data: json, loading: false, error: '' });
-    } catch (err) {
+    if (get()._initialized) return;
+    set({ _initialized: true });
+
+    // Both fetches in parallel with timeout
+    const [statsResult, healthResult] = await Promise.allSettled([
+      fetchWithTimeout('/api/stats', { timeoutMs: FETCH_TIMEOUT }),
+      fetchWithTimeout('/api/medios/health', { timeoutMs: FETCH_TIMEOUT }),
+    ]);
+
+    // Process stats result
+    if (statsResult.status === 'fulfilled' && statsResult.value.ok) {
+      try {
+        const json = await statsResult.value.json();
+        set({ data: json, loading: false, error: '' });
+      } catch {
+        set({ error: 'Error al procesar datos del dashboard', loading: false });
+      }
+    } else {
+      const reason = statsResult.status === 'rejected' ? statsResult.reason : 'Error al cargar datos';
       set({
-        error: err instanceof Error ? err.message : 'Error desconocido',
+        error: reason instanceof Error ? reason.message : String(reason),
         loading: false,
       });
     }
 
-    // Load medios health in parallel
-    try {
-      const res = await fetch('/api/medios/health');
-      if (res.ok) {
-        const json = await res.json();
+    // Process health result (non-critical — silent on failure)
+    if (healthResult.status === 'fulfilled' && healthResult.value.ok) {
+      try {
+        const json = await healthResult.value.json();
         set({ mediosHealth: json });
-      }
-    } catch {
-      // silent — health check is non-critical
+      } catch { /* silent */ }
     }
   },
 }));
