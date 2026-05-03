@@ -26,6 +26,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { UserMenu } from '@/components/user-menu';
 import Link from 'next/link';
 
 /* ═══════════════════════════════════════════════════════════
@@ -199,6 +200,7 @@ export default function DashboardCliente() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <UserMenu compact />
               <Link href="/">
                 <Button variant="outline" size="sm" className="text-xs gap-1.5">
                   <ArrowLeft className="h-3 w-3" />
