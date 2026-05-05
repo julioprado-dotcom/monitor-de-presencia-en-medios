@@ -1,6 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+/**
+ * Validación SSRF: verifica que una URL no apunte a recursos internos.
+ * Bloquea IPs privadas, localhost, cloud metadata, y esquemas peligrosos.
+ */
+function isSafeUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+
+    // Solo permitir HTTP y HTTPS
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return false;
+    }
+
+    const hostname = url.hostname.toLowerCase();
+
+    // Bloquear localhost
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+      return false;
+    }
+
+    // Bloquear cloud metadata endpoints
+    if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal') {
+      return false;
+    }
+
+    // Bloquear rangos IP privados
+    const ipMatch = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (ipMatch) {
+      const [, a, b] = ipMatch.map(Number);
+      // 10.0.0.0/8
+      if (a === 10) return false;
+      // 172.16.0.0/12
+      if (a === 172 && b >= 16 && b <= 31) return false;
+      // 192.168.0.0/16
+      if (a === 192 && b === 168) return false;
+      // 169.254.0.0/16 (link-local / cloud metadata)
+      if (a === 169 && b === 254) return false;
+      // 0.0.0.0
+      if (a === 0) return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Get menciones with URLs that haven't been verified recently
@@ -37,14 +84,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Filtrar URLs peligrosas (SSRF protection)
+    const safeMenciones = mencionesToCheck.filter((m) => isSafeUrl(m.url));
+    const skipped = mencionesToCheck.length - safeMenciones.length;
+
     let activos = 0;
     let rotos = 0;
     const detalles: Array<{ id: string; url: string; status: number | string; activo: boolean }> = [];
 
     // Verify URLs in parallel (max 5 concurrent)
     const concurrency = 5;
-    for (let i = 0; i < mencionesToCheck.length; i += concurrency) {
-      const batch = mencionesToCheck.slice(i, i + concurrency);
+    for (let i = 0; i < safeMenciones.length; i += concurrency) {
+      const batch = safeMenciones.slice(i, i + concurrency);
 
       const results = await Promise.allSettled(
         batch.map(async (m) => {
@@ -116,9 +167,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      verified: mencionesToCheck.length,
+      verified: safeMenciones.length,
       activos,
       rotos,
+      skipped,
       detalles,
     });
   } catch (error: unknown) {
