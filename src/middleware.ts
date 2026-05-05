@@ -50,15 +50,13 @@ const PII_PROTECTED_GET: string[] = [
 
 const DESTRUCTIVE_METHODS = ['POST', 'PUT', 'DELETE', 'PATCH'];
 
-// ── AUTH_SECRET cache ──────────────────────────────────────────
-let _secret: Uint8Array | null = null;
-
+// ── AUTH_SECRET ────────────────────────────────────────────────
+// Edge Runtime: leer env var en cada invocación (sin cache estático)
+// porque el módulo puede cargar antes de que las env vars estén disponibles.
 function getSecret(): Uint8Array | null {
-  if (_secret) return _secret;
   const env = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
   if (!env) return null;
-  _secret = new TextEncoder().encode(env);
-  return _secret;
+  return new TextEncoder().encode(env);
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
