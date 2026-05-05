@@ -3,11 +3,23 @@
 import { useDashboardStore } from '@/stores/useDashboardStore';
 import { NAV_ITEMS, NAV_GROUPS, getNavLabel } from '@/constants/nav';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { AlertCircle, Menu, X, Globe, ChevronDown, ChevronRight, MonitorPlay } from 'lucide-react';
+import {
+  AlertCircle, Menu, X, Globe, ChevronDown, ChevronRight,
+  MonitorPlay, BarChart3, Zap,
+} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 export { LoadingScreen } from './LoadingScreen';
+
+// ─── Active indicator bar ─────────────────────────────────
+// Thin left accent bar that shows which section is active
+
+function ActiveBar() {
+  return (
+    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
+  );
+}
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   // Fine-grained selectors
@@ -22,6 +34,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   // Current view label (supports nested items)
   const currentLabel = useMemo(() => getNavLabel(activeView), [activeView]);
+
+  // Check if any child of a parent item is active
+  const isChildActive = useCallback((item: typeof NAV_ITEMS[number]): boolean => {
+    return item.children?.some(c => c.id === activeView) || false;
+  }, [activeView]);
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -60,94 +77,174 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
-          {/* Nav with collapsible groups */}
+          {/* ═══ NAVIGATION ═══ */}
           <nav className="flex-1 px-3 py-3 overflow-y-auto custom-scrollbar">
+
+            {/* ── CENTRO DE COMANDO (always visible) ── */}
+            <div className="mb-3">
+              <button
+                onClick={() => setActiveView('resumen')}
+                className={`
+                  relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-semibold
+                  transition-all duration-150
+                  ${activeView === 'resumen'
+                    ? 'bg-primary/10 text-primary shadow-sm'
+                    : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                  }
+                `}
+              >
+                {/* Active indicator — always on top-level main button */}
+                {activeView === 'resumen' && <ActiveBar />}
+
+                <div className={`flex items-center justify-center h-5 w-5 rounded-md shrink-0 ${activeView === 'resumen' ? 'bg-primary/20' : ''}`}>
+                  <BarChart3 className="h-4 w-4" />
+                </div>
+                <span className="flex-1 text-left truncate">Centro de Comando</span>
+
+                {/* Pulse dot for active */}
+                {activeView === 'resumen' && (
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/60 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="mx-3 mb-3 border-t border-sidebar-border/60" />
+
+            {/* ── GROUPS (collapsible) ── */}
             {NAV_GROUPS.map((group) => {
               const isGroupExpanded = expandedGroups.includes(group.id);
+              // Check if any item in this group or its children is active
+              const isGroupActive = NAV_ITEMS.slice(group.from, group.to + 1).some(
+                item => item.id === activeView || item.children?.some(c => c.id === activeView)
+              );
+
               return (
-                <div key={group.id} className="mb-2 last:mb-0">
-                  {/* Group header (clickable to collapse/expand) */}
+                <div key={group.id} className="mb-1.5">
+                  {/* Group header */}
                   <button
                     onClick={() => toggleGroup(group.id)}
-                    className="w-full flex items-center gap-2 px-3 mb-1 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/50 hover:text-sidebar-foreground/80 hover:bg-sidebar-accent/30 transition-colors"
+                    className={`
+                      w-full flex items-center gap-2 px-3 mb-1 py-1 rounded-md
+                      text-[10px] font-bold uppercase tracking-widest
+                      transition-colors
+                      ${isGroupActive
+                        ? 'text-primary/80'
+                        : 'text-sidebar-foreground/40 hover:text-sidebar-foreground/70'
+                      }
+                    `}
                   >
+                    {/* Active dot on group label when any child is active */}
+                    {isGroupActive && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                    )}
                     <span className="flex-1 text-left">{group.label}</span>
                     {isGroupExpanded
-                      ? <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
-                      : <ChevronRight className="h-3 w-3 shrink-0 opacity-60" />
+                      ? <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                      : <ChevronRight className="h-3 w-3 shrink-0 opacity-50" />
                     }
                   </button>
 
-                  {/* Group items (hidden when collapsed) */}
+                  {/* Group items */}
                   {isGroupExpanded && (
-                    <div className="space-y-0.5">
-                  {NAV_ITEMS.slice(group.from, group.to + 1).map((item) => {
-                    const hasChildren = item.children && item.children.length > 0;
-                    const isExpanded = expandedGroups.includes(item.id);
-                    const isActive = activeView === item.id;
-                    const isChildActive = hasChildren && item.children!.some(c => c.id === activeView);
+                    <div className="space-y-0.5 mb-1">
+                      {NAV_ITEMS.slice(group.from, group.to + 1).map((item) => {
+                        const hasChildren = item.children && item.children.length > 0;
+                        const isExpanded = expandedGroups.includes(item.id);
+                        const isActive = activeView === item.id;
+                        const childActive = isChildActive(item);
 
-                    return (
-                      <div key={item.id}>
-                        {/* Main item */}
-                        <button
-                          onClick={() => {
-                            if (hasChildren) {
-                              toggleGroup(item.id);
-                              // Also navigate to parent if clicking on collapsed
-                              if (!isExpanded) setActiveView(item.id);
-                            } else {
-                              setActiveView(item.id);
-                            }
-                          }}
-                          className={`
-                            w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium
-                            transition-colors duration-150
-                            ${isActive
-                              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                              : isChildActive
-                                ? 'bg-sidebar-accent/40 text-sidebar-accent-foreground'
-                                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                            }
-                          `}
-                        >
-                          {item.icon && <item.icon className="h-4 w-4 shrink-0" />}
-                          <span className="flex-1 text-left truncate">{item.label}</span>
-                          {hasChildren && (
-                            isExpanded
-                              ? <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
-                              : <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-50" />
-                          )}
-                        </button>
+                        return (
+                          <div key={item.id}>
+                            {/* Main item */}
+                            <button
+                              onClick={() => {
+                                if (hasChildren) {
+                                  toggleGroup(item.id);
+                                  if (!isExpanded) setActiveView(item.id);
+                                } else {
+                                  setActiveView(item.id);
+                                }
+                              }}
+                              className={`
+                                relative w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium
+                                transition-all duration-150
+                                ${isActive
+                                  ? 'bg-primary/10 text-primary'
+                                  : childActive
+                                    ? 'bg-sidebar-accent/50 text-sidebar-accent-foreground'
+                                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                                }
+                              `}
+                            >
+                              {/* Active indicator bar */}
+                              {isActive && <ActiveBar />}
+                              {childActive && !isActive && (
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-3 rounded-r-full bg-primary/40" />
+                              )}
 
-                        {/* Sub-items (collapsible) */}
-                        {hasChildren && isExpanded && (
-                          <div className="ml-4 pl-3 border-l border-sidebar-border/50 space-y-0.5 mt-0.5 mb-1">
-                            {item.children!.map((child) => {
-                              const isChildItemActive = activeView === child.id;
-                              return (
-                                <button
-                                  key={child.id}
-                                  onClick={() => setActiveView(child.id)}
-                                  className={`
-                                    w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-medium
-                                    transition-colors duration-150
-                                    ${isChildItemActive
-                                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                                      : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground/90'
-                                    }
-                                  `}
-                                >
-                                  {child.icon && <child.icon className="h-3.5 w-3.5 shrink-0 opacity-70" />}
-                                  <span className="truncate">{child.label}</span>
-                                </button>
-                              );
-                            })}
+                              {item.icon && <item.icon className={`h-4 w-4 shrink-0 ${isActive ? '' : 'opacity-70'}`} />}
+                              <span className="flex-1 text-left truncate">{item.label}</span>
+
+                              {/* Active dot for leaf items */}
+                              {isActive && !hasChildren && (
+                                <span className="relative flex h-2 w-2 shrink-0">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/60 opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                                </span>
+                              )}
+
+                              {hasChildren && (
+                                isExpanded
+                                  ? <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                                  : <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                              )}
+                            </button>
+
+                            {/* Sub-items (differentiated from main items) */}
+                            {hasChildren && isExpanded && (
+                              <div className="ml-3 mt-0.5 mb-1">
+                                <div className="border-l-2 border-sidebar-border/40 pl-3 space-y-0.5">
+                                  {item.children!.map((child) => {
+                                    const isChildItemActive = activeView === child.id;
+                                    return (
+                                      <button
+                                        key={child.id}
+                                        onClick={() => setActiveView(child.id)}
+                                        className={`
+                                          relative w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md
+                                          text-[11px] font-medium
+                                          transition-all duration-150
+                                          ${isChildItemActive
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'text-sidebar-foreground/50 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground/80'
+                                          }
+                                        `}
+                                      >
+                                        {/* Sub-item active indicator */}
+                                        {isChildItemActive && (
+                                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-3 rounded-r-full bg-primary" />
+                                        )}
+
+                                        {child.icon && <child.icon className={`h-3 w-3 shrink-0 ${isChildItemActive ? '' : 'opacity-50'}`} />}
+                                        <span className="truncate">{child.label}</span>
+
+                                        {/* Tiny active dot for sub-items */}
+                                        {isChildItemActive && (
+                                          <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -159,7 +256,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <div className="px-3 py-4 border-t border-sidebar-border">
             <Link
               href="/dashboard"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
             >
               <Globe className="h-4 w-4 shrink-0" />
               Vista cliente
@@ -167,13 +264,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <Link
               href="/"
               onClick={() => setActiveView('preview')}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors mt-0.5"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors mt-0.5"
             >
               <MonitorPlay className="h-4 w-4 shrink-0" />
               Vista Preview
             </Link>
             <div className="mt-2 px-3">
-              <p className="text-[10px] text-sidebar-foreground/40">DECODEX &middot; ONION200 &middot; Bolivia</p>
+              <p className="text-[10px] text-sidebar-foreground/30">DECODEX &middot; ONION200 &middot; Bolivia</p>
             </div>
           </div>
         </div>
@@ -192,9 +289,22 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               >
                 <Menu className="h-5 w-5" />
               </button>
-              <span className="text-xs sm:text-sm font-semibold text-foreground truncate">
-                {currentLabel}
-              </span>
+              <div className="flex items-center gap-2">
+                {/* Quick return to command center */}
+                {activeView !== 'resumen' && (
+                  <button
+                    onClick={() => setActiveView('resumen')}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium text-primary hover:bg-primary/10 transition-colors"
+                    title="Volver al Centro de Comando"
+                  >
+                    <Zap className="h-3 w-3" />
+                    <span className="hidden sm:inline">Comando</span>
+                  </button>
+                )}
+                <span className="text-xs sm:text-sm font-semibold text-foreground truncate">
+                  {currentLabel}
+                </span>
+              </div>
             </div>
             {/* Right: status + actions */}
             <div className="flex items-center gap-2">
