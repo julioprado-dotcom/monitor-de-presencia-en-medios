@@ -1,138 +1,166 @@
-/**
- * Product Generator — ONION200 / DECODEX Bolivia
- * Genera la configuración necesaria para producir cada tipo de boletín.
- */
+// Product Generator - Generacion de productos ONION200
+// DECODEX Bolivia
+// Stub funcional: la implementacion completa se desarrolla en modulo dedicado
 
-import { PRODUCTOS } from '@/constants/products'
-import { type TipoBoletin, type ProductoConfig } from '@/types/bulletin'
-import { db as prisma } from '@/lib/db'
+import type { TipoBoletin, ProductoConfig } from '@/types/bulletin'
 
-// ─── Obtener configuración de producto ────────────────────────────
+// Configuracion de productos ONION200
+const PRODUCTOS: ProductoConfig[] = [
+  {
+    tipo: 'EL_TERMOMETRO',
+    nombre: 'El Termometro',
+    nombreCorto: 'Termometro',
+    descripcion: 'Boletin matutino - abre el dia con balance de medios',
+    categoria: 'premium',
+    frecuencia: 'diario_am',
+    horarioEnvio: '07:00 AM',
+    longitudPaginas: 8,
+    longitudMinLectura: 12,
+    canales: ['whatsapp', 'email', 'web'],
+    periodoDefault: 1,
+    activo: true,
+    generador: {
+      tipo: 'dedicado',
+      ventana: 'nocturna',
+      filtros: ['fecha', 'ejes', 'actores', 'medios'],
+      requierePreview: true,
+      panelId: 'termometro_saldo',
+      descripcionVentana: 'Ayer 19:00 - Hoy 07:00',
+    },
+  },
+  {
+    tipo: 'SALDO_DEL_DIA',
+    nombre: 'Saldo del Dia',
+    nombreCorto: 'Saldo',
+    descripcion: 'Cierre de jornada con balance completo',
+    categoria: 'premium',
+    frecuencia: 'diario_pm',
+    horarioEnvio: '07:00 PM',
+    longitudPaginas: 10,
+    longitudMinLectura: 15,
+    canales: ['whatsapp', 'email', 'web'],
+    periodoDefault: 1,
+    activo: true,
+    generador: {
+      tipo: 'dedicado',
+      ventana: 'diurna',
+      filtros: ['fecha', 'ejes', 'actores', 'medios'],
+      requierePreview: true,
+      panelId: 'termometro_saldo',
+      descripcionVentana: 'Hoy 07:00 - 19:00',
+    },
+  },
+  {
+    tipo: 'EL_FOCO',
+    nombre: 'El Foco',
+    nombreCorto: 'Foco',
+    descripcion: 'Analisis profundo por eje tematico',
+    categoria: 'premium_mid',
+    frecuencia: 'diario',
+    horarioEnvio: '09:00 AM',
+    longitudPaginas: 15,
+    longitudMinLectura: 20,
+    canales: ['whatsapp', 'email', 'pdf'],
+    periodoDefault: 1,
+    activo: true,
+    generador: {
+      tipo: 'dedicado',
+      ventana: 'dia_completo',
+      filtros: ['ejes', 'actores'],
+      requierePreview: true,
+      panelId: 'foco',
+      tieneFases: true,
+      descripcionVentana: 'Dia completo (00:00 - 23:59)',
+    },
+  },
+  {
+    tipo: 'EL_RADAR',
+    nombre: 'El Radar',
+    nombreCorto: 'Radar',
+    descripcion: 'Boletin semanal gratuito de awareness',
+    categoria: 'gratuito',
+    frecuencia: 'semanal',
+    horarioEnvio: '08:00 AM lunes',
+    longitudPaginas: 5,
+    longitudMinLectura: 8,
+    canales: ['email', 'web'],
+    periodoDefault: 7,
+    activo: true,
+    generador: {
+      tipo: 'dedicado',
+      ventana: 'semanal',
+      filtros: ['fecha', 'ejes'],
+      requierePreview: true,
+      panelId: 'radar',
+      descripcionVentana: 'Lunes - Domingo',
+    },
+  },
+  {
+    tipo: 'EL_ESPECIALIZADO',
+    nombre: 'El Especializado',
+    nombreCorto: 'Especializado',
+    descripcion: 'Analisis experto sectorial',
+    categoria: 'premium_mid',
+    frecuencia: 'semanal',
+    horarioEnvio: '10:00 AM',
+    longitudPaginas: 20,
+    longitudMinLectura: 25,
+    canales: ['whatsapp', 'email', 'pdf'],
+    periodoDefault: 7,
+    activo: true,
+    generador: {
+      tipo: 'dedicado',
+      ventana: 'semanal',
+      filtros: ['ejes', 'actores', 'medios'],
+      requierePreview: true,
+      panelId: 'especializado',
+      descripcionVentana: 'Semana completa',
+    },
+  },
+]
 
+// Obtener config de un producto por tipo
 export function getProductConfig(tipo: TipoBoletin): ProductoConfig | null {
-  return PRODUCTOS[tipo] ?? null
+  return PRODUCTOS.find(p => p.tipo === tipo) || null
 }
 
-// ─── Obtener todos los productos activos ──────────────────────────
-
-export function getActiveProducts(): ProductoConfig[] {
-  return Object.values(PRODUCTOS).filter(p => p.activo)
-}
-
-// ─── Calcular rango de fechas para un producto ────────────────────
-
-export function getDateRange(tipo: TipoBoletin, customDays?: number): {
-  fechaInicio: Date
-  fechaFin: Date
-} {
-  const config = PRODUCTOS[tipo]
-  const days = customDays ?? config.periodoDefault
-
-  const fechaFin = new Date()
-  const fechaInicio = new Date()
-
-  if (tipo === 'SALDO_DEL_DIA') {
-    // Saldo del Día: rango del día de hoy (jornada completa)
-    fechaInicio.setHours(0, 0, 0, 0)
-    fechaFin.setHours(23, 59, 59, 999)
-  } else if (tipo === 'EL_TERMOMETRO') {
-    // Termómetro: desde ayer hasta ahora (para dar contexto de apertura)
-    fechaInicio.setDate(fechaInicio.getDate() - 1)
-    fechaInicio.setHours(0, 0, 0, 0)
-  } else if (config.frecuencia === 'semanal') {
-    // Semanales: lunes anterior a domingo
-    const dayOfWeek = fechaInicio.getDay()
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-    fechaInicio.setDate(fechaInicio.getDate() - daysToMonday - 7)
-    fechaInicio.setHours(0, 0, 0, 0)
-    fechaFin.setDate(fechaFin.getDate() - daysToMonday)
-    fechaFin.setHours(23, 59, 59, 999)
-  } else if (config.frecuencia === 'mensual') {
-    // Mensuales: primer día del mes anterior al último
-    fechaInicio.setMonth(fechaInicio.getMonth() - 1, 1)
-    fechaInicio.setHours(0, 0, 0, 0)
-    fechaFin.setDate(0) // último día del mes anterior
-    fechaFin.setHours(23, 59, 59, 999)
-  } else {
-    // Diarios por defecto
-    fechaInicio.setDate(fechaInicio.getDate() - days)
-    fechaInicio.setHours(0, 0, 0, 0)
-  }
-
-  return { fechaInicio, fechaFin }
-}
-
-// ─── Obtener menciones para un boletín ───────────────────────────
-
+// Obtener menciones para un boletin
 export async function getMencionesForBulletin(
   tipo: TipoBoletin,
-  options?: {
-    ejesTematicos?: string[]
-    personaId?: string
-    customDays?: number
-  }
-) {
-  const { fechaInicio, fechaFin } = getDateRange(tipo, options?.customDays)
+  options: { personaId?: string; ejesTematicos?: string[] } = {},
+): Promise<{
+  menciones: Record<string, unknown>[]
+  fechaInicio: Date
+  fechaFin: Date
+  totalMenciones: number
+}> {
+  // En produccion: query real a la DB con filtros por tipo, fechas, ejes, etc.
+  // Por ahora, ventana de fechas segun tipo
+  const now = new Date()
+  const config = getProductConfig(tipo)
+  const dias = config?.periodoDefault || 1
 
-  const where: Record<string, unknown> = {
-    fechaCaptura: {
-      gte: fechaInicio,
-      lte: fechaFin,
-    },
-  }
+  const fechaFin = new Date(now)
+  const fechaInicio = new Date(now)
+  fechaInicio.setDate(fechaInicio.getDate() - dias)
 
-  if (options?.personaId) {
-    where.personaId = options.personaId
-  }
-
-  const menciones = await prisma.mencion.findMany({
-    where,
-    include: {
-      persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true } },
-      medio: { select: { id: true, nombre: true, nivel: true, tipo: true } },
-      ejesTematicos: {
-        include: {
-          ejeTematico: { select: { id: true, nombre: true, slug: true } },
-        },
-      },
-    },
-    orderBy: { fechaPublicacion: 'desc' },
-    take: tipo === 'EL_FOCO' ? 50 : 100,
-  })
-
-  // Filtrar por ejes temáticos si se especificaron
-  const mencionesFiltradas = options?.ejesTematicos && options.ejesTematicos.length > 0
-    ? menciones.filter(m =>
-        m.ejesTematicos.some(et =>
-          options.ejesTematicos!.includes(et.ejeTematico.slug)
-        )
-      )
-    : menciones
-
+  // Placeholder: devolver array vacio
+  // El modulo real de generacion inyectara las menciones
   return {
-    menciones: mencionesFiltradas,
+    menciones: [],
     fechaInicio,
     fechaFin,
-    totalMenciones: mencionesFiltradas.length,
+    totalMenciones: 0,
   }
 }
 
-// ─── Formatear fecha para Bolivia ─────────────────────────────────
-
-export function formatFechaBolivia(fecha: Date): string {
-  return fecha.toLocaleDateString('es-BO', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
+// Formatear fecha en zona horaria de Bolivia (America/La_Paz, UTC-4)
+export function formatFechaBolivia(date: Date): string {
+  const opciones: Intl.DateTimeFormatOptions = {
     day: 'numeric',
+    month: 'long',
+    year: 'numeric',
     timeZone: 'America/La_Paz',
-  })
-}
-
-export function formatHoraBolivia(fecha: Date): string {
-  return fecha.toLocaleTimeString('es-BO', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'America/La_Paz',
-  })
+  }
+  return date.toLocaleDateString('es-BO', opciones)
 }

@@ -14,6 +14,10 @@ interface DashboardStore {
   setActiveView: (viewId: string) => void;
   setSidebarOpen: (open: boolean) => void;
 
+  // Collapsible sidebar groups
+  expandedGroups: string[];
+  toggleGroup: (groupId: string) => void;
+
   // Global data (loaded once at init)
   data: DashboardData | null;
   loading: boolean;
@@ -39,6 +43,15 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   setActiveView: (viewId) => set({ activeView: viewId, sidebarOpen: false }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
+  // Collapsible sidebar groups (sections + sub-items)
+  expandedGroups: ['analisis', 'onion200', 'comercial', 'config', 'menciones'],
+  toggleGroup: (groupId) =>
+    set((s) => ({
+      expandedGroups: s.expandedGroups.includes(groupId)
+        ? s.expandedGroups.filter((g) => g !== groupId)
+        : [...s.expandedGroups, groupId],
+    })),
+
   // Global data
   data: null,
   loading: true,
@@ -56,38 +69,35 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   _initialized: false,
 
   // Initialize — load global data once (deduplicated)
+  // Stats fetch is blocking (drives loading screen); health fetch is non-blocking (background).
   initialize: async () => {
     if (get()._initialized) return;
     set({ _initialized: true });
 
-    // Both fetches in parallel with timeout
-    const [statsResult, healthResult] = await Promise.allSettled([
-      fetchWithTimeout('/api/stats', { timeoutMs: FETCH_TIMEOUT }),
-      fetchWithTimeout('/api/medios/health', { timeoutMs: FETCH_TIMEOUT }),
-    ]);
-
-    // Process stats result
-    if (statsResult.status === 'fulfilled' && statsResult.value.ok) {
-      try {
-        const json = await statsResult.value.json();
+    // Step 1: Fetch stats (blocking — controls loading screen)
+    try {
+      const statsResponse = await fetchWithTimeout('/api/stats', { timeoutMs: FETCH_TIMEOUT });
+      if (statsResponse.ok) {
+        const json = await statsResponse.json();
         set({ data: json, loading: false, error: '' });
-      } catch {
-        set({ error: 'Error al procesar datos del dashboard', loading: false });
+      } else {
+        set({ error: 'Error al cargar datos del dashboard', loading: false });
       }
-    } else {
-      const reason = statsResult.status === 'rejected' ? statsResult.reason : 'Error al cargar datos';
+    } catch (err) {
       set({
-        error: reason instanceof Error ? reason.message : String(reason),
+        error: err instanceof Error ? err.message : 'Error de conexion',
         loading: false,
       });
     }
 
-    // Process health result (non-critical — silent on failure)
-    if (healthResult.status === 'fulfilled' && healthResult.value.ok) {
-      try {
-        const json = await healthResult.value.json();
-        set({ mediosHealth: json });
-      } catch { /* silent */ }
-    }
+    // Step 2: Fetch medios health in the background (non-blocking)
+    fetchWithTimeout('/api/medios/health', { timeoutMs: FETCH_TIMEOUT })
+      .then((res) => {
+        if (res.ok) return res.json();
+      })
+      .then((json) => {
+        if (json) set({ mediosHealth: json });
+      })
+      .catch(() => { /* silent — non-critical */ });
   },
 }));

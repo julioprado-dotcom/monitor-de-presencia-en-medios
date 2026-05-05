@@ -1,12 +1,13 @@
 'use client';
 
 import { useDashboardStore } from '@/stores/useDashboardStore';
-import { NAV_ITEMS } from '@/constants/nav';
+import { NAV_ITEMS, NAV_GROUPS, getNavLabel } from '@/constants/nav';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { AlertCircle, Menu, X, Globe } from 'lucide-react';
+import { AlertCircle, Menu, X, Globe, ChevronDown, ChevronRight, MonitorPlay } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useMemo } from 'react';
+export { LoadingScreen } from './LoadingScreen';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   // Fine-grained selectors
@@ -16,12 +17,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const setActiveView = useDashboardStore((s) => s.setActiveView);
   const error = useDashboardStore((s) => s.error);
   const clearError = useDashboardStore((s) => s.clearError);
+  const expandedGroups = useDashboardStore((s) => s.expandedGroups);
+  const toggleGroup = useDashboardStore((s) => s.toggleGroup);
 
-  // Memoize current nav item lookup
-  const currentNavItem = useMemo(
-    () => NAV_ITEMS.find((n) => n.id === activeView),
-    [activeView],
-  );
+  // Current view label (supports nested items)
+  const currentLabel = useMemo(() => getNavLabel(activeView), [activeView]);
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -50,7 +50,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-sm font-extrabold tracking-tight text-sidebar-foreground truncate leading-none">DECODEX BOLIVIA</h2>
-              <p className="text-[9px] text-sidebar-foreground/60 mt-0.5 tracking-wide uppercase">Inteligencia de Señales</p>
+              <p className="text-[9px] text-sidebar-foreground/60 mt-0.5 tracking-wide uppercase">Inteligencia de Senales</p>
             </div>
             <button
               className="lg:hidden p-1 rounded hover:bg-sidebar-accent"
@@ -60,27 +60,97 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
-          {/* Nav */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeView === item.id;
+          {/* Nav with collapsible groups */}
+          <nav className="flex-1 px-3 py-3 overflow-y-auto custom-scrollbar">
+            {NAV_GROUPS.map((group) => {
+              const isGroupExpanded = expandedGroups.includes(group.id);
               return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveView(item.id)}
-                  className={`
-                    w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                    transition-colors duration-150
-                    ${isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                <div key={group.id} className="mb-2 last:mb-0">
+                  {/* Group header (clickable to collapse/expand) */}
+                  <button
+                    onClick={() => toggleGroup(group.id)}
+                    className="w-full flex items-center gap-2 px-3 mb-1 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/50 hover:text-sidebar-foreground/80 hover:bg-sidebar-accent/30 transition-colors"
+                  >
+                    <span className="flex-1 text-left">{group.label}</span>
+                    {isGroupExpanded
+                      ? <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+                      : <ChevronRight className="h-3 w-3 shrink-0 opacity-60" />
                     }
-                  `}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {item.label}
-                </button>
+                  </button>
+
+                  {/* Group items (hidden when collapsed) */}
+                  {isGroupExpanded && (
+                    <div className="space-y-0.5">
+                  {NAV_ITEMS.slice(group.from, group.to + 1).map((item) => {
+                    const hasChildren = item.children && item.children.length > 0;
+                    const isExpanded = expandedGroups.includes(item.id);
+                    const isActive = activeView === item.id;
+                    const isChildActive = hasChildren && item.children!.some(c => c.id === activeView);
+
+                    return (
+                      <div key={item.id}>
+                        {/* Main item */}
+                        <button
+                          onClick={() => {
+                            if (hasChildren) {
+                              toggleGroup(item.id);
+                              // Also navigate to parent if clicking on collapsed
+                              if (!isExpanded) setActiveView(item.id);
+                            } else {
+                              setActiveView(item.id);
+                            }
+                          }}
+                          className={`
+                            w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium
+                            transition-colors duration-150
+                            ${isActive
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                              : isChildActive
+                                ? 'bg-sidebar-accent/40 text-sidebar-accent-foreground'
+                                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                            }
+                          `}
+                        >
+                          {item.icon && <item.icon className="h-4 w-4 shrink-0" />}
+                          <span className="flex-1 text-left truncate">{item.label}</span>
+                          {hasChildren && (
+                            isExpanded
+                              ? <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                              : <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                          )}
+                        </button>
+
+                        {/* Sub-items (collapsible) */}
+                        {hasChildren && isExpanded && (
+                          <div className="ml-4 pl-3 border-l border-sidebar-border/50 space-y-0.5 mt-0.5 mb-1">
+                            {item.children!.map((child) => {
+                              const isChildItemActive = activeView === child.id;
+                              return (
+                                <button
+                                  key={child.id}
+                                  onClick={() => setActiveView(child.id)}
+                                  className={`
+                                    w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-medium
+                                    transition-colors duration-150
+                                    ${isChildItemActive
+                                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                                      : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground/90'
+                                    }
+                                  `}
+                                >
+                                  {child.icon && <child.icon className="h-3.5 w-3.5 shrink-0 opacity-70" />}
+                                  <span className="truncate">{child.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </nav>
@@ -94,8 +164,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <Globe className="h-4 w-4 shrink-0" />
               Vista cliente
             </Link>
+            <Link
+              href="/"
+              onClick={() => setActiveView('preview')}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors mt-0.5"
+            >
+              <MonitorPlay className="h-4 w-4 shrink-0" />
+              Vista Preview
+            </Link>
             <div className="mt-2 px-3">
-              <p className="text-[10px] text-sidebar-foreground/40">DECODEX · ONION200 · Bolivia</p>
+              <p className="text-[10px] text-sidebar-foreground/40">DECODEX &middot; ONION200 &middot; Bolivia</p>
             </div>
           </div>
         </div>
@@ -115,14 +193,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <Menu className="h-5 w-5" />
               </button>
               <span className="text-xs sm:text-sm font-semibold text-foreground truncate">
-                {currentNavItem?.label || 'Centro de Comando'}
+                {currentLabel}
               </span>
             </div>
             {/* Right: status + actions */}
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30">
                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 hidden sm:inline">En línea</span>
+                <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 hidden sm:inline">En linea</span>
               </div>
               <ThemeToggle />
             </div>
@@ -151,25 +229,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
             <span className="text-[11px] font-bold text-foreground/80 tracking-tight">DECODEX BOLIVIA</span>
           </div>
-          <span className="text-[10px] text-muted-foreground/60 tracking-wide uppercase">Inteligencia de Señales</span>
+          <span className="text-[10px] text-muted-foreground/60 tracking-wide uppercase">Inteligencia de Senales</span>
         </div>
       </div>
     </div>
   );
 }
 
-export function LoadingScreen() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center space-y-4">
-        <div className="h-12 w-12 rounded-xl flex items-center justify-center mx-auto" style={{ backgroundColor: '#0A1628' }}>
-          <Image src="/logo.png" alt="DECODEX" width={48} height={48} className="object-cover" />
-        </div>
-        <div>
-          <p className="text-lg font-bold text-foreground">DECODEX</p>
-          <p className="text-muted-foreground text-sm">Cargando dashboard...</p>
-        </div>
-      </div>
-    </div>
-  );
-}

@@ -96,11 +96,14 @@ export interface MedioItem {
   nombre: string;
   url: string;
   tipo: string;
+  categoria: string;
   nivel: string;
   departamento: string | null;
   plataformas: string;
   activo: boolean;
   mencionesCount: number;
+  notas: string;
+  pais: string;
 }
 
 export interface EjeItem {

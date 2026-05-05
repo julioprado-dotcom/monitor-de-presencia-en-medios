@@ -50,6 +50,9 @@ interface Cliente {
   parlamentariosCount: number;
   contratosActivos: number;
   notas: string;
+  ci: string;
+  razonSocial: string;
+  nit: string;
 }
 
 type FormData = {
@@ -62,6 +65,9 @@ type FormData = {
   segmento: string;
   plan: string;
   notas: string;
+  ci: string;
+  razonSocial: string;
+  nit: string;
 };
 
 const EMPTY_FORM: FormData = {
@@ -74,6 +80,9 @@ const EMPTY_FORM: FormData = {
   segmento: 'otro',
   plan: 'basico',
   notas: '',
+  ci: '',
+  razonSocial: '',
+  nit: '',
 };
 
 /* ──────────────────── Component ──────────────────── */
@@ -222,6 +231,9 @@ export function ClientesView() {
       segmento: c.segmento || 'otro',
       plan: c.plan || 'basico',
       notas: c.notas || '',
+      ci: c.ci || '',
+      razonSocial: c.razonSocial || '',
+      nit: c.nit || '',
     });
     setEditErrors({});
   };
@@ -389,6 +401,33 @@ export function ClientesView() {
                   </select>
                 </div>
               </div>
+
+              {/* Datos de facturacion */}
+              <div className="border-t border-border pt-3 mt-1">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Datos de facturación
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <Field
+                    label="CI (Cédula de Identidad)"
+                    value={createForm.ci}
+                    onChange={(v) => setCreateForm((f) => ({ ...f, ci: v }))}
+                    placeholder="Ej: 8901234"
+                  />
+                  <Field
+                    label="Razón Social (factura)"
+                    value={createForm.razonSocial}
+                    onChange={(v) => setCreateForm((f) => ({ ...f, razonSocial: v }))}
+                    placeholder="Nombre para la factura"
+                  />
+                  <Field
+                    label="NIT"
+                    value={createForm.nit}
+                    onChange={(v) => setCreateForm((f) => ({ ...f, nit: v }))}
+                    placeholder="Número de NIT"
+                  />
+                </div>
+              </div>
               <div className="space-y-1 sm:col-span-2">
                 <label className="text-[11px] font-medium text-muted-foreground">Notas</label>
                 <textarea
@@ -484,6 +523,33 @@ export function ClientesView() {
                         </select>
                       </div>
                     </div>
+
+                    {/* Datos de facturacion */}
+                    <div className="border-t border-border pt-3">
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                        Datos de facturación
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <Field
+                          label="CI (Cédula de Identidad)"
+                          value={editForm.ci}
+                          onChange={(v) => setEditForm((f) => ({ ...f, ci: v }))}
+                          placeholder="Ej: 8901234"
+                        />
+                        <Field
+                          label="Razón Social (factura)"
+                          value={editForm.razonSocial}
+                          onChange={(v) => setEditForm((f) => ({ ...f, razonSocial: v }))}
+                          placeholder="Nombre para la factura"
+                        />
+                        <Field
+                          label="NIT"
+                          value={editForm.nit}
+                          onChange={(v) => setEditForm((f) => ({ ...f, nit: v }))}
+                          placeholder="Número de NIT"
+                        />
+                      </div>
+                    </div>
                     <div className="space-y-1">
                       <label className="text-[11px] font-medium text-muted-foreground">Notas</label>
                       <textarea
@@ -535,6 +601,18 @@ export function ClientesView() {
                         </p>
                         {c.organizacion && (
                           <p className="text-[11px] text-muted-foreground">{c.organizacion}</p>
+                        )}
+                        {(c.ci || c.nit) && (
+                          <p className="text-[11px] text-muted-foreground">
+                            {c.ci && <span>CI: {c.ci}</span>}
+                            {c.ci && c.nit && <span className="mx-1.5 text-border">|</span>}
+                            {c.nit && <span>NIT: {c.nit}</span>}
+                          </p>
+                        )}
+                        {c.razonSocial && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Factura: {c.razonSocial}
+                          </p>
                         )}
                         <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1">
                           <span>Contratos activos: <strong className="text-foreground">{c.contratosActivos}</strong></span>
@@ -634,7 +712,7 @@ export function ClientesView() {
             ) : (
               <div className="col-span-full text-center py-4">
                 <p className="text-xs text-muted-foreground">
-                  Carga datos de ejemplo primero (Resumen → Cargar datos)
+                  No hay legisladores registrados
                 </p>
               </div>
             )}

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import {
-  Loader2, Database, UserCircle, Mail, Newspaper, Radio,
+  UserCircle, Mail, Newspaper, Radio,
   AlertTriangle, ChevronRight, Bell, Zap, Activity,
   CheckCircle2, XCircle, Package, ArrowRight,
 } from 'lucide-react';
@@ -23,7 +23,6 @@ export function ResumenView() {
   const setError = useDashboardStore((s) => s.setError);
   const setActiveView = useDashboardStore((s) => s.setActiveView);
   const setData = useDashboardStore((s) => s.setData);
-  const [seedLoading, setSeedLoading] = useState(false);
 
   // Memoize filtered unhealthy medios (used 3x in health banner)
   const mediosConProblema = useMemo(
@@ -35,33 +34,8 @@ export function ResumenView() {
     [mediosConProblema],
   );
 
-  const handleSeed = async () => {
-    setSeedLoading(true);
-    try {
-      const res = await fetch('/api/seed', { method: 'POST' });
-      if (!res.ok) throw new Error('Error al cargar datos');
-      const statsRes = await fetch('/api/stats');
-      if (!statsRes.ok) throw new Error('Error al cargar estadísticas');
-      const json = await statsRes.json();
-      setData(json);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
-    } finally {
-      setSeedLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
-      {/* Seed button if no data */}
-      {data && data.totalPersonas === 0 && (
-        <div className="flex justify-center">
-          <Button onClick={handleSeed} disabled={seedLoading} className="gap-2">
-            {seedLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
-            Cargar datos de ejemplo
-          </Button>
-        </div>
-      )}
 
       {/* KPI Cards — Centro de Comando */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

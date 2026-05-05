@@ -2,10 +2,10 @@
  * fetch-utils.ts — Utilidades de fetch optimizadas para conexiones lentas
  *
  * - fetchWithTimeout: AbortController automático + timeout configurable
- * - FETCH_TIMEOUT: timeout default (15s)
+ * - FETCH_TIMEOUT: timeout default (8s)
  */
 
-export const FETCH_TIMEOUT = 15_000; // 15 segundos
+export const FETCH_TIMEOUT = 8_000; // 8 seconds
 
 /**
  * Wrapper de fetch con AbortController y timeout automático.
