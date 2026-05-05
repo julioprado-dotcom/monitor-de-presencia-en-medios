@@ -12,14 +12,60 @@ import {
   Newspaper, Radio, Bell, UserCircle, Package, TrendingUp,
   ChevronRight, ArrowRight, Cpu, Database, Clock, Activity,
   CheckCircle2, XCircle, AlertTriangle, BarChart3, Zap, FileBarChart,
-  Monitor, Eye, ArrowUpRight, ArrowDownRight, Minus,
+  Monitor, Eye, ArrowUpRight, ArrowDownRight, Minus, ShieldAlert,
 } from 'lucide-react';
 import { useDashboardStore } from '@/stores/useDashboardStore';
 import { RadialGauge } from '@/components/dashboard/gauges/RadialGauge';
 import { MiniGauge } from '@/components/dashboard/gauges/MiniGauge';
+import { TopVariations } from '@/components/dashboard/TopVariations';
+import { AlarmasComerciales } from '@/components/dashboard/AlarmasComerciales';
 import { SENTIMIENTO_STYLES, TIPO_MENCION_LABELS } from '@/constants/ui';
 import { ALL_PRODUCTS } from '@/constants/nav';
 import type { SystemMetrics } from '@/types/dashboard';
+
+// ─── Alertas Comerciales types ──────────────────────────
+
+interface VariacionItem {
+  id: string;
+  nombre: string;
+  slug?: string;
+  color?: string;
+  icono?: string;
+  partidoSigla?: string;
+  camara?: string;
+  mencionesActuales: number;
+  mencionesAnteriores: number;
+  variacion: number;
+}
+
+interface ContratoPorVencer {
+  id: string;
+  clienteId: string;
+  clienteNombre: string;
+  tipoProducto: string;
+  frecuencia: string;
+  fechaFin: string;
+  diasRestantes: number;
+  montoMensual: number;
+  moneda: string;
+}
+
+interface SolicitudPendiente {
+  contratoId: string;
+  tipo: string;
+  descripcion: string;
+  clienteNombre: string;
+}
+
+interface AlertasComercialesData {
+  topVariaciones: {
+    personas: VariacionItem[];
+    ejes: VariacionItem[];
+  };
+  contratosPorVencer: ContratoPorVencer[];
+  solicitudesPendientes: SolicitudPendiente[];
+  entregasPendientes: number;
+}
 
 // ─── Animation variants ────────────────────────────────────
 
@@ -145,6 +191,22 @@ export function DashboardCommandCenter() {
   // System metrics state
   const [sysMetrics, setSysMetrics] = useState<SystemMetrics | null>(null);
 
+  // Alertas comerciales state
+  const [alertasCom, setAlertasCom] = useState<AlertasComercialesData | null>(null);
+
+  // Fetch alertas comerciales
+  const fetchAlertasComerciales = useCallback(async () => {
+    try {
+      const res = await fetch('/api/dashboard/alertas-comerciales');
+      if (res.ok) {
+        const json = await res.json();
+        setAlertasCom(json);
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
   // Fetch system metrics
   const fetchSystemMetrics = useCallback(async () => {
     try {
@@ -163,6 +225,12 @@ export function DashboardCommandCenter() {
     const interval = setInterval(fetchSystemMetrics, 10000);
     return () => clearInterval(interval);
   }, [fetchSystemMetrics]);
+
+  useEffect(() => {
+    fetchAlertasComerciales();
+    const interval = setInterval(fetchAlertasComerciales, 30000); // refresh cada 30s
+    return () => clearInterval(interval);
+  }, [fetchAlertasComerciales]);
 
   // ─── Computed values ────────────────────────────────────
 
@@ -647,12 +715,65 @@ export function DashboardCommandCenter() {
         </motion.div>
       </div>
 
-      {/* ═══ Section 4: Quick Actions ═══ */}
+      {/* ═══ Section 4: Top Variaciones + Alarmas Comerciales ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Top 5 con mayor variacion */}
+        <motion.div
+          variants={fadeInUp}
+          initial="hidden"
+          animate="visible"
+          custom={8}
+        >
+          {alertasCom ? (
+            <TopVariations
+              data={alertasCom.topVariaciones}
+              onNavigate={setActiveView}
+            />
+          ) : (
+            <Card className="hover:shadow-md transition-all">
+              <CardContent className="py-10 text-center">
+                <div className="animate-pulse flex flex-col items-center gap-2 text-muted-foreground">
+                  <TrendingUp className="h-5 w-5 opacity-40" />
+                  <span className="text-xs">Calculando variaciones...</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
+
+        {/* Alarmas comerciales */}
+        <motion.div
+          variants={fadeInUp}
+          initial="hidden"
+          animate="visible"
+          custom={9}
+        >
+          {alertasCom ? (
+            <AlarmasComerciales
+              contratosPorVencer={alertasCom.contratosPorVencer}
+              solicitudesPendientes={alertasCom.solicitudesPendientes}
+              entregasPendientes={alertasCom.entregasPendientes}
+              onNavigate={setActiveView}
+            />
+          ) : (
+            <Card className="hover:shadow-md transition-all">
+              <CardContent className="py-10 text-center">
+                <div className="animate-pulse flex flex-col items-center gap-2 text-muted-foreground">
+                  <ShieldAlert className="h-5 w-5 opacity-40" />
+                  <span className="text-xs">Cargando alarmas comerciales...</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
+      </div>
+
+      {/* ═══ Section 5: Quick Actions ═══ */}
       <motion.div
         variants={fadeInUp}
         initial="hidden"
         animate="visible"
-        custom={8}
+        custom={10}
       >
         <Card>
           <CardContent className="p-4">
@@ -696,6 +817,15 @@ export function DashboardCommandCenter() {
               >
                 <FileBarChart className="h-3.5 w-3.5" />
                 Generar Reporte
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs gap-1.5"
+                onClick={() => setActiveView('clientes')}
+              >
+                <UserCircle className="h-3.5 w-3.5" />
+                Contratos
               </Button>
               <Button
                 variant="outline"
