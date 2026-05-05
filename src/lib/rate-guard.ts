@@ -61,13 +61,13 @@ export function rateLimitHeaders(remaining: number, resetIn: number): Record<str
 }
 
 /**
- * Parsea y valida el body con Zod. Si falla, responde con 400 y retorna null.
+ * Parsea y valida el body con Zod. Si falla, responde con 400.
  * Si OK, retorna el body parseado y tipado.
  */
 export async function parseBody<T extends z.ZodTypeAny>(
   request: NextRequest,
   schema: T
-): Promise<z.infer<T> | null> {
+): Promise<z.infer<T> | NextResponse> {
   try {
     const raw = await request.json();
     const result = schema.safeParse(raw);
@@ -77,23 +77,21 @@ export async function parseBody<T extends z.ZodTypeAny>(
         field: issue.path.join('.'),
         message: issue.message,
       }));
-      NextResponse.json(
+      return NextResponse.json(
         {
           error: 'Datos inválidos',
           details: errors,
         },
         { status: 400 }
       );
-      return null;
     }
 
     return result.data as z.infer<T>;
   } catch {
-    NextResponse.json(
+    return NextResponse.json(
       { error: 'Body debe ser JSON válido' },
       { status: 400 }
     );
-    return null;
   }
 }
 
