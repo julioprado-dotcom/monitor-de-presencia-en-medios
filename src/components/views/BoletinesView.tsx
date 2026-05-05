@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Mail, CheckCircle2, XCircle, AlertTriangle, Eye, FileText, RefreshCw } from 'lucide-react';
+import { Loader2, Mail, CheckCircle2, XCircle, AlertTriangle, Eye, FileText, RefreshCw, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { KPICard } from '@/components/shared/KPICard';
 import { ALL_PRODUCTS } from '@/constants/nav';
 
@@ -37,6 +37,9 @@ export function BoletinesView() {
   const [entregasFilterTipo, setEntregasFilterTipo] = useState('todos');
   const [entregasFilterEstado, setEntregasFilterEstado] = useState('todos');
   const [previewEntrega, setPreviewEntrega] = useState<PreviewEntrega | null>(null);
+  const [showGenForm, setShowGenForm] = useState(false);
+  const [genForm, setGenForm] = useState({ tipoBoletin: '', personaId: '', ejes: [] as string[], indicadores: [] as string[] });
+  const [generating, setGenerating] = useState(false);
 
   // Initial load + reload on filter change
   useEffect(() => {
@@ -89,6 +92,73 @@ export function BoletinesView() {
         <KPICard icon={<XCircle className="h-5 w-5" />} value={entregasStats?.fallidasHoy || 0} label="Fallidas hoy" colorClass="text-red-600 dark:text-red-400" />
         <KPICard icon={<AlertTriangle className="h-5 w-5" />} value={entregasStats?.pendientes || 0} label="Pendientes" colorClass="text-amber-600 dark:text-amber-400" />
       </div>
+
+      {/* Generar Boletin */}
+      <Card>
+        <CardHeader className="pb-3">
+          <button onClick={() => setShowGenForm(!showGenForm)} className="w-full flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Plus className="h-4 w-4 text-primary" />
+              Generar boletin
+            </CardTitle>
+            {showGenForm ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+          </button>
+        </CardHeader>
+        {showGenForm && (
+          <CardContent className="p-4 pt-0 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Tipo de producto</label>
+                <select value={genForm.tipoBoletin} onChange={(e) => setGenForm(p => ({ ...p, tipoBoletin: e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm">
+                  <option value="">Seleccionar producto...</option>
+                  {ALL_PRODUCTS.map(p => <option key={p.tipo} value={p.tipo}>{p.nombre}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Persona (opcional)</label>
+                <input type="text" value={genForm.personaId} onChange={(e) => setGenForm(p => ({ ...p, personaId: e.target.value }))} placeholder="ID de persona o nombre" className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-2 block">Ejes tematicos (opcional)</label>
+              <div className="flex flex-wrap gap-1.5">
+                {['hidrocarburos-energia', 'mineria', 'economia', 'gobierno-oposicion', 'movimientos-sociales', 'corrupcion-impunidad', 'justicia-derechos', 'medio-ambiente', 'educacion-cultura', 'salud-servicios'].map(eje => (
+                  <button key={eje} onClick={() => setGenForm(p => ({ ...p, ejes: p.ejes.includes(eje) ? p.ejes.filter(x => x !== eje) : [...p.ejes, eje] }))} className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors ${genForm.ejes.includes(eje) ? 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-background text-muted-foreground border-border hover:border-purple-300'}`}>
+                    {eje.replace(/-/g, ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-2 block">Indicadores a incluir (opcional)</label>
+              <div className="flex flex-wrap gap-1.5">
+                {['tc-oficial-bcb', 'rin-bcb', 'lme-estano', 'lme-plata', 'ipc'].map(ind => (
+                  <button key={ind} onClick={() => setGenForm(p => ({ ...p, indicadores: p.indicadores.includes(ind) ? p.indicadores.filter(x => x !== ind) : [...p.indicadores, ind] }))} className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors ${genForm.indicadores.includes(ind) ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-background text-muted-foreground border-border hover:border-blue-300'}`}>
+                    {ind.replace(/-/g, ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Button onClick={async () => {
+                if (!genForm.tipoBoletin) return;
+                setGenerating(true);
+                try {
+                  const res = await fetch('/api/reportes/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo: genForm.tipoBoletin, personaId: genForm.personaId || undefined, ejes: genForm.ejes, indicadores: genForm.indicadores }) });
+                  if (res.ok) {
+                    setShowGenForm(false);
+                    setGenForm({ tipoBoletin: '', personaId: '', ejes: [], indicadores: [] });
+                    refreshEntregas();
+                  }
+                } catch { /* silent */ } finally { setGenerating(false); }
+              }} disabled={generating || !genForm.tipoBoletin} className="text-xs gap-1">
+                {generating ? 'Generando...' : 'Generar boletin'}
+              </Button>
+              <Button variant="outline" onClick={() => { setShowGenForm(false); setGenForm({ tipoBoletin: '', personaId: '', ejes: [], indicadores: [] }); }} className="text-xs">Cancelar</Button>
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
       {/* Filtros + Lista */}
       <Card>

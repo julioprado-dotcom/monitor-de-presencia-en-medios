@@ -17,6 +17,9 @@ export async function GET(request: NextRequest) {
         { nombreContacto: { contains: search } },
         { email: { contains: search } },
         { organizacion: { contains: search } },
+        { ci: { contains: search } },
+        { nit: { contains: search } },
+        { razonSocial: { contains: search } },
       ];
     }
     if (estado) where.estado = estado;
@@ -89,6 +92,7 @@ export async function POST(request: NextRequest) {
     const {
       nombre, nombreContacto, email, telefono, whatsapp,
       organizacion, segmento, plan, estado, parlamentarios, ejesContratados, notas,
+      ci, razonSocial, nit,
     } = body;
 
     if (!nombre || !email) {
@@ -109,6 +113,9 @@ export async function POST(request: NextRequest) {
         parlamentarios: Array.isArray(parlamentarios) ? JSON.stringify(parlamentarios) : (parlamentarios || '[]'),
         ejesContratados: Array.isArray(ejesContratados) ? JSON.stringify(ejesContratados) : (ejesContratados || '[]'),
         notas: notas || '',
+        ci: ci ? ci.trim() : '',
+        razonSocial: razonSocial ? razonSocial.trim() : '',
+        nit: nit ? nit.trim() : '',
       },
     });
 

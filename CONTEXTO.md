@@ -41,7 +41,7 @@ Arquitectura del Sandbox Z.ai
 
 Nombre: DECODEX Bolivia
 Motor Interno: ONION200
-Version: 0.8.0 (en desarrollo)
+Version: 0.9.0 (en desarrollo)
 Repositorio: https://github.com/julioprado-dotcom/connect
 Descripcion: SaaS de inteligencia mediatica que monitorea la presencia de actores politicos bolivianos en medios de comunicacion y redes sociales. Proporciona boletines especializados con datos duros, indicadores macroeconomicos y analisis de tendencias. Orientado al pluralismo y la Constitucion del 2009.
 Slogan: "Traduciendo senales en patrones de poder"

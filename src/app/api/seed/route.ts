@@ -303,7 +303,7 @@ export async function POST(request: Request) {
     await seedIndicadores();
 
     return NextResponse.json({
-      message: `Seed ejecutado correctamente (v0.6.0) — ${force ? 'FORCE RESET' : 'nuevo'}`,
+      message: `Seed ejecutado correctamente (v0.9.0) — ${force ? 'FORCE RESET' : 'nuevo'}`,
       ejesInsertados: ejesResult.length,
       subsInsertados: subsCreated,
       mediosInsertados: mediosResult.length,

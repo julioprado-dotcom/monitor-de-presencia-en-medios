@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+const CATEGORIAS_VALIDAS = ['oficial', 'corporativo', 'regional', 'alternativo', 'red_social'];
+const TIPOS_VALIDOS = [
+  'agencia_noticias', 'diario', 'portal_web', 'television', 'radio', 'revista',
+  'institucional', 'ente_regulador', 'tribunal', 'red_social', 'otro',
+];
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const categoria = searchParams.get('categoria');
     const nivel = searchParams.get('nivel');
     const tipo = searchParams.get('tipo');
     const departamento = searchParams.get('departamento');
     const activo = searchParams.get('activo');
 
     const where: Record<string, unknown> = {};
+    if (categoria && CATEGORIAS_VALIDAS.includes(categoria)) where.categoria = categoria;
     if (nivel) where.nivel = nivel;
     if (tipo) where.tipo = tipo;
     if (departamento) where.departamento = departamento;
@@ -19,7 +27,7 @@ export async function GET(request: NextRequest) {
     const [medios, conteosRaw] = await Promise.all([
       db.medio.findMany({
         where,
-        orderBy: [{ nivel: 'asc' }, { nombre: 'asc' }],
+        orderBy: [{ categoria: 'asc' }, { nombre: 'asc' }],
       }),
       db.mencion.groupBy({
         by: ['medioId'],
@@ -35,29 +43,28 @@ export async function GET(request: NextRequest) {
       mencionesCount: conteoMap.get(medio.id) || 0,
     }));
 
-    // Resumen por nivel — batched: 1 count + 1 groupBy instead of 15 queries
-    const nivelLabels: Record<string, string> = {
-      '1': 'Corporativos',
-      '2': 'Regionales',
-      '3': 'Alternativos',
-      '4': 'Redes',
-      '5': 'Extendidos',
+    // Resumen por categoría
+    const categoriaLabels: Record<string, string> = {
+      oficial: 'Medios Oficiales',
+      corporativo: 'Corporativos',
+      regional: 'Regionales',
+      alternativo: 'Alternativos',
+      red_social: 'Redes Sociales',
     };
 
-    const [mediosActivos, mencionesPorMedio] = await Promise.all([
+    const [mediosPorCategoria, mencionesPorMedio] = await Promise.all([
       db.medio.groupBy({
-        by: ['nivel'],
+        by: ['categoria'],
         where: { activo: true },
         _count: { id: true },
       }),
-      // Get all medios activos IDs and count their mentions in one query
       db.medio.findMany({
         where: { activo: true },
-        select: { id: true, nivel: true },
+        select: { id: true, categoria: true },
       }),
     ]);
 
-    const activosMap = new Map(mediosActivos.map((m) => [m.nivel, m._count.id]));
+    const categoriaMap = new Map(mediosPorCategoria.map((m) => [m.categoria, m._count.id]));
     const activosIds = new Set(mencionesPorMedio.map((m) => m.id));
 
     // Count menciones for all active medios in a single groupBy
@@ -69,28 +76,65 @@ export async function GET(request: NextRequest) {
         })
       : [];
 
-    const mencionesActivasMap = new Map(mencionesPorMedio.map((m) => [m.id, m.nivel]));
+    const mencionesCategoriaMap = new Map(mencionesPorMedio.map((m) => [m.id, m.categoria]));
     const conteoActivasMap = new Map(mencionesActivasRaw.map((c) => [c.medioId, c._count.id]));
 
-    // Aggregate by level
-    const conteosPorNivel = new Map<string, number>();
-    for (const [medioId, nivel] of mencionesActivasMap) {
+    // Aggregate by category
+    const conteosPorCategoria = new Map<string, number>();
+    for (const [medioId, cat] of mencionesCategoriaMap) {
       const count = conteoActivasMap.get(medioId) || 0;
-      conteosPorNivel.set(nivel, (conteosPorNivel.get(nivel) || 0) + count);
+      conteosPorCategoria.set(cat, (conteosPorCategoria.get(cat) || 0) + count);
     }
 
-    const resumenPorNivel = ['1', '2', '3', '4', '5'].map((n) => ({
-      nivel: n,
-      etiqueta: nivelLabels[n] || `Nivel ${n}`,
-      totalMedios: activosMap.get(n) || 0,
-      mencionesCount: conteosPorNivel.get(n) || 0,
+    const resumenPorCategoria = CATEGORIAS_VALIDAS.map((c) => ({
+      categoria: c,
+      etiqueta: categoriaLabels[c] || c,
+      totalMedios: categoriaMap.get(c) || 0,
+      mencionesCount: conteosPorCategoria.get(c) || 0,
     }));
 
     return NextResponse.json({
       medios: mediosConConteo,
       totalMedios: medios.length,
-      resumenPorNivel,
+      resumenPorCategoria,
     });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error desconocido';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { nombre, url, tipo, categoria, nivel, departamento, plataformas, notas, pais } = body;
+
+    if (!nombre || typeof nombre !== 'string' || nombre.trim().length === 0) {
+      return NextResponse.json({ error: 'El nombre es obligatorio' }, { status: 400 });
+    }
+    if (!tipo || !TIPOS_VALIDOS.includes(tipo)) {
+      return NextResponse.json({ error: `Tipo inválido. Valores: ${TIPOS_VALIDOS.join(', ')}` }, { status: 400 });
+    }
+    if (categoria && !CATEGORIAS_VALIDAS.includes(categoria)) {
+      return NextResponse.json({ error: `Categoría inválida. Valores: ${CATEGORIAS_VALIDAS.join(', ')}` }, { status: 400 });
+    }
+
+    const medio = await db.medio.create({
+      data: {
+        nombre: nombre.trim(),
+        url: url || '',
+        tipo,
+        categoria: categoria || 'corporativo',
+        nivel: nivel || '1',
+        departamento: departamento || null,
+        plataformas: plataformas || '',
+        notas: notas || '',
+        pais: pais || 'Bolivia',
+        activo: true,
+      },
+    });
+
+    return NextResponse.json({ medio }, { status: 201 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error desconocido';
     return NextResponse.json({ error: message }, { status: 500 });

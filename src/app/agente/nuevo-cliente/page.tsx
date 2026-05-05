@@ -40,6 +40,9 @@ interface ClienteData {
   whatsapp: string;
   segmento: string;
   notas: string;
+  ci: string;
+  razonSocial: string;
+  nit: string;
 }
 
 interface ProductConfig {
@@ -214,6 +217,39 @@ function StepClient({
           value={data.notas}
           onChange={(e) => update('notas', e.target.value)}
         />
+      </div>
+
+      {/* Datos de facturacion */}
+      <div className="border-t border-border pt-4">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+          Datos de facturaci&oacute;n
+        </p>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-foreground">CI (C&eacute;dula de Identidad)</label>
+            <Input
+              placeholder="Ej: 8901234"
+              value={data.ci}
+              onChange={(e) => update('ci', e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-foreground">Raz&oacute;n Social (para factura)</label>
+            <Input
+              placeholder="Nombre o raz&oacute;n social que aparece en la factura"
+              value={data.razonSocial}
+              onChange={(e) => update('razonSocial', e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-foreground">NIT</label>
+            <Input
+              placeholder="N&uacute;mero de Identificaci&oacute;n Tributaria"
+              value={data.nit}
+              onChange={(e) => update('nit', e.target.value)}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -525,6 +561,9 @@ export default function NuevoClientePage() {
     whatsapp: '',
     segmento: 'otro',
     notas: '',
+    ci: '',
+    razonSocial: '',
+    nit: '',
   });
 
   // Selected products
@@ -613,6 +652,9 @@ export default function NuevoClientePage() {
           whatsapp: cliente.whatsapp,
           segmento: cliente.segmento,
           notas: cliente.notas,
+          ci: cliente.ci,
+          razonSocial: cliente.razonSocial,
+          nit: cliente.nit,
         }),
       });
 
@@ -669,6 +711,9 @@ export default function NuevoClientePage() {
       whatsapp: '',
       segmento: 'otro',
       notas: '',
+      ci: '',
+      razonSocial: '',
+      nit: '',
     });
     setSelectedProducts([]);
     setProductConfigs({});

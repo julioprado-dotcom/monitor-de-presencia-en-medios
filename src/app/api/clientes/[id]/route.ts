@@ -64,6 +64,9 @@ export async function PUT(
           ejesContratados: Array.isArray(body.ejesContratados) ? JSON.stringify(body.ejesContratados) : body.ejesContratados,
         } : {}),
         ...(body.notas !== undefined ? { notas: body.notas } : {}),
+        ...(body.ci !== undefined ? { ci: body.ci.trim ? body.ci.trim() : body.ci } : {}),
+        ...(body.razonSocial !== undefined ? { razonSocial: body.razonSocial.trim ? body.razonSocial.trim() : body.razonSocial } : {}),
+        ...(body.nit !== undefined ? { nit: body.nit.trim ? body.nit.trim() : body.nit } : {}),
       },
     });
 

@@ -98,11 +98,13 @@ export async function POST(request: Request) {
     }
 
     // 3. Formatear menciones para el prompt
-    const mencionesFormateadas = menciones.slice(0, 30).map(m => {
-      const temas = m.ejesTematicos
-        .map(et => et.ejeTematico.nombre)
+    const mencionesFormateadas = menciones.slice(0, 30).map((m) => {
+      const ejes = m.ejesTematicos as Array<{ ejeTematico: { nombre: string } }> | undefined
+      const medio = m.medio as { nivel?: string; nombre?: string } | undefined
+      const temas = (ejes || [])
+        .map((et) => et.ejeTematico.nombre)
         .join(', ')
-      return `- [${m.medio.nivel || '?'}] "${m.titulo}" (${m.medio.nombre}) — Sentimiento: ${m.sentimiento} — Temas: ${temas}`
+      return `- [${medio?.nivel || '?'}] "${m.titulo}" (${medio?.nombre || '—'}) — Sentimiento: ${m.sentimiento} — Temas: ${temas}`
     }).join('\n')
 
     // 4. Construir prompt de usuario
@@ -116,7 +118,7 @@ ${mencionesFormateadas}
 
 DISTRIBUCIÓN POR NIVEL DE MEDIO:
 ${[1,2,3,4,5].map(nivel => {
-  const count = menciones.filter(m => m.medio.nivel === String(nivel)).length
+  const count = menciones.filter(m => (m.medio as Record<string, unknown> | undefined)?.nivel === String(nivel)).length
   const labels: Record<number, string> = { 1: 'Corporativos', 2: 'Regionales', 3: 'Alternativos', 4: 'Redes', 5: 'Repositorio' }
   return `- Nivel ${nivel} (${labels[nivel]}): ${count} menciones`
 }).join('\n')}

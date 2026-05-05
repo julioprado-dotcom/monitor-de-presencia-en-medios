@@ -15,9 +15,13 @@ import {
   Users,
   BarChart3,
   Radio,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList,
 } from 'lucide-react';
 
-// ─── Local types ───
+// -- Local types --
 
 interface IndicadorItem {
   slug: string;
@@ -26,6 +30,18 @@ interface IndicadorItem {
   fuente: string;
   periodicidad: string;
   unidad: string;
+  tipo: 'cuantitativo' | 'cualitativo';
+  metodologia?: string;
+  variables?: string;
+  escalaMin?: number;
+  escalaMax?: number;
+  ultimaEvaluacion?: {
+    valorCompuesto: number;
+    valorTexto: string;
+    escalaNivel: 'alto' | 'medio' | 'bajo' | 'critico';
+    puntuaciones: Record<string, number>;
+    fechaEvaluacion: string;
+  } | null;
   ultimoValor: {
     valor: string;
     valorRaw: number;
@@ -81,12 +97,55 @@ interface IndicadoresHistorico {
   indicadores: IndicadorHistorico[];
 }
 
-// ─── Component ───
+interface IndicadorCualitativoItem {
+  id: string;
+  slug: string;
+  nombre: string;
+  categoria: string;
+  tipo: 'cualitativo';
+  metodologia: string;
+  variables: string;
+  escalaMin: number;
+  escalaMax: number;
+  ultimaEvaluacion: {
+    valorCompuesto: number;
+    valorTexto: string;
+    escalaNivel: 'alto' | 'medio' | 'bajo' | 'critico';
+    puntuaciones: Record<string, number>;
+    fechaEvaluacion: string;
+  } | null;
+}
+
+interface EvaluacionFormState {
+  indicadorId: string;
+  indicadorSlug: string;
+  puntuaciones: Record<string, number>;
+  observaciones: string;
+  evaluador: string;
+  fuentes: string;
+  submitting: boolean;
+}
+
+const ESCALA_NIVEL_STYLES: Record<string, string> = {
+  critico: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-red-200 dark:border-red-800',
+  alto: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+  medio: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  bajo: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+};
+
+const ESCALA_NIVEL_DOT: Record<string, string> = {
+  critico: 'bg-red-500',
+  alto: 'bg-orange-500',
+  medio: 'bg-amber-500',
+  bajo: 'bg-emerald-500',
+};
+
+// -- Component --
 
 export function IndicadoresView() {
   const data = useDashboardStore((s) => s.data);
 
-  // ── Local state ──
+  // -- Local state --
   const [indicadoresTab, setIndicadoresTab] = useState<'macro' | 'presencia' | 'conflictividad'>('macro');
   const [indicadoresPeriodo, setIndicadoresPeriodo] = useState('30d');
   const [indicadoresCategoria, setIndicadoresCategoria] = useState('');
@@ -94,8 +153,33 @@ export function IndicadoresView() {
   const [indicadoresHistorico, setIndicadoresHistorico] = useState<IndicadoresHistorico | null>(null);
   const [indicadoresLoading, setIndicadoresLoading] = useState(false);
   const [capturaIndicadoresLoading, setCapturaIndicadoresLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    exito: boolean; exitosos: Array<{slug: string; valorTexto: string; confiable: boolean}>;
+    fallidos: Array<{slug: string; error: string}>;
+    total: number; seeded: number; timestamp: string;
+  } | null>(null);
+  const [showSyncResults, setShowSyncResults] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newInd, setNewInd] = useState({
+    nombre: '', slug: '', categoria: 'monetario', fuente: '', url: '',
+    periodicidad: 'diaria', unidad: '', formatoNumero: 2, tier: 1,
+    tipo: 'cuantitativo' as 'cuantitativo' | 'cualitativo',
+    metodologia: '',
+    variables: '',
+    escalaMin: 1,
+    escalaMax: 10,
+    notas: '', ejesTematicos: '' as string,
+  });
+  const [savingInd, setSavingInd] = useState(false);
 
-  // ── Mount + reload effect ──
+  // -- Qualitative indicators + evaluations state --
+  const [indicadoresCualitativos, setIndicadoresCualitativos] = useState<IndicadorCualitativoItem[]>([]);
+  const [cualitativosLoading, setCualitativosLoading] = useState(false);
+  const [expandedEvaluacion, setExpandedEvaluacion] = useState<string | null>(null);
+  const [evaluacionForms, setEvaluacionForms] = useState<Record<string, EvaluacionFormState>>({});
+
+  // -- Mount + reload effect --
 
   const reloadTrigger = useState(0)[1];
 
@@ -149,7 +233,29 @@ export function IndicadoresView() {
     return () => { cancelled = true; controller.abort(); };
   }, [indicadoresPeriodo, indicadoresCategoria, reloadTrigger]);
 
-  // ── Callbacks ──
+  // Fetch qualitative social indicators when on conflictividad tab
+  useEffect(() => {
+    if (indicadoresTab !== 'conflictividad') return;
+    let cancelled = false;
+    const controller = new AbortController();
+    (async () => {
+      setCualitativosLoading(true);
+      try {
+        const res = await fetch('/api/indicadores?tipo=cualitativo&categoria=social', { signal: controller.signal });
+        const json = await res.json();
+        if (!cancelled && Array.isArray(json)) {
+          setIndicadoresCualitativos(json);
+        }
+      } catch {
+        /* silent */
+      } finally {
+        if (!cancelled) setCualitativosLoading(false);
+      }
+    })();
+    return () => { cancelled = true; controller.abort(); };
+  }, [indicadoresTab, reloadTrigger]);
+
+  // -- Callbacks --
 
   const handleCapturaIndicadores = async () => {
     setCapturaIndicadoresLoading(true);
@@ -161,16 +267,144 @@ export function IndicadoresView() {
     }
   };
 
-  // ── Render ──
+  const handleSyncIndicadores = async () => {
+    setSyncLoading(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch('/api/indicadores/sync', { method: 'POST' });
+      const json = await res.json();
+      setSyncResult(json);
+      setShowSyncResults(true);
+      reloadTrigger(n => n + 1);
+    } catch {
+      setSyncResult({ exito: false, exitosos: [], fallidos: [{ slug: '-', error: 'Error de conexion' }], total: 0, seeded: 0, timestamp: new Date().toISOString() });
+      setShowSyncResults(true);
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  const handleSaveIndicador = async () => {
+    if (!newInd.nombre || !newInd.slug) return;
+    setSavingInd(true);
+    try {
+      const payload: Record<string, unknown> = {
+        nombre: newInd.nombre,
+        slug: newInd.slug,
+        categoria: newInd.categoria,
+        fuente: newInd.fuente,
+        url: newInd.url,
+        periodicidad: newInd.periodicidad,
+        unidad: newInd.unidad,
+        formatoNumero: newInd.formatoNumero,
+        tier: newInd.tier,
+        tipo: newInd.tipo,
+        notas: newInd.notas,
+        ejesTematicos: newInd.ejesTematicos || undefined,
+      };
+      if (newInd.tipo === 'cualitativo') {
+        payload.metodologia = newInd.metodologia;
+        payload.variables = newInd.variables;
+        payload.escalaMin = newInd.escalaMin;
+        payload.escalaMax = newInd.escalaMax;
+      }
+      const res = await fetch('/api/indicadores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setShowCreateForm(false);
+        setNewInd({
+          nombre: '', slug: '', categoria: 'monetario', fuente: '', url: '',
+          periodicidad: 'diaria', unidad: '', formatoNumero: 2, tier: 1,
+          tipo: 'cuantitativo',
+          metodologia: '', variables: '', escalaMin: 1, escalaMax: 10,
+          notas: '', ejesTematicos: '',
+        });
+        reloadTrigger(n => n + 1);
+      }
+    } catch { /* silent */ } finally {
+      setSavingInd(false);
+    }
+  };
+
+  const handleSaveEvaluacion = async (indicadorId: string) => {
+    const form = evaluacionForms[indicadorId];
+    if (!form || form.submitting) return;
+    const updatedForm = { ...form, submitting: true };
+    setEvaluacionForms(prev => ({ ...prev, [indicadorId]: updatedForm }));
+    try {
+      const fuentesArr = form.fuentes
+        .split(',')
+        .map(f => f.trim())
+        .filter(Boolean);
+      const res = await fetch('/api/indicadores/evaluaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          indicadorId,
+          puntuaciones: form.puntuaciones,
+          observaciones: form.observaciones || undefined,
+          evaluador: form.evaluador || 'analista',
+          fuentes: fuentesArr.length > 0 ? fuentesArr : undefined,
+        }),
+      });
+      if (res.ok) {
+        setExpandedEvaluacion(null);
+        setEvaluacionForms(prev => {
+          const next = { ...prev };
+          delete next[indicadorId];
+          return next;
+        });
+        reloadTrigger(n => n + 1);
+      }
+    } catch { /* silent */ } finally {
+      setEvaluacionForms(prev => ({
+        ...prev,
+        [indicadorId]: { ...prev[indicadorId], submitting: false },
+      }));
+    }
+  };
+
+  const toggleEvalForm = useCallback((ind: IndicadorCualitativoItem) => {
+    setExpandedEvaluacion(prev => prev === ind.id ? null : ind.id);
+    setEvaluacionForms(prev => {
+      if (prev[ind.id]) return prev;
+      const vars: string[] = [];
+      try { vars.push(...JSON.parse(ind.variables || '[]')); } catch { /* empty */ }
+      const puntuaciones: Record<string, number> = {};
+      vars.forEach(v => { puntuaciones[v] = Math.round((ind.escalaMin + ind.escalaMax) / 2); });
+      return {
+        ...prev,
+        [ind.id]: {
+          indicadorId: ind.id,
+          indicadorSlug: ind.slug,
+          puntuaciones,
+          observaciones: '',
+          evaluador: 'analista',
+          fuentes: '',
+          submitting: false,
+        },
+      };
+    });
+  }, []);
+
+  // Helper to parse variables JSON
+  const parseVariables = useCallback((varsJson: string): string[] => {
+    try { return JSON.parse(varsJson || '[]'); } catch { return []; }
+  }, []);
+
+  // -- Render --
 
   return (
     <div className="space-y-4">
-      {/* ── Tab Navigation ── */}
+      {/* -- Tab Navigation -- */}
       <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50 border border-border">
         {([
-          { id: 'macro' as const, label: 'Macroeconomía', icon: TrendingUp, desc: 'TC, reserva, inflación, minería' },
-          { id: 'presencia' as const, label: 'Presencia Mediática', icon: Newspaper, desc: 'Menciones por partido, ranking de actores' },
-          { id: 'conflictividad' as const, label: 'Conflictividad', icon: AlertTriangle, desc: 'Tensión social y escalamiento' },
+          { id: 'macro' as const, label: 'Macroeconomia', icon: TrendingUp, desc: 'TC, reserva, inflacion, mineria' },
+          { id: 'presencia' as const, label: 'Presencia Mediatica', icon: Newspaper, desc: 'Menciones por partido, ranking de actores' },
+          { id: 'conflictividad' as const, label: 'Conflictividad', icon: AlertTriangle, desc: 'Tension social y escalamiento' },
         ]).map(tab => {
           const TabIcon = tab.icon;
           return (
@@ -191,7 +425,152 @@ export function IndicadoresView() {
         })}
       </div>
 
-      {/* ═════════ TAB: MACROECONOMÍA ═════════ */}
+      {/* -- Crear Indicador Button + Form -- */}
+      <div className="flex items-center justify-between">
+        <div />
+        <Button
+          variant={showCreateForm ? 'outline' : 'default'}
+          size="sm"
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          className="text-xs gap-1"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Crear indicador
+        </Button>
+      </div>
+      {showCreateForm && (
+        <Card className="border-primary/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Plus className="h-4 w-4 text-primary" />
+              Nuevo indicador
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0 space-y-3">
+            {/* Row 1: Nombre + Slug */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Nombre</label>
+                <input type="text" value={newInd.nombre} onChange={(e) => setNewInd(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Tasa de Desempleo" className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Slug (identificador unico)</label>
+                <input type="text" value={newInd.slug} onChange={(e) => setNewInd(p => ({ ...p, slug: e.target.value.toLowerCase().replace(/\s/g, '-') }))} placeholder="Ej: tasa-desempleo" className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              </div>
+            </div>
+            {/* Row 2: Categoria + Periodicidad + Tier */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Categoria</label>
+                <select value={newInd.categoria} onChange={(e) => setNewInd(p => ({ ...p, categoria: e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm">
+                  <option value="monetario">Monetario</option>
+                  <option value="minero">Minero</option>
+                  <option value="economico">Economico</option>
+                  <option value="hidrocarburos">Hidrocarburos</option>
+                  <option value="climatico">Climatico</option>
+                  <option value="social">Social</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Periodicidad</label>
+                <select value={newInd.periodicidad} onChange={(e) => setNewInd(p => ({ ...p, periodicidad: e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm">
+                  <option value="diaria">Diaria</option>
+                  <option value="semanal">Semanal</option>
+                  <option value="mensual">Mensual</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Tier</label>
+                <select value={newInd.tier} onChange={(e) => setNewInd(p => ({ ...p, tier: parseInt(e.target.value) }))} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm">
+                  <option value="1">Tier 1 - Inmediato</option>
+                  <option value="2">Tier 2 - Corto plazo</option>
+                  <option value="3">Tier 3 - Mediano plazo</option>
+                </select>
+              </div>
+            </div>
+            {/* Row 3: Tipo toggle */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Tipo de indicador</label>
+              <div className="flex gap-2">
+                {(['cuantitativo', 'cualitativo'] as const).map(t => (
+                  <button key={t} onClick={() => setNewInd(p => ({ ...p, tipo: t }))} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${newInd.tipo === t ? 'bg-primary text-primary-foreground border-primary' : 'bg-background text-muted-foreground border-border hover:border-primary/50'}`}>
+                    {t === 'cuantitativo' ? 'Cuantitativo (numero)' : 'Cualitativo (evaluacion)'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Conditional fields for cualitativo */}
+            {newInd.tipo === 'cualitativo' && (
+              <div className="space-y-3 p-3 rounded-lg border border-primary/20 bg-primary/5">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Metodologia</label>
+                  <textarea value={newInd.metodologia} onChange={(e) => setNewInd(p => ({ ...p, metodologia: e.target.value }))} placeholder="Descripcion de la metodologia de evaluacion..." rows={2} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Variables (separadas por coma)</label>
+                  <input type="text" value={newInd.variables} onChange={(e) => setNewInd(p => ({ ...p, variables: e.target.value }))} placeholder="Ej: frecuencia, intensidad, alcance" className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  {newInd.variables.trim() && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {newInd.variables.split(',').map((v, i) => v.trim() && (
+                        <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{v.trim()}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Escala minima</label>
+                    <input type="number" value={newInd.escalaMin} onChange={(e) => setNewInd(p => ({ ...p, escalaMin: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Escala maxima</label>
+                    <input type="number" value={newInd.escalaMax} onChange={(e) => setNewInd(p => ({ ...p, escalaMax: parseInt(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Row 4: Fuente + URL + Unidad (shown for cuantitativo) */}
+            {newInd.tipo === 'cuantitativo' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Fuente</label>
+                  <input type="text" value={newInd.fuente} onChange={(e) => setNewInd(p => ({ ...p, fuente: e.target.value }))} placeholder="Ej: BCB" className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">URL de la fuente</label>
+                  <input type="text" value={newInd.url} onChange={(e) => setNewInd(p => ({ ...p, url: e.target.value }))} placeholder="https://..." className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Unidad</label>
+                  <input type="text" value={newInd.unidad} onChange={(e) => setNewInd(p => ({ ...p, unidad: e.target.value }))} placeholder="Ej: Bs/USD" className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                </div>
+              </div>
+            )}
+            {/* Row 5: Decimales + Notas */}
+            {newInd.tipo === 'cuantitativo' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Decimales</label>
+                  <input type="number" value={newInd.formatoNumero} onChange={(e) => setNewInd(p => ({ ...p, formatoNumero: parseInt(e.target.value) || 0 }))} min={0} max={6} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Notas</label>
+                  <input type="text" value={newInd.notas} onChange={(e) => setNewInd(p => ({ ...p, notas: e.target.value }))} placeholder="Notas adicionales..." className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                </div>
+              </div>
+            )}
+            {/* Actions */}
+            <div className="flex items-center gap-2 pt-1">
+              <Button onClick={handleSaveIndicador} disabled={savingInd || !newInd.nombre || !newInd.slug} className="text-xs gap-1">
+                {savingInd ? 'Guardando...' : 'Guardar indicador'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowCreateForm(false)} className="text-xs">Cancelar</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== TAB: MACROECONOMIA ========== */}
       {indicadoresTab === 'macro' && (
         <Card>
           <CardHeader className="pb-3">
@@ -199,12 +578,12 @@ export function IndicadoresView() {
               <div>
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  Indicadores Macroeconómicos
+                  Indicadores Macroeconomicos
                 </CardTitle>
                 <CardDescription className="text-xs mt-0.5">
                   {indicadoresHistorico
-                    ? `${indicadoresHistorico.conDatos} de ${indicadoresHistorico.totalIndicadores} con datos · Período: ${indicadoresPeriodo}`
-                    : 'Datos macroeconómicos del ecosistema boliviano'}
+                    ? `${indicadoresHistorico.conDatos} de ${indicadoresHistorico.totalIndicadores} con datos - Periodo: ${indicadoresPeriodo}`
+                    : 'Datos macroeconomicos del ecosistema boliviano'}
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -218,7 +597,7 @@ export function IndicadoresView() {
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     }`}
                   >
-                    {p === '7d' ? '7 días' : p === '30d' ? '30 días' : p === '90d' ? '90 días' : '1 año'}
+                    {p === '7d' ? '7 dias' : p === '30d' ? '30 dias' : p === '90d' ? '90 dias' : '1 ano'}
                   </button>
                 ))}
                 <select
@@ -226,17 +605,17 @@ export function IndicadoresView() {
                   onChange={(e) => { setIndicadoresCategoria(e.target.value); reloadTrigger(n => n + 1); }}
                   className="text-[10px] border border-border rounded-lg px-2 py-1 bg-background text-foreground"
                 >
-                  <option value="">Todas las categorías</option>
+                  <option value="">Todas las categorias</option>
                   <option value="monetario">Monetario</option>
                   <option value="minero">Minero</option>
                   <option value="social">Social</option>
-                  <option value="economico">Económico</option>
+                  <option value="economico">Economico</option>
                   <option value="hidrocarburos">Hidrocarburos</option>
-                  <option value="climatico">Climático</option>
+                  <option value="climatico">Climatico</option>
                 </select>
-                <Button variant="outline" size="sm" onClick={handleCapturaIndicadores} disabled={capturaIndicadoresLoading} className="text-xs gap-1">
-                  {capturaIndicadoresLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                  Capturar
+                <Button variant="default" size="sm" onClick={handleSyncIndicadores} disabled={syncLoading} className="text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white">
+                  {syncLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                  Sincronizar
                 </Button>
               </div>
             </div>
@@ -262,7 +641,7 @@ export function IndicadoresView() {
               </div>
             )}
 
-            {/* Tabla de indicadores con estadísticas */}
+            {/* Tabla de indicadores con estadisticas */}
             {indicadoresLoading ? (
               <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
             ) : indicadoresHistorico && indicadoresHistorico.indicadores.length > 0 ? (
@@ -290,7 +669,7 @@ export function IndicadoresView() {
                               : stats.tendencia === 'descendente' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
                               : 'bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400'
                             }`}>
-                              {stats.tendencia === 'ascendente' ? '↑' : stats.tendencia === 'descendente' ? '↓' : '→'} {stats.diffPct > 0 ? '+' : ''}{stats.diffPct}%
+                              {stats.tendencia === 'ascendente' ? '^' : stats.tendencia === 'descendente' ? 'v' : '-'} {stats.diffPct > 0 ? '+' : ''}{stats.diffPct}%
                             </span>
                           )}
                           <p className={`text-sm font-bold ${tieneValor ? 'text-foreground' : 'text-muted-foreground'}`}>
@@ -300,17 +679,17 @@ export function IndicadoresView() {
                         </div>
                       </div>
 
-                      {/* Estadísticas expandidas */}
+                      {/* Estadisticas expandidas */}
                       {stats && (
                         <div className="mt-2 grid grid-cols-2 sm:grid-cols-5 gap-2 pl-1">
                           <div className="text-[9px] text-muted-foreground">
                             <span className="font-medium text-foreground">{stats.puntos}</span> pts en {stats.periodo}
                           </div>
                           <div className="text-[9px] text-muted-foreground">
-                            Mín: <span className="font-medium text-foreground">{stats.min}</span>
+                            Min: <span className="font-medium text-foreground">{stats.min}</span>
                           </div>
                           <div className="text-[9px] text-muted-foreground">
-                            Máx: <span className="font-medium text-foreground">{stats.max}</span>
+                            Max: <span className="font-medium text-foreground">{stats.max}</span>
                           </div>
                           <div className="text-[9px] text-muted-foreground">
                             Prom: <span className="font-medium text-foreground">{stats.promedio}</span>
@@ -345,7 +724,7 @@ export function IndicadoresView() {
                         </div>
                       )}
 
-                      {/* Fuente y última captura */}
+                      {/* Fuente y ultima captura */}
                       <div className="mt-1.5 flex items-center justify-between pl-1">
                         <span className="text-[9px] text-muted-foreground">Fuente: {ind.fuente}</span>
                         {tieneValor && ind.ultimoValor!.fechaCaptura && (
@@ -360,14 +739,63 @@ export function IndicadoresView() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-xs text-muted-foreground">Sin datos de indicadores para el período seleccionado.</p>
+                <p className="text-xs text-muted-foreground">Sin datos de indicadores para el periodo seleccionado.</p>
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* ═════════ TAB: PRESENCIA MEDIÁTICA ═════════ */}
+      {/* ========== SYNC RESULTS ========== */}
+      {showSyncResults && syncResult && (
+        <Card className="border-emerald-200 dark:border-emerald-800">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 text-emerald-600" />
+                Resultado de Sincronizacion
+              </CardTitle>
+              <button onClick={() => setShowSyncResults(false)} className="text-xs text-muted-foreground hover:text-foreground">Cerrar</button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 pt-0 space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="text-center p-2 rounded bg-emerald-50 dark:bg-emerald-950/20">
+                <p className="text-lg font-bold text-emerald-600">{syncResult.total}</p>
+                <p className="text-[10px] text-muted-foreground">Procesados</p>
+              </div>
+              <div className="text-center p-2 rounded bg-blue-50 dark:bg-blue-950/20">
+                <p className="text-lg font-bold text-blue-600">{syncResult.exitosos.length}</p>
+                <p className="text-[10px] text-muted-foreground">Exitosos</p>
+              </div>
+              <div className="text-center p-2 rounded bg-amber-50 dark:bg-amber-950/20">
+                <p className="text-lg font-bold text-amber-600">{syncResult.fallidos.length}</p>
+                <p className="text-[10px] text-muted-foreground">Fallidos</p>
+              </div>
+            </div>
+            {syncResult.seeded > 0 && (
+              <p className="text-xs text-emerald-600 font-medium">+{syncResult.seeded} indicadores nuevos registrados en la base</p>
+            )}
+            <div className="space-y-1">
+              {syncResult.exitosos.map(e => (
+                <div key={e.slug} className="flex items-center justify-between text-[10px] p-1.5 rounded bg-emerald-50 dark:bg-emerald-950/20">
+                  <span className="font-medium text-foreground">{e.slug}</span>
+                  <span className="text-emerald-600">{e.valorTexto}</span>
+                </div>
+              ))}
+              {syncResult.fallidos.map(f => (
+                <div key={f.slug} className="flex items-center justify-between text-[10px] p-1.5 rounded bg-red-50 dark:bg-red-950/20">
+                  <span className="font-medium text-foreground">{f.slug}</span>
+                  <span className="text-red-600">{f.error}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[9px] text-muted-foreground">Ultima sync: {new Date(syncResult.timestamp).toLocaleString('es-BO')}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ========== TAB: PRESENCIA MEDIATICA ========== */}
       {indicadoresTab === 'presencia' && (
         <div className="space-y-4">
           {/* KPIs de presencia */}
@@ -388,8 +816,8 @@ export function IndicadoresView() {
             <KPICard
               icon={<TrendingUp className="h-5 w-5" />}
               value={data?.topActores?.[0]?.mencionesCount || 0}
-              label="Máx. menciones individuales"
-              subtext={data?.topActores?.[0]?.nombre || '—'}
+              label="Max. menciones individuales"
+              subtext={data?.topActores?.[0]?.nombre || '--'}
               colorClass="text-amber-600 dark:text-amber-400"
             />
             <KPICard
@@ -401,17 +829,17 @@ export function IndicadoresView() {
             />
           </div>
 
-          {/* Top 10 presencia mediática */}
+          {/* Top 10 presencia mediatica */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    Top 10 presencia mediática
+                    Top 10 presencia mediatica
                   </CardTitle>
                   <CardDescription className="text-xs mt-0.5">
-                    Actores con mayor presencia mediática · {indicadoresPeriodo === '7d' ? 'últimos 7 días' : indicadoresPeriodo === '30d' ? 'últimos 30 días' : indicadoresPeriodo === '90d' ? 'últimos 90 días' : 'último año'}
+                    Actores con mayor presencia mediatica - {indicadoresPeriodo === '7d' ? 'ultimos 7 dias' : indicadoresPeriodo === '30d' ? 'ultimos 30 dias' : indicadoresPeriodo === '90d' ? 'ultimos 90 dias' : 'ultimo ano'}
                   </CardDescription>
                 </div>
               </div>
@@ -448,7 +876,7 @@ export function IndicadoresView() {
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground text-center py-8">Sin datos de presencia para el período seleccionado</p>
+                <p className="text-xs text-muted-foreground text-center py-8">Sin datos de presencia para el periodo seleccionado</p>
               )}
             </CardContent>
           </Card>
@@ -462,7 +890,7 @@ export function IndicadoresView() {
                   Menciones por partido
                 </CardTitle>
                 <CardDescription className="text-xs mt-0.5">
-                  Distribución de menciones por agrupación política
+                  Distribucion de menciones por agrupacion politica
                 </CardDescription>
               </div>
             </CardHeader>
@@ -500,7 +928,7 @@ export function IndicadoresView() {
         </div>
       )}
 
-      {/* ═════════ TAB: CONFLICTIVIDAD ═════════ */}
+      {/* ========== TAB: CONFLICTIVIDAD ========== */}
       {indicadoresTab === 'conflictividad' && (
         <div className="space-y-4">
           {/* KPIs de conflictividad */}
@@ -524,8 +952,8 @@ export function IndicadoresView() {
                     </p>
                   </div>
                   <div className="p-4 rounded-lg border border-border bg-muted/30">
-                    <p className="text-[10px] font-medium text-muted-foreground mb-1">Período de análisis</p>
-                    <p className="text-xl font-bold text-foreground">{indicadoresPeriodo === '7d' ? '7 días' : indicadoresPeriodo === '30d' ? '30 días' : indicadoresPeriodo === '90d' ? '90 días' : '1 año'}</p>
+                    <p className="text-[10px] font-medium text-muted-foreground mb-1">Periodo de analisis</p>
+                    <p className="text-xl font-bold text-foreground">{indicadoresPeriodo === '7d' ? '7 dias' : indicadoresPeriodo === '30d' ? '30 dias' : indicadoresPeriodo === '90d' ? '90 dias' : '1 ano'}</p>
                   </div>
                 </>
               );
@@ -542,7 +970,7 @@ export function IndicadoresView() {
                     Indicadores de conflictividad
                   </CardTitle>
                   <CardDescription className="text-xs mt-0.5">
-                    Tensión social y escalamiento regional · ONION200
+                    Tension social y escalamiento regional - ONION200
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -583,12 +1011,12 @@ export function IndicadoresView() {
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
-                              {esEscalamiento ? 'Global' : 'Análisis'}
+                              {esEscalamiento ? 'Global' : 'Analisis'}
                             </span>
                             <span className="text-xs font-semibold text-foreground">{ind.nombre}</span>
                             {tieneValor && (
                               <span className={`text-[9px] ${ind.ultimoValor!.confiable ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                {ind.ultimoValor!.confiable ? '✓ confiable' : '⚠ verificar'}
+                                {ind.ultimoValor!.confiable ? 'OK confiable' : 'AT verificar'}
                               </span>
                             )}
                           </div>
@@ -596,14 +1024,14 @@ export function IndicadoresView() {
                             {tieneValor ? ind.ultimoValor!.valor : 'N/D'}
                           </p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">{ind.unidad} · Fuente: {ind.fuente}</p>
+                        <p className="text-[10px] text-muted-foreground">{ind.unidad} - Fuente: {ind.fuente}</p>
 
-                        {/* Estadísticas históricas */}
+                        {/* Estadisticas historicas */}
                         {stats && (
                           <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[9px] text-muted-foreground">
                             <div>Puntos: <span className="font-medium text-foreground">{stats.puntos}</span></div>
-                            <div>Mín: <span className="font-medium text-foreground">{stats.min}</span></div>
-                            <div>Máx: <span className="font-medium text-foreground">{stats.max}</span></div>
+                            <div>Min: <span className="font-medium text-foreground">{stats.min}</span></div>
+                            <div>Max: <span className="font-medium text-foreground">{stats.max}</span></div>
                             <div>Tendencia: <span className={`font-medium ${
                               stats.tendencia === 'ascendente' ? 'text-red-600' : stats.tendencia === 'descendente' ? 'text-emerald-600' : 'text-foreground'
                             }`}>{stats.tendencia}</span></div>
@@ -634,13 +1062,215 @@ export function IndicadoresView() {
                     );
                   })}
                   <p className="text-[10px] text-muted-foreground/60 mt-2 text-center">
-                    Los indicadores de conflictividad se calculan a partir del análisis de menciones y keywords de protesta. Fuente: ONION200.
+                    Los indicadores de conflictividad se calculan a partir del analisis de menciones y keywords de protesta. Fuente: ONION200.
                   </p>
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-xs text-muted-foreground">Sin indicadores de conflictividad para el período seleccionado.</p>
-                  <p className="text-[10px] text-muted-foreground/60 mt-1">Usa el botón de captura para obtener datos actualizados.</p>
+                  <p className="text-xs text-muted-foreground">Sin indicadores de conflictividad para el periodo seleccionado.</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">Usa el boton de captura para obtener datos actualizados.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ========== Evaluaciones Cualitativas ========== */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div>
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                  Evaluaciones Cualitativas
+                </CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Indicadores cualitativos de tension social con evaluaciones por sub-variables
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              {cualitativosLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : indicadoresCualitativos.length > 0 ? (
+                <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar">
+                  {indicadoresCualitativos.map((ind) => {
+                    const vars = parseVariables(ind.variables);
+                    const evalData = ind.ultimaEvaluacion;
+                    const isExpanded = expandedEvaluacion === ind.id;
+                    const form = evaluacionForms[ind.id];
+
+                    return (
+                      <div key={ind.id} className="p-4 rounded-lg border border-border hover:bg-muted/20 transition-colors">
+                        {/* Header row */}
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                                Cualitativo
+                              </span>
+                              <span className="text-xs font-semibold text-foreground">{ind.nombre}</span>
+                            </div>
+                            {ind.metodologia && (
+                              <p className="text-[9px] text-muted-foreground line-clamp-2">{ind.metodologia}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {evalData && (
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium border ${ESCALA_NIVEL_STYLES[evalData.escalaNivel] || ESCALA_NIVEL_STYLES.medio}`}>
+                                <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${ESCALA_NIVEL_DOT[evalData.escalaNivel] || ESCALA_NIVEL_DOT.medio}`} />
+                                {evalData.escalaNivel.toUpperCase()} ({evalData.valorCompuesto.toFixed(1)})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Sub-variables with last scores */}
+                        {vars.length > 0 && (
+                          <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {vars.map((v) => {
+                              const lastScore = evalData?.puntuaciones?.[v];
+                              return (
+                                <div key={v} className="flex items-center justify-between p-1.5 rounded bg-muted/30 text-[9px]">
+                                  <span className="text-muted-foreground font-medium">{v}</span>
+                                  <span className={`font-bold ${lastScore != null ? (lastScore >= (ind.escalaMax * 0.7) ? 'text-red-600 dark:text-red-400' : lastScore >= (ind.escalaMax * 0.4) ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400') : 'text-muted-foreground'}`}>
+                                    {lastScore != null ? lastScore : '-'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Last evaluation meta */}
+                        {evalData && (
+                          <div className="mt-1.5 flex items-center justify-between pl-1">
+                            <span className="text-[9px] text-muted-foreground">
+                              {evalData.valorTexto}
+                            </span>
+                            <span className="text-[9px] text-muted-foreground">
+                              {new Date(evalData.fechaEvaluacion).toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Toggle evaluation form button */}
+                        <button
+                          onClick={() => toggleEvalForm(ind)}
+                          className="mt-2 flex items-center gap-1 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors"
+                        >
+                          {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          Nueva Evaluacion
+                        </button>
+
+                        {/* Evaluation form */}
+                        {isExpanded && form && (
+                          <div className="mt-2 p-3 rounded-lg border border-primary/20 bg-muted/20 space-y-3">
+                            {/* Slider inputs for each sub-variable */}
+                            {vars.map((v) => (
+                              <div key={v} className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-[10px] font-medium text-muted-foreground">{v}</label>
+                                  <span className="text-[10px] font-bold text-foreground">{form.puntuaciones[v] ?? '-'}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[8px] text-muted-foreground w-4">{ind.escalaMin}</span>
+                                  <input
+                                    type="range"
+                                    min={ind.escalaMin}
+                                    max={ind.escalaMax}
+                                    value={form.puntuaciones[v] ?? Math.round((ind.escalaMin + ind.escalaMax) / 2)}
+                                    onChange={(e) => setEvaluacionForms(prev => ({
+                                      ...prev,
+                                      [ind.id]: {
+                                        ...prev[ind.id],
+                                        puntuaciones: { ...prev[ind.id].puntuaciones, [v]: parseInt(e.target.value) },
+                                      },
+                                    }))}
+                                    className="flex-1 h-1.5 accent-primary"
+                                  />
+                                  <span className="text-[8px] text-muted-foreground w-4 text-right">{ind.escalaMax}</span>
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* Observaciones */}
+                            <div>
+                              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Observaciones</label>
+                              <textarea
+                                value={form.observaciones}
+                                onChange={(e) => setEvaluacionForms(prev => ({
+                                  ...prev,
+                                  [ind.id]: { ...prev[ind.id], observaciones: e.target.value },
+                                }))}
+                                placeholder="Notas sobre la evaluacion..."
+                                rows={2}
+                                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                              />
+                            </div>
+
+                            {/* Evaluador + Fuentes */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Evaluador</label>
+                                <input
+                                  type="text"
+                                  value={form.evaluador}
+                                  onChange={(e) => setEvaluacionForms(prev => ({
+                                    ...prev,
+                                    [ind.id]: { ...prev[ind.id], evaluador: e.target.value },
+                                  }))}
+                                  placeholder="analista"
+                                  className="w-full px-3 py-1.5 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Fuentes (separadas por coma)</label>
+                                <input
+                                  type="text"
+                                  value={form.fuentes}
+                                  onChange={(e) => setEvaluacionForms(prev => ({
+                                    ...prev,
+                                    [ind.id]: { ...prev[ind.id], fuentes: e.target.value },
+                                  }))}
+                                  placeholder="Ej: redes sociales, prensa"
+                                  className="w-full px-3 py-1.5 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Submit */}
+                            <div className="flex items-center gap-2 pt-1">
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveEvaluacion(ind.id)}
+                                disabled={form.submitting}
+                                className="text-xs gap-1"
+                              >
+                                {form.submitting ? (
+                                  <><Loader2 className="h-3 w-3 animate-spin" /> Guardando...</>
+                                ) : (
+                                  <>Registrar evaluacion</>
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setExpandedEvaluacion(null)}
+                                className="text-xs"
+                              >
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <ClipboardList className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                  <p className="text-xs text-muted-foreground">No hay indicadores cualitativos de categoria social.</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">Crea un indicador cualitativo con categoria "social" para comenzar.</p>
                 </div>
               )}
             </CardContent>

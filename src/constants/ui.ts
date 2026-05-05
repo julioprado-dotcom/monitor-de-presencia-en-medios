@@ -43,19 +43,56 @@ export const TIPO_MENCION_LABELS: Record<string, string> = {
 };
 
 export const NIVEL_LABELS: Record<string, string> = {
-  '1': 'Corporativos',
-  '2': 'Regionales',
-  '3': 'Alternativos',
-  '4': 'Redes',
-  '5': 'Extendidos',
+  '1': 'Alta prioridad',
+  '2': 'Media prioridad',
+  '3': 'Baja prioridad',
 };
 
 export const NIVEL_COLORS: Record<string, string> = {
-  '1': 'bg-primary text-primary-foreground',
-  '2': 'bg-sky-600 text-white',
-  '3': 'bg-amber-600 text-white',
-  '4': 'bg-purple-600 text-white',
-  '5': 'bg-stone-500 text-white',
+  '1': 'bg-red-600 text-white',
+  '2': 'bg-amber-600 text-white',
+  '3': 'bg-stone-500 text-white',
+};
+
+// Categorías de medios — clasificación por tipo de fuente
+export const CATEGORIA_LABELS: Record<string, string> = {
+  oficial: 'Medios Oficiales',
+  corporativo: 'Corporativos',
+  regional: 'Regionales',
+  alternativo: 'Alternativos',
+  red_social: 'Redes Sociales',
+};
+
+export const CATEGORIA_COLORS: Record<string, string> = {
+  oficial: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+  corporativo: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+  regional: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
+  alternativo: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  red_social: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+};
+
+export const CATEGORIA_ICONS: Record<string, string> = {
+  oficial: 'landmark',
+  corporativo: 'building-2',
+  regional: 'map-pin',
+  alternativo: 'newspaper',
+  red_social: 'share-2',
+};
+
+export const CATEGORIAS = ['oficial', 'corporativo', 'regional', 'alternativo', 'red_social'] as const;
+
+export const TIPO_MEDIO_LABELS: Record<string, string> = {
+  agencia_noticias: 'Agencia de Noticias',
+  diario: 'Diario',
+  portal_web: 'Portal Web',
+  television: 'Televisión',
+  radio: 'Radio',
+  revista: 'Revista',
+  institucional: 'Sitio Institucional',
+  ente_regulador: 'Ente Regulador',
+  tribunal: 'Tribunal',
+  red_social: 'Red Social',
+  otro: 'Otro',
 };
 
 export const CAMARAS = ['Todas', 'Diputados', 'Senado'];

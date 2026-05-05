@@ -32,16 +32,19 @@ model Medio {
   nombre        String
   url           String   @default("")
   tipo          String
-  nivel         String   @default("1") // 1=corporativo, 2=regional, 3=alternativo, 4=redes, 5=repositorio
+  categoria     String   @default("corporativo") // oficial, corporativo, regional, alternativo, red_social
+  nivel         String   @default("1") // prioridad de captura: 1=alta, 2=media, 3=baja
   departamento  String?  // para medios regionales
-  plataformas   String   @default("") // "web,facebook,youtube,tiktok,x"
-  notas         String   @default("")
-  pais          String   @default("Bolivia")
-  activo        Boolean  @default(true)
-  fechaCreacion DateTime @default(now())
+  plataformas        String   @default("") // "web,facebook,youtube,tiktok,x"
+  notas               String   @default("")
+  pais                String   @default("Bolivia")
+  activo              Boolean  @default(true)
+  fechaCreacion       DateTime @default(now())
+  frecuenciaOverride  String   @default("") // JSON: override temporal por contrato
 
-  menciones   Mencion[]
-  capturaLogs CapturaLog[]
+  menciones      Mencion[]
+  capturaLogs    CapturaLog[]
+  fuenteEstado   FuenteEstado?
 }
 
 model EjeTematico {
@@ -175,6 +178,10 @@ model Cliente {
   parlamentarios   String   @default("") // JSON: lista de IDs de Persona asignadas al cliente
   ejesContratados  String   @default("") // JSON: lista de slugs de EjeTematico contratados
   notas            String   @default("")
+  // Datos de facturacion
+  ci               String   @default("") // Cedula de Identidad del cliente
+  razonSocial      String   @default("") // Nombre o razon social para la factura
+  nit              String   @default("") // Numero de Identificacion Tributaria para facturacion
   fechaCreacion    DateTime @default(now())
   fechaActualizacion DateTime @updatedAt
 
@@ -226,6 +233,71 @@ model Entrega {
   @@index([fechaEnvio])
 }
 
+// ─── JOB QUEUE ──────────────────────────────────────────────────
+
+model Job {
+  id                String    @id @default(cuid())
+  tipo              String                        // "scrape_fuente", "capture_indicador", "generar_boletin", "enviar_entrega", "check_fuente", "check_indicador", "verificar_enlaces", "mantenimiento"
+  prioridad         Int       @default(5)          // 0=crítico, 1=alta, 3=media, 5=normal, 7=baja, 9=mantenimiento
+  estado            String    @default("pendiente") // "pendiente", "en_progreso", "completado", "fallido", "cancelado"
+  payload           String    @default("{}")        // JSON con datos específicos del job
+  resultado         String    @default("")          // JSON con resultado de la ejecución
+  error             String    @default("")          // Mensaje de error si falló
+  intentos          Int       @default(0)           // Veces que se intentó ejecutar
+  maxIntentos       Int       @default(3)           // Máximo de reintentos
+  fechaCreacion     DateTime  @default(now())
+  fechaInicio       DateTime?                     // Cuándo empezó a ejecutarse
+  fechaFin          DateTime?                     // Cuándo terminó
+  proximaEjecucion  DateTime?                     // Para jobs recurrentes o reintentos
+  programa          String    @default("")          // Expresión cron para recurrencia
+
+  @@index([estado, prioridad])
+  @@index([tipo])
+  @@index([fechaCreacion])
+}
+
+// ─── ESTADO DE FUENTES (Check-First + Frecuencia + Histograma) ───
+
+model FuenteEstado {
+  id               String   @id @default(cuid())
+  medioId          String   @unique
+  url              String                        // URL principal de consulta
+  tipoCheck        String   @default("head")     // "rss", "head", "fingerprint", "api"
+
+  // Cache (Check-First)
+  etag             String   @default("")          // HTTP ETag
+  lastModified     String   @default("")          // HTTP Last-Modified
+  fingerprint      String   @default("")          // SHA-256 del contenido
+  ultimoValor      String   @default("")          // Último valor capturado (para APIs)
+  ultimosIds       String   @default("[]")        // JSON: IDs de las últimas entries RSS
+
+  // Métricas
+  ultimoCheck      DateTime?
+  ultimoCambio     DateTime?
+  totalChecks      Int      @default(0)
+  totalCambios     Int      @default(0)
+  checksSinCambio  Int      @default(0)
+
+  // Horarios (Histograma)
+  horasPublicacion String   @default("[]")        // JSON: {"7":22,"8":18,...}
+  horariosOptimos  String   @default("[]")        // JSON: [7,8,10,11]
+
+  // Frecuencia (Adaptativa)
+  frecuenciaBase   String   @default("6h")
+  frecuenciaActual String   @default("6h")
+
+  // Estado operativo
+  activo           Boolean  @default(true)
+  error            String   @default("")
+  responseTime     Int      @default(0)           // Último tiempo de respuesta en ms
+
+  medio            Medio    @relation(fields: [medioId], references: [id])
+
+  @@index([medioId])
+  @@index([ultimoCheck])
+  @@index([activo])
+}
+
 // ─── ONION200: Capa de Indicadores ───────────────────────────────
 
 model Indicador {
@@ -233,6 +305,7 @@ model Indicador {
   nombre          String                       // "Tipo de Cambio Oficial"
   slug            String   @unique             // "tc-oficial-bcb"
   categoria       String                       // "monetario", "minero", "climatico", "economico", "hidrocarburos", "social"
+  tipo            String   @default("cuantitativo") // "cuantitativo" (extraible) o "cualitativo" (construido)
   fuente          String                       // "Banco Central de Bolivia"
   url             String   @default("")         // URL de la fuente
   periodicidad    String   @default("diaria")   // "diaria", "semanal", "mensual"
@@ -243,10 +316,16 @@ model Indicador {
   ejesTematicos   String   @default("")         // slugs de ejes donde aplica, separados por coma
   tier            Int      @default(1)           // 1=inmediato, 2=corto plazo, 3=mediano plazo
   notas           String   @default("")         // notas del capturador
+  // Campos para indicadores cualitativos
+  metodologia     String   @default("")         // descripcion de como se construye/construye el indicador
+  variables       String   @default("[]")        // JSON: sub-variables que componen el indicador cualitativo
+  escalaMin       Float    @default(0)          // valor minimo de la escala (para cualitativos)
+  escalaMax       Float    @default(10)         // valor maximo de la escala (para cualitativos)
   fechaCreacion   DateTime @default(now())
   fechaActualizacion DateTime @updatedAt
 
-  valores IndicadorValor[]
+  valores     IndicadorValor[]
+  evaluaciones IndicadorEvaluacion[]
 }
 
 model IndicadorValor {
@@ -262,6 +341,29 @@ model IndicadorValor {
   indicador Indicador @relation(fields: [indicadorId], references: [id], onDelete: Cascade)
 
   @@index([indicadorId, fecha])
+}
+
+// ─── IndicadorEvaluacion: evaluaciones cualitativas ────────────────
+// Para indicadores cualitativos que se construyen analizando multiples variables
+
+model IndicadorEvaluacion {
+  id              String   @id @default(cuid())
+  indicadorId     String                       // FK al Indicador cualitativo
+  fechaEvaluacion DateTime @default(now())     // fecha de la evaluacion
+  valorCompuesto  Float                        // valor final compuesto (promedio/ponderado de sub-variables)
+  valorTexto      String   @default("")        // etiqueta descriptiva: "Alto", "Medio", "Bajo"
+  escalaNivel     String   @default("")        // nivel en la escala: "alto", "medio", "bajo", "critico"
+  puntuaciones    String   @default("{}")      // JSON: { "variable1": 7, "variable2": 5, ... }
+  observaciones   String   @default("")        // notas del analista
+  fuentes         String   @default("[]")      // JSON: ["encuesta X", "medios Y", "redes Z"]
+  evaluador       String   @default("sistema") // quien realizo la evaluacion
+  confiable       Boolean  @default(true)
+  fechaCreacion   DateTime @default(now())
+
+  indicador Indicador @relation(fields: [indicadorId], references: [id], onDelete: Cascade)
+
+  @@index([indicadorId, fechaEvaluacion])
+  @@index([escalaNivel])
 }
 
 // ─── ONION200: Suscriptores Gratuitos (El Radar) ──────────────────

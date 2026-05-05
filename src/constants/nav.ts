@@ -1,6 +1,6 @@
 /**
- * Navegación y catálogo de productos — DECODEX Bolivia
- * Items de sidebar y definiciones de productos operativos.
+ * Navegacion y catalogo de productos - DECODEX Bolivia
+ * Sidebar con grupos colapsables, sub-items y jerarquia.
  */
 
 import type { TipoBoletin } from '@/types/bulletin';
@@ -8,36 +8,86 @@ import {
   BarChart3, UserCircle, FileCheck, Newspaper, Tag, Mail, Bell,
   Rocket, Zap, FileBarChart, Database, TrendingUp, Package, Settings,
   Thermometer, Scale, Search, FileText, UserCheck, GraduationCap,
-  Radio, ListChecks, Link2, Target, Users, MonitorPlay, RefreshCw, ExternalLink, Maximize2, Minimize2,
+  Radio, ListChecks, Link2, Target, Users, MonitorPlay, Globe,
+  RadioTower, UsersRound, ChevronRight, Eye, Bookmark, LayoutGrid, Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-// ─── Nav Items ────────────────────────────────────────────────
+// ─── Nav Item con soporte para sub-items ────────────────────────
 
 export interface NavItem {
   id: string;
   label: string;
-  icon: LucideIcon;
+  icon?: LucideIcon;         // si no tiene icono, es un separador de grupo
+  children?: NavItem[];      // sub-items (colapsables)
 }
 
+// ─── Nav Groups (orden del sidebar) ────────────────────────────
+
 export const NAV_ITEMS: NavItem[] = [
+  // ── ANALISIS ──────────────────────────────────────────────
   { id: 'resumen', label: 'Centro de Comando', icon: BarChart3 },
+  {
+    id: 'menciones',
+    label: 'Menciones',
+    icon: Newspaper,
+    children: [
+      { id: 'personas-seguimiento', label: 'Personas en seguimiento', icon: UsersRound },
+      { id: 'temas-seguimiento', label: 'Temas en seguimiento', icon: Tag },
+    ],
+  },
+  { id: 'alertas', label: 'Alertas', icon: Bell },
+  { id: 'indicadores', label: 'Indicadores', icon: TrendingUp },
+
+  // ── ONION200 (Productos) ──────────────────────────────────
+  { id: 'boletines', label: 'Boletines', icon: Mail },
+  { id: 'reportes', label: 'Reportes', icon: FileBarChart },
+  { id: 'productos', label: 'Productos', icon: Package },
+  { id: 'estrategia', label: 'Estrategia', icon: Rocket },
+
+  // ── GESTION COMERCIAL ─────────────────────────────────────
   { id: 'clientes', label: 'Clientes', icon: UserCircle },
   { id: 'contratos', label: 'Contratos', icon: FileCheck },
   { id: 'suscriptores', label: 'Suscriptores', icon: Users },
-  { id: 'menciones', label: 'Menciones', icon: Newspaper },
-  { id: 'clasificadores', label: 'Ejes Temáticos', icon: Tag },
-  { id: 'boletines', label: 'Boletines', icon: Mail },
-  { id: 'alertas', label: 'Alertas', icon: Bell },
-  { id: 'estrategia', label: 'Estrategia', icon: Rocket },
+
+  // ── CONFIGURACION ─────────────────────────────────────────
+  { id: 'medios', label: 'Gestion de Medios', icon: RadioTower },
+  { id: 'clasificadores', label: 'Ejes Tematicos', icon: Tag },
   { id: 'generadores', label: 'Generadores', icon: Zap },
-  { id: 'reportes', label: 'Reportes', icon: FileBarChart },
   { id: 'captura', label: 'Captura', icon: Database },
-  { id: 'indicadores', label: 'Indicadores', icon: TrendingUp },
-  { id: 'productos', label: 'Productos', icon: Package },
-  { id: 'configuracion', label: 'Configuración', icon: Settings },
-  { id: 'preview', label: 'Vista Preview', icon: MonitorPlay },
+  { id: 'jobs', label: 'Sistema de Jobs', icon: Activity },
+  { id: 'configuracion', label: 'Configuracion', icon: Settings },
 ];
+
+// ─── Grupo labels para headers de seccion ──────────────────────
+
+export interface NavGroup {
+  id: string;
+  label: string;
+  /** indices en NAV_ITEMS que pertenecen a este grupo */
+  from: number;
+  to: number;
+}
+
+export const NAV_GROUPS: NavGroup[] = [
+  { id: 'analisis', label: 'Analisis', from: 0, to: 3 },
+  { id: 'onion200', label: 'ONION200', from: 4, to: 7 },
+  { id: 'comercial', label: 'Gestion Comercial', from: 8, to: 10 },
+  { id: 'config', label: 'Configuracion', from: 11, to: 16 },
+];
+
+// ─── Helper: obtener label de cualquier item (incluyendo children) ──
+
+export function getNavLabel(viewId: string): string {
+  for (const item of NAV_ITEMS) {
+    if (item.id === viewId) return item.label;
+    if (item.children) {
+      const child = item.children.find(c => c.id === viewId);
+      if (child) return `${item.label} / ${child.label}`;
+    }
+  }
+  return 'Centro de Comando';
+}
 
 // ─── All Products ─────────────────────────────────────────────
 
@@ -52,8 +102,8 @@ export interface ProductDisplay {
 
 export const ALL_PRODUCTS: ProductDisplay[] = [
   // Premium
-  { tipo: 'EL_TERMOMETRO', nombre: 'El Termómetro', icon: Thermometer, color: '#3B82F6', categoria: 'premium', estado: 'operativo' },
-  { tipo: 'SALDO_DEL_DIA', nombre: 'Saldo del Día', icon: Scale, color: '#8B5CF6', categoria: 'premium', estado: 'operativo' },
+  { tipo: 'EL_TERMOMETRO', nombre: 'El Termometro', icon: Thermometer, color: '#3B82F6', categoria: 'premium', estado: 'operativo' },
+  { tipo: 'SALDO_DEL_DIA', nombre: 'Saldo del Dia', icon: Scale, color: '#8B5CF6', categoria: 'premium', estado: 'operativo' },
   { tipo: 'EL_FOCO', nombre: 'El Foco', icon: Search, color: '#F59E0B', categoria: 'premium', estado: 'operativo' },
   { tipo: 'EL_INFORME_CERRADO', nombre: 'El Informe Cerrado', icon: FileText, color: '#10B981', categoria: 'premium', estado: 'definido' },
   { tipo: 'FICHA_LEGISLADOR', nombre: 'Ficha del Legislador', icon: UserCheck, color: '#06B6D4', categoria: 'premium', estado: 'definido' },
