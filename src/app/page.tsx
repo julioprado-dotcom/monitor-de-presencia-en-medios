@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useDashboardStore } from '@/stores/useDashboardStore';
 import { DashboardShell, LoadingScreen } from '@/components/dashboard/DashboardShell';
 
@@ -46,49 +47,76 @@ function ViewSkeleton() {
 /* Main page - slim orchestrator */
 export default function Dashboard() {
   const { loading, activeView, initialize } = useDashboardStore();
+  const [dismissing, setDismissing] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
+
+  // Cuando loading pasa de true a false → iniciar fade-out
+  const prevLoading = useState(loading)[0];
+  useEffect(() => {
+    if (prevLoading && !loading) {
+      // Espera un frame para que AnimatePresence detecte el cambio
+      requestAnimationFrame(() => setDismissing(true));
+    }
+  }, [loading, prevLoading]);
+
+  const handleSplashDone = useCallback(() => {
+    setSplashDone(true);
+  }, []);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
 
-  if (loading) return <LoadingScreen />;
+  // Mostrar splash mientras carga O durante el fade-out
+  const showSplash = loading || dismissing;
 
   const views: Record<string, ReactNode> = {
-    // Analisis
     resumen: <ResumenView />,
     menciones: <MencionesView />,
     'personas-seguimiento': <PersonasSeguimientoView />,
     'temas-seguimiento': <TemasSeguimientoView />,
     alertas: <AlertasView />,
     indicadores: <IndicadoresView />,
-
-    // ONION200 (Productos)
     boletines: <BoletinesView />,
     reportes: <ReportesView />,
     productos: <ProductosView />,
     estrategia: <EstrategiaView />,
-
-    // Gestion Comercial
     clientes: <ClientesView />,
     contratos: <ContratosView />,
     suscriptores: <SuscriptoresView />,
-
-    // Configuracion
     medios: <MediosView />,
     clasificadores: <ClasificadoresView />,
     generadores: <GeneradoresView />,
     captura: <CapturaView />,
     jobs: <JobsView />,
     configuracion: <ConfiguracionView />,
-
-    // Extras (acceso desde footer)
     preview: <PreviewView />,
     personas: <PersonasView />,
   };
 
   return (
-    <DashboardShell>
-      {views[activeView] || <ResumenView />}
-    </DashboardShell>
+    <>
+      <AnimatePresence onExitComplete={() => setDismissing(false)}>
+        {showSplash && (
+          <motion.div
+            key="splash-screen"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: 'easeInOut' }}
+            className="fixed inset-0 z-50"
+          >
+            <LoadingScreen onComplete={handleSplashDone} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Dashboard se rendera debajo del splash (visible cuando fade-out termina) */}
+      {!loading && (
+        <DashboardShell>
+          {views[activeView] || <ResumenView />}
+        </DashboardShell>
+      )}
+    </>
   );
 }

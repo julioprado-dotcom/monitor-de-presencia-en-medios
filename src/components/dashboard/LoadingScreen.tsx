@@ -57,18 +57,7 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
       {/* Contenido central */}
       <div className="relative z-10 flex flex-col items-center px-4">
 
-        {/* ─── Etapa 0-1: Lluvia binaria (el canvas ya hace el trabajo) ─── */}
-        {/* Indicador sutil de que algo esta cargando */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.3 }}
-          transition={{ duration: 0.5 }}
-          className="mb-8"
-        >
-          <span className="text-xs font-mono tracking-[0.3em] uppercase" style={{ color: 'rgba(0, 255, 136, 0.25)' }}>
-            inicializando
-          </span>
-        </motion.div>
+        {/* ─── Etapa 0-1: Solo lluvia binaria cayendo ─── */}
 
         {/* ─── Etapa 1: Puntos animados ─── */}
         <AnimatePresence>
