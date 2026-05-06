@@ -36,6 +36,16 @@ export async function PUT(
       data: parsed.body,
     });
 
+    // Sincronizar activo con FuenteEstado si cambio ese campo
+    if (parsed.body.activo !== undefined) {
+      await db.fuenteEstado.updateMany({
+        where: { medioId: id },
+        data: { activo: parsed.body.activo as boolean },
+      }).catch(err => {
+        console.warn(`[medios/[id]] Error sincronizando FuenteEstado para ${id}:`, err);
+      });
+    }
+
     return NextResponse.json({ medio });
   } catch (error: unknown) {
     return NextResponse.json({ error: safeError(error, 'medios/[id]') }, { status: 500 });
