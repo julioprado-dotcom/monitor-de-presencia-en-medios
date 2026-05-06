@@ -467,16 +467,17 @@ export function DashboardCommandCenter() {
                 {/* Panel izquierdo: 5 StatusOrbs en fila */}
                 <div className="flex-1">
                   <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-3">Estado del Sistema</p>
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:items-center lg:justify-between gap-3 lg:gap-2">
                     <StatusOrb
                       level={systemLevel}
                       icon={<Activity className="h-3.5 w-3.5" />}
                       label="Sistema"
                       value={healthScore !== null ? `${healthScore}%` : '--'}
                       size="md"
+                      horizontal={true}
                     />
                     {scoreReason && (
-                      <span className="text-[8px] text-muted-foreground max-w-[120px] truncate hidden lg:inline-block" title={scoreReason}>
+                      <span className="text-[8px] text-muted-foreground max-w-[120px] truncate hidden lg:inline-block lg:col-span-1" title={scoreReason}>
                         {scoreReason}
                       </span>
                     )}
@@ -486,6 +487,7 @@ export function DashboardCommandCenter() {
                       label="Memoria"
                       value={memoryPct}
                       size="md"
+                      horizontal={true}
                     />
                     <StatusOrb
                       level={dbLevel}
@@ -493,6 +495,7 @@ export function DashboardCommandCenter() {
                       label="DB"
                       value={dbSizeStr}
                       size="md"
+                      horizontal={true}
                     />
                     <StatusOrb
                       level={uptimeLevel}
@@ -500,6 +503,7 @@ export function DashboardCommandCenter() {
                       label="Uptime"
                       value={uptimeStr}
                       size="md"
+                      horizontal={true}
                     />
                     <StatusOrb
                       level={entregasLevel}
@@ -507,12 +511,13 @@ export function DashboardCommandCenter() {
                       label="Entregas"
                       value={entregasHoy ? `${entregasHoy.enviadas}/${entregasHoy.total}` : '--'}
                       size="md"
+                      horizontal={true}
                     />
                   </div>
                 </div>
 
                 {/* Separador vertical */}
-                <div className="hidden lg:block w-px h-16 bg-border/50 self-center" />
+                <div className="hidden lg:block w-px h-10 bg-border/50 self-center" />
 
                 {/* Panel derecho: Diagnosticos activos */}
                 <div className="lg:w-72 shrink-0">

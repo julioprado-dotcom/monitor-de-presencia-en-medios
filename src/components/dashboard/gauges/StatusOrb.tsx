@@ -14,6 +14,7 @@ export interface StatusOrbProps {
   label: string;
   value?: string;
   size?: 'sm' | 'md' | 'lg';
+  horizontal?: boolean;
 }
 
 // ─── Color maps ─────────────────────────────────────────────
@@ -95,12 +96,15 @@ const criticalPulse = {
 // StatusOrb — Pulsating sphere with halo
 // ═══════════════════════════════════════════════════════════
 
-export function StatusOrb({ level, icon, label, value, size = 'md' }: StatusOrbProps) {
+export function StatusOrb({ level, icon, label, value, size = 'md', horizontal }: StatusOrbProps) {
   const colors = LEVEL_COLORS[level];
   const dim = SIZE_MAP[size];
 
   return (
-    <div className="flex flex-col items-center gap-1.5 min-w-0">
+    <div className={cn(
+      'flex items-center gap-2 min-w-0',
+      horizontal ? 'flex-row' : 'flex-col',
+    )}>
       {/* Orb container */}
       <div className="relative flex items-center justify-center" style={{ width: dim.orb, height: dim.orb }}>
         {/* Outer halo (pulsating) */}
@@ -141,17 +145,17 @@ export function StatusOrb({ level, icon, label, value, size = 'md' }: StatusOrbP
         </motion.div>
       </div>
 
-      {/* Value */}
-      {value && (
-        <span className={cn('font-bold leading-none', colors.text, dim.value)}>
-          {value}
+      {/* Value + Label */}
+      <div className={cn('leading-tight', horizontal ? 'text-left' : 'text-center')}>
+        {value && (
+          <span className={cn('font-bold leading-none block', colors.text, dim.value)}>
+            {value}
+          </span>
+        )}
+        <span className={cn('text-muted-foreground block', dim.label)}>
+          {label}
         </span>
-      )}
-
-      {/* Label */}
-      <span className={cn('text-muted-foreground text-center leading-tight', dim.label)}>
-        {label}
-      </span>
+      </div>
     </div>
   );
 }
