@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { safeError } from '@/lib/rate-guard';
 import ZAI from 'z-ai-web-dev-sdk';
+import { analyzeMencion, applyAnalysisToMencion } from '@/lib/analyze';
 
 const SITES_QUERY = 'site:la-razon.com OR site:eldeber.com.bo OR site:lostiempos.com OR site:opinion.com.bo OR site:correodelsur.com OR site:elpotosi.net OR site:lapatria.bo OR site:eldiario.net OR site:jornadanet.com OR site:unitel.bo OR site:reduno.bo OR site:atb.com.bo OR site:boliviaverifica.bo OR site:abi.bo OR site:eju.tv OR site:elmundo.com.bo OR site:vision360.bo';
 
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
     const zai = await ZAI.create();
     let totalBusquedas = 0;
     let totalMencionesNuevas = 0;
+    let totalClasificadas = 0;
     let totalErrores = 0;
     const detalles: string[] = [];
 
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
           const medioId = medioNombre ? (medioMap.get(medioNombre) || null) : null;
           if (!medioId) continue;
 
-          await db.mencion.create({
+          const mencion = await db.mencion.create({
             data: {
               personaId: persona.id,
               medioId,
@@ -108,6 +110,15 @@ export async function POST(request: NextRequest) {
           });
           nuevasParaPersona++;
           totalMencionesNuevas++;
+
+          // Clasificar automáticamente con IA
+          try {
+            const analysis = await analyzeMencion(mencion.titulo, mencion.texto);
+            await applyAnalysisToMencion(mencion.id, analysis);
+            totalClasificadas++;
+          } catch {
+            // Si falla la clasificación, la mención queda como no_clasificado — no se pierde
+          }
         }
 
         detalles.push(`${persona.nombre}: ${nuevasParaPersona} menciones nuevas`);
@@ -135,6 +146,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       busquedas: totalBusquedas,
       mencionesNuevas: totalMencionesNuevas,
+      clasificadas: totalClasificadas,
       errores: totalErrores,
       detalles,
     });
