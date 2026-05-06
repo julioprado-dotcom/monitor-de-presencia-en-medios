@@ -3,7 +3,10 @@
 worklog.md
 download/
 node_modules/
-backups/
+
+# Database backups — tracked in git for disaster recovery
+# Only *.db files in backups/ are tracked; backup scripts are in scripts/
+# To exclude from git locally (without affecting team): git update-index --assume-unchanged backups/*.db
 
 # Sensitive / session files
 HANDOFF.md
