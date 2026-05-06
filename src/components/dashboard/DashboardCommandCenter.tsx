@@ -13,6 +13,7 @@ import {
   ChevronRight, ArrowRight, Cpu, Database, Clock, Activity,
   CheckCircle2, XCircle, AlertTriangle, BarChart3, Zap, FileBarChart,
   Monitor, Eye, ArrowUpRight, ArrowDownRight, Minus, ShieldAlert,
+  Send, AlertOctagon, Timer, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { useDashboardStore } from '@/stores/useDashboardStore';
 import { MiniGauge } from '@/components/dashboard/gauges/MiniGauge';
@@ -21,6 +22,8 @@ import { AlarmasComerciales } from '@/components/dashboard/AlarmasComerciales';
 import { SENTIMIENTO_STYLES, TIPO_MENCION_LABELS } from '@/constants/ui';
 import { ALL_PRODUCTS } from '@/constants/nav';
 import type { SystemMetrics } from '@/types/dashboard';
+import { StatusOrb, StatusPill, StatusBar } from '@/components/dashboard/gauges/StatusOrb';
+import type { StatusLevel } from '@/components/dashboard/gauges/StatusOrb';
 
 // ─── Alertas Comerciales types ──────────────────────────
 
@@ -64,6 +67,42 @@ interface AlertasComercialesData {
   contratosPorVencer: ContratoPorVencer[];
   solicitudesPendientes: SolicitudPendiente[];
   entregasPendientes: number;
+}
+
+// ─── Entregas Hoy types ────────────────────────────────────
+
+interface FallidaConDiagnostico {
+  id: string;
+  tipoBoletin: string;
+  canal: string;
+  fechaEnvio: string | null;
+  error: string | null;
+  contrato: string;
+  clienteNombre: string;
+  diagnostico: {
+    causa: string;
+    accion: string;
+    equipo: string;
+  };
+}
+
+interface EntregasHoyData {
+  total: number;
+  enviadas: number;
+  pendientes: number;
+  fallidas: number;
+  enProcesoCount: number;
+  porTipo: Record<string, { total: number; enviadas: number; pendientes: number; fallidas: number }>;
+  fallidasConDiagnostico: FallidaConDiagnostico[];
+  enProceso: {
+    id: string;
+    tipoBoletin: string;
+    canal: string;
+    fechaCreacion: string;
+    contrato: string;
+    clienteNombre: string;
+    fechaProgramada: string | null;
+  }[];
 }
 
 // ─── Animation variants ────────────────────────────────────
@@ -193,6 +232,23 @@ export function DashboardCommandCenter() {
   // Alertas comerciales state
   const [alertasCom, setAlertasCom] = useState<AlertasComercialesData | null>(null);
 
+  // Entregas hoy state
+  const [entregasHoy, setEntregasHoy] = useState<EntregasHoyData | null>(null);
+  const [showEntregasDetail, setShowEntregasDetail] = useState(false);
+
+  // Fetch entregas hoy
+  const fetchEntregasHoy = useCallback(async () => {
+    try {
+      const res = await fetch('/api/dashboard/entregas-hoy');
+      if (res.ok) {
+        const json = await res.json();
+        setEntregasHoy(json);
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
   // Fetch alertas comerciales
   const fetchAlertasComerciales = useCallback(async () => {
     try {
@@ -230,6 +286,12 @@ export function DashboardCommandCenter() {
     const interval = setInterval(fetchAlertasComerciales, 30000); // refresh cada 30s
     return () => clearInterval(interval);
   }, [fetchAlertasComerciales]);
+
+  useEffect(() => {
+    fetchEntregasHoy();
+    const interval = setInterval(fetchEntregasHoy, 15000); // refresh cada 15s
+    return () => clearInterval(interval);
+  }, [fetchEntregasHoy]);
 
   // ─── Computed values ────────────────────────────────────
 
@@ -295,9 +357,40 @@ export function DashboardCommandCenter() {
   const diagnoses = sysMetrics?.diagnoses ?? [];
   const criticals = diagnoses.filter(d => d.severity === 'critical');
   const warnings = diagnoses.filter(d => d.severity === 'warning');
-  const oks = diagnoses.filter(d => d.severity === 'ok');
 
-  // Colores del score
+  // ─── StatusLevel derived from sysMetrics ───────────────
+  const systemLevel: StatusLevel = useMemo(() => {
+    if (criticals.length > 0) return 'critical';
+    if (warnings.length > 0) return 'warning';
+    return 'ok';
+  }, [criticals, warnings]);
+
+  const memoryLevel: StatusLevel = useMemo(() => {
+    if (!sysMetrics?.memoryUsage) return 'ok';
+    const heapPct = (sysMetrics.memoryUsage.heapUsed / Math.max(1, sysMetrics.memoryUsage.heapLimit)) * 100;
+    if (heapPct > 85) return 'critical';
+    if (heapPct > 60) return 'warning';
+    return 'ok';
+  }, [sysMetrics?.memoryUsage]);
+
+  const uptimeLevel: StatusLevel = useMemo(() => {
+    if (!sysMetrics?.uptime) return 'ok';
+    return sysMetrics.uptime < 300 ? 'warning' : 'ok';
+  }, [sysMetrics?.uptime]);
+
+  const dbLevel: StatusLevel = useMemo(() => {
+    if (!sysMetrics?.dbSize) return 'ok';
+    return sysMetrics.dbSize > 500 ? 'warning' : 'ok';
+  }, [sysMetrics?.dbSize]);
+
+  const entregasLevel: StatusLevel = useMemo(() => {
+    if (!entregasHoy) return 'ok';
+    if (entregasHoy.fallidas > 0) return 'critical';
+    if (entregasHoy.pendientes > 0) return 'warning';
+    return 'ok';
+  }, [entregasHoy]);
+
+  // Colores del score (kept for section 4 compatibility)
   const healthColor = useMemo(() => {
     if (healthScore === null) return 'text-muted-foreground';
     if (healthScore >= 90) return 'text-emerald-500';
@@ -311,6 +404,20 @@ export function DashboardCommandCenter() {
     if (healthScore >= 70) return 'bg-amber-500/10 border-amber-500/30';
     return 'bg-red-500/10 border-red-500/30';
   }, [healthScore]);
+
+  // StatusOrb display values
+  const memoryPct = useMemo(() => {
+    if (!sysMetrics?.memoryUsage) return '--';
+    return `${Math.round((sysMetrics.memoryUsage.heapUsed / Math.max(1, sysMetrics.memoryUsage.heapLimit)) * 100)}%`;
+  }, [sysMetrics?.memoryUsage]);
+
+  const dbSizeStr = useMemo(() => {
+    return sysMetrics?.dbSize ? `${sysMetrics.dbSize} MB` : '--';
+  }, [sysMetrics?.dbSize]);
+
+  const uptimeStr = useMemo(() => {
+    return sysMetrics?.uptimeFormatted || '--';
+  }, [sysMetrics?.uptimeFormatted]);
 
   // ═══════════════════════════════════════════════════════
   // Render
@@ -330,82 +437,234 @@ export function DashboardCommandCenter() {
   return (
     <div className="space-y-6">
 
-      {/* ═══ Section 1: Diagnóstico del Sistema ═══ */}
+      {/* ═══ Section 1: Diagnostico del Sistema + StatusOrbs ═══ */}
       <motion.div
         variants={stagger}
         initial="hidden"
         animate="visible"
-        className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4"
+        className="grid grid-cols-1 gap-3 sm:gap-4"
       >
-        {/* Score de salud */}
+        {/* FILA 1: StatusOrbs + Diagnosticos activos */}
         <motion.div custom={0} variants={fadeInUp}>
           <Card className="border">
-            <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Salud del Sistema</span>
-              <span className={`text-4xl font-bold ${healthColor}`}>
-                {healthScore !== null ? healthScore : '--'}
-              </span>
-              <span className="text-[10px] text-muted-foreground">
-                {criticals.length > 0 && <span className="text-red-500">{criticals.length} critico{criticals.length > 1 ? 's' : ''}</span>}
-                {criticals.length > 0 && warnings.length > 0 && <span> · </span>}
-                {warnings.length > 0 && <span className="text-amber-500">{warnings.length} advertencia{warnings.length > 1 ? 's' : ''}</span>}
-                {criticals.length === 0 && warnings.length === 0 && <span className="text-emerald-500">Todo normal</span>}
-              </span>
+            <CardContent className="p-4">
+              <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                {/* Panel izquierdo: 5 StatusOrbs en fila */}
+                <div className="flex-1">
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-3">Estado del Sistema</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <StatusOrb
+                      level={systemLevel}
+                      icon={<Activity className="h-3.5 w-3.5" />}
+                      label="Sistema"
+                      value={healthScore !== null ? `${healthScore}%` : '--'}
+                      size="md"
+                    />
+                    <StatusOrb
+                      level={memoryLevel}
+                      icon={<Cpu className="h-3.5 w-3.5" />}
+                      label="Memoria"
+                      value={memoryPct}
+                      size="md"
+                    />
+                    <StatusOrb
+                      level={dbLevel}
+                      icon={<Database className="h-3.5 w-3.5" />}
+                      label="DB"
+                      value={dbSizeStr}
+                      size="md"
+                    />
+                    <StatusOrb
+                      level={uptimeLevel}
+                      icon={<Clock className="h-3.5 w-3.5" />}
+                      label="Uptime"
+                      value={uptimeStr}
+                      size="md"
+                    />
+                    <StatusOrb
+                      level={entregasLevel}
+                      icon={<Send className="h-3.5 w-3.5" />}
+                      label="Entregas"
+                      value={entregasHoy ? `${entregasHoy.enviadas}/${entregasHoy.total}` : '--'}
+                      size="md"
+                    />
+                  </div>
+                </div>
+
+                {/* Separador vertical */}
+                <div className="hidden lg:block w-px h-16 bg-border/50 self-center" />
+
+                {/* Panel derecho: Diagnosticos activos */}
+                <div className="lg:w-72 shrink-0">
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-3">Diagnosticos</p>
+                  <div className="space-y-1.5">
+                    {criticals.length > 0 && criticals.map(d => (
+                      <div key={d.id} className="flex items-start gap-2">
+                        <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-medium text-red-600 dark:text-red-400">{d.message}</p>
+                          {d.action && <p className="text-[9px] text-muted-foreground mt-0.5">{d.action}</p>}
+                        </div>
+                      </div>
+                    ))}
+                    {warnings.length > 0 && warnings.map(d => (
+                      <div key={d.id} className="flex items-start gap-2">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">{d.message}</p>
+                          {d.action && <p className="text-[9px] text-amber-700/70 dark:text-amber-400/70 mt-0.5">{d.action}</p>}
+                        </div>
+                      </div>
+                    ))}
+                    {criticals.length === 0 && warnings.length === 0 && (
+                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span className="text-xs font-medium">Todo normal</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* KPIs rápidos */}
+        {/* FILA 2: Entregas Hoy */}
         <motion.div custom={1} variants={fadeInUp}>
           <Card className="border">
-            <CardContent className="p-4 grid grid-cols-2 gap-3">
-              <div className="flex flex-col items-center">
-                <span className="text-lg font-bold text-foreground">{sysMetrics?.memoryUsage?.heapUsed ?? '--'}</span>
-                <span className="text-[9px] text-muted-foreground">Heap MB</span>
+            <CardContent className="p-4 space-y-3">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Send className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">Entregas Hoy</span>
+                  {entregasHoy && entregasHoy.fallidas > 0 && (
+                    <AlertOctagon className="h-3.5 w-3.5 text-red-500" />
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-[10px] gap-1 h-6 px-2"
+                  onClick={() => setShowEntregasDetail(prev => !prev)}
+                >
+                  {showEntregasDetail ? 'Ocultar' : 'Ver mas'}
+                  {showEntregasDetail
+                    ? <ChevronUp className="h-3 w-3" />
+                    : <ChevronDown className="h-3 w-3" />
+                  }
+                </Button>
               </div>
-              <div className="flex flex-col items-center">
-                <span className="text-lg font-bold text-foreground">{sysMetrics?.dbSize ?? '--'}</span>
-                <span className="text-[9px] text-muted-foreground">DB MB</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-lg font-bold text-foreground">{sysMetrics?.uptimeFormatted ?? '--'}</span>
-                <span className="text-[9px] text-muted-foreground">Uptime</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-lg font-bold text-foreground">{data.entregasHoy}</span>
-                <span className="text-[9px] text-muted-foreground">Entregas hoy</span>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
 
-        {/* Alertas activas (solo si hay) */}
-        <motion.div custom={2} variants={fadeInUp}>
-          <Card className={`border ${healthBg}`}>
-            <CardContent className="p-4 space-y-2">
-              {criticals.length > 0 && criticals.map(d => (
-                <div key={d.id} className="flex items-start gap-2">
-                  <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-red-600 dark:text-red-400">{d.message}</p>
-                    {d.action && <p className="text-[9px] text-muted-foreground mt-0.5">{d.action}</p>}
+              {/* 4 contadores en fila */}
+              <div className="grid grid-cols-4 gap-3">
+                <div className="flex flex-col items-center py-2 rounded-lg bg-muted/40 border border-border/50">
+                  <span className="text-lg font-bold text-foreground">{entregasHoy?.total ?? '--'}</span>
+                  <span className="text-[9px] text-muted-foreground">Total</span>
+                </div>
+                <div className="flex flex-col items-center py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                  <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{entregasHoy?.enviadas ?? '--'}</span>
+                  <span className="text-[9px] text-muted-foreground">Enviadas</span>
+                </div>
+                <div className="flex flex-col items-center py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                  <span className="text-lg font-bold text-amber-600 dark:text-amber-400">{entregasHoy?.pendientes ?? '--'}</span>
+                  <span className="text-[9px] text-muted-foreground">En proceso</span>
+                </div>
+                <div className="flex flex-col items-center py-2 rounded-lg bg-red-500/5 border border-red-500/20">
+                  <span className="text-lg font-bold text-red-600 dark:text-red-400">{entregasHoy?.fallidas ?? '--'}</span>
+                  <span className="text-[9px] text-muted-foreground">Fallidas</span>
+                </div>
+              </div>
+
+              {/* Alarma por rechazos con diagnostico */}
+              {entregasHoy && entregasHoy.fallidas > 0 && entregasHoy.fallidasConDiagnostico.length > 0 && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <AlertOctagon className="h-4 w-4 text-red-500" />
+                    <span className="text-xs font-semibold text-red-600 dark:text-red-400">
+                      {entregasHoy.fallidas} entrega{entregasHoy.fallidas > 1 ? 's' : ''} fallida{entregasHoy.fallidas > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {entregasHoy.fallidasConDiagnostico.slice(0, 3).map((f) => (
+                      <div key={f.id} className="bg-background/50 rounded-md p-2 border border-red-500/10">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-medium text-foreground truncate">
+                            {f.clienteNombre} — {f.tipoBoletin.replace(/_/g, ' ')}
+                          </span>
+                          <StatusPill level="critical" label={f.canal} compact />
+                        </div>
+                        <p className="text-[9px] text-red-600 dark:text-red-400 font-medium">{f.diagnostico.causa}</p>
+                        <p className="text-[9px] text-muted-foreground mt-0.5">{f.diagnostico.accion}</p>
+                      </div>
+                    ))}
+                    {entregasHoy.fallidasConDiagnostico.length > 3 && (
+                      <p className="text-[9px] text-muted-foreground text-center">
+                        +{entregasHoy.fallidasConDiagnostico.length - 3} fallida{entregasHoy.fallidasConDiagnostico.length - 3 > 1 ? 's' : ''} mas
+                      </p>
+                    )}
                   </div>
                 </div>
-              ))}
-              {warnings.length > 0 && warnings.map(d => (
-                <div key={d.id} className="flex items-start gap-2">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">{d.message}</p>
-                    <p className="text-[9px] text-muted-foreground">{d.detail}</p>
-                    {d.action && <p className="text-[9px] text-amber-700/70 dark:text-amber-400/70 mt-0.5">{d.action}</p>}
-                  </div>
-                </div>
-              ))}
-              {criticals.length === 0 && warnings.length === 0 && (
-                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span className="text-xs font-medium">Sin alertas activas</span>
+              )}
+
+              {/* Expandible: detalle por tipo + en proceso */}
+              {showEntregasDetail && entregasHoy && (
+                <div className="space-y-3 border-t border-border/50 pt-3">
+                  {/* Por tipo de boletin */}
+                  {Object.keys(entregasHoy.porTipo).length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Por tipo de boletin</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {Object.entries(entregasHoy.porTipo).map(([tipo, counts]) => (
+                          <div key={tipo} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/30 border border-border/30">
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-medium text-foreground truncate">{tipo.replace(/_/g, ' ')}</p>
+                              <p className="text-[9px] text-muted-foreground">{counts.total} total</p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {counts.fallidas > 0 && <StatusPill level="critical" label={`${counts.fallidas} fall.`} compact />}
+                              {counts.pendientes > 0 && <StatusPill level="warning" label={`${counts.pendientes} pend.`} compact />}
+                              {counts.enviadas > 0 && <StatusPill level="ok" label={`${counts.enviadas} env.`} compact />}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* En proceso */}
+                  {entregasHoy.enProceso.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                        En proceso ({entregasHoy.enProceso.length})
+                      </p>
+                      <div className="space-y-1.5">
+                        {entregasHoy.enProceso.map((ep) => (
+                          <div key={ep.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/20 border border-border/20">
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-medium text-foreground truncate">{ep.clienteNombre}</p>
+                              <p className="text-[9px] text-muted-foreground">
+                                {ep.tipoBoletin.replace(/_/g, ' ')} · {ep.canal}
+                                {ep.fechaProgramada && (
+                                  <span className="ml-1">
+                                    · <Timer className="h-2.5 w-2.5 inline" />{' '}
+                                    {new Date(ep.fechaProgramada).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <StatusPill level="warning" label="pendiente" compact icon={<Clock className="h-2.5 w-2.5" />} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {Object.keys(entregasHoy.porTipo).length === 0 && entregasHoy.enProceso.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-3">
+                      Sin entregas registradas hoy
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>
