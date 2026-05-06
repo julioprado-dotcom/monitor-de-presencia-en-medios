@@ -70,20 +70,39 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 
   // Initialize — load global data once (deduplicated)
   // Stats fetch is blocking (drives loading screen); health fetch is non-blocking (background).
+  // Minimum splash duration: 4 seconds (visual sequence must complete).
   initialize: async () => {
     if (get()._initialized) return;
     set({ _initialized: true });
+
+    const splashStart = Date.now();
 
     // Step 1: Fetch stats (blocking — controls loading screen)
     try {
       const statsResponse = await fetchWithTimeout('/api/stats', { timeoutMs: FETCH_TIMEOUT });
       if (statsResponse.ok) {
         const json = await statsResponse.json();
+        // Ensure minimum splash duration of 4 seconds
+        const elapsed = Date.now() - splashStart;
+        const remaining = Math.max(0, 4000 - elapsed);
+        if (remaining > 0) {
+          await new Promise(resolve => setTimeout(resolve, remaining));
+        }
         set({ data: json, loading: false, error: '' });
       } else {
+        const elapsed = Date.now() - splashStart;
+        const remaining = Math.max(0, 4000 - elapsed);
+        if (remaining > 0) {
+          await new Promise(resolve => setTimeout(resolve, remaining));
+        }
         set({ error: 'Error al cargar datos del dashboard', loading: false });
       }
     } catch (err) {
+      const elapsed = Date.now() - splashStart;
+      const remaining = Math.max(0, 4000 - elapsed);
+      if (remaining > 0) {
+        await new Promise(resolve => setTimeout(resolve, remaining));
+      }
       set({
         error: err instanceof Error ? err.message : 'Error de conexion',
         loading: false,

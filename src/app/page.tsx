@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
+import { Loader2 } from 'lucide-react';
 import { useDashboardStore } from '@/stores/useDashboardStore';
 import { DashboardShell, LoadingScreen } from '@/components/dashboard/DashboardShell';
 
@@ -32,18 +33,12 @@ const PreviewView = dynamic(() => import('@/components/views/PreviewView').then(
 const PersonasSeguimientoView = dynamic(() => import('@/components/views/PersonasSeguimientoView').then(m => ({ default: m.PersonasSeguimientoView })), { ssr: false, loading });
 const TemasSeguimientoView = dynamic(() => import('@/components/views/TemasSeguimientoView').then(m => ({ default: m.TemasSeguimientoView })), { ssr: false, loading });
 
-/* View skeleton - shown during lazy loading */
+/* View skeleton - shown during lazy loading of views */
 function ViewSkeleton() {
   return (
-    <div className="space-y-4 animate-pulse">
-      <div className="h-4 bg-muted rounded w-48" />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-20 bg-muted rounded-lg" />
-        ))}
-      </div>
-      <div className="h-48 bg-muted rounded-lg" />
-      <div className="h-48 bg-muted rounded-lg" />
+    <div className="flex flex-col items-center justify-center py-24 gap-4">
+      <Loader2 className="h-6 w-6 animate-spin text-primary/50" />
+      <span className="text-sm text-muted-foreground animate-pulse">Cargando...</span>
     </div>
   );
 }
