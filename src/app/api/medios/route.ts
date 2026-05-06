@@ -134,6 +134,26 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Auto-crear FuenteEstado para que el scheduler pueda capturar este medio
+    if (medio.url) {
+      const nivelNum = parseInt(medio.nivel) || 3;
+      const frecuenciaMap: Record<number, string> = { 1: '30m', 2: '2h', 3: '6h' };
+      const frecuenciaBase = frecuenciaMap[nivelNum] || '6h';
+
+      await db.fuenteEstado.create({
+        data: {
+          medioId: medio.id,
+          url: medio.url,
+          activo: medio.activo,
+          frecuenciaBase,
+          frecuenciaActual: frecuenciaBase,
+          tipoCheck: medio.tipo === 'red_social' ? 'api' : 'head',
+        },
+      }).catch(err => {
+        console.warn(`[medios] Error creando FuenteEstado para ${medio.id}:`, err);
+      });
+    }
+
     return NextResponse.json({ medio }, { status: 201 });
   } catch (error: unknown) {
     return NextResponse.json({ error: safeError(error, 'medios') }, { status: 500 });
