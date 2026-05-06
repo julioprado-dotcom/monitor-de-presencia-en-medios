@@ -110,7 +110,7 @@ async function actualizarEstadoEntrega(
       data: {
         estado: nuevoEstado,
         error: errorMsg ?? null,
-        fechaEnvio: nuevoEstado === 'enviada' ? new Date() : undefined,
+        fechaEnvio: nuevoEstado === 'enviado' ? new Date() : undefined,
       },
     });
     return true;
@@ -212,7 +212,7 @@ export async function despacharReporte(
           // Actualizar estado
           await actualizarEstadoEntrega(
             entregaId,
-            result.exito ? 'enviada' : 'fallida',
+            result.exito ? 'enviado' : 'fallido',
             result.trackingId,
             result.error
           );
@@ -232,7 +232,7 @@ export async function despacharReporte(
             fallidas++;
           }
         } catch (error) {
-          await actualizarEstadoEntrega(entregaId, 'fallida', undefined,
+          await actualizarEstadoEntrega(entregaId, 'fallido', undefined,
             error instanceof Error ? error.message : 'Error de envio'
           );
           resultados.push({
@@ -278,7 +278,7 @@ export async function reintentarFallidas(maxReintentos: number = MAX_REINTENTOS)
   try {
     const entregasFallidas = await db.entrega.findMany({
       where: {
-        estado: 'fallida',
+        estado: 'fallido',
       },
       include: {
         contrato: true,
@@ -294,7 +294,7 @@ export async function reintentarFallidas(maxReintentos: number = MAX_REINTENTOS)
         where: {
           contratoId: entrega.contratoId,
           canal: entrega.canal,
-          estado: 'fallida',
+          estado: 'fallido',
         },
       });
 
@@ -344,9 +344,9 @@ export async function obtenerEstadisticasEntregas(): Promise<{
 }> {
   const [pendientes, enviadas, fallidas, leidas] = await Promise.all([
     db.entrega.count({ where: { estado: 'pendiente' } }),
-    db.entrega.count({ where: { estado: 'enviada' } }),
-    db.entrega.count({ where: { estado: 'fallida' } }),
-    db.entrega.count({ where: { estado: 'leida' } }),
+    db.entrega.count({ where: { estado: 'enviado' } }),
+    db.entrega.count({ where: { estado: 'fallido' } }),
+    db.entrega.count({ where: { estado: 'leido' } }),
   ]);
 
   return {
