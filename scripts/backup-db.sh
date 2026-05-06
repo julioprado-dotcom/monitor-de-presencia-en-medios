@@ -20,9 +20,10 @@ set -euo pipefail
 # ─── Config ──────────────────────────────────────────────────
 REPO_DIR="/home/z/my-project/connect-repo"
 BACKUP_DIR="${REPO_DIR}/backups"
-DB_PATH="/home/z/my-project/connect/db/custom.db"
-# Fallback: upload DB (Z.ai sandbox)
-ALT_DB_PATH="/home/z/my-project/upload/db/dev.db"
+# DB primaria: persistente en Z.ai sandbox (sobrevive reinicios)
+DB_PATH="/home/z/my-project/upload/db/dev.db"
+# Fallback: DB en el repo (si existe)
+ALT_DB_PATH="${REPO_DIR}/db/custom.db"
 
 # Tiempo maximo de backups locales (dias)
 MAX_BACKUP_AGE_DAYS=7

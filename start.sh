@@ -1,13 +1,13 @@
 #!/bin/bash
 # ─── DECODEX Bolivia — Script de inicio para Z.ai Sandbox ─────────
-# Ejecutar desde /home/z/my-project/connect
+# Ejecutar desde /home/z/my-project/connect-repo
 # Uso: bash start.sh [--dev] [--build]
 
 set -e
 cd "$(dirname "$0")"
 
 MODE="${1:---build}"
-PROJECT_DIR="/home/z/my-project/connect"
+PROJECT_DIR="/home/z/my-project/connect-repo"
 DB_PATH="$PROJECT_DIR/db/custom.db"
 LOG="/tmp/decodex-server.log"
 

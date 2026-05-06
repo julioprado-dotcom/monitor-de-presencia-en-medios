@@ -17,7 +17,7 @@ async function main() {
   }
 
   // Seed medios
-  const mediosPath = path.join('/home/z/my-project/connect/data', 'medios.json');
+  const mediosPath = path.join(__dirname, 'data', 'medios.json');
   const medios = JSON.parse(fs.readFileSync(mediosPath, 'utf-8'));
   let mediosCount = 0;
   for (const m of medios) {
@@ -27,7 +27,7 @@ async function main() {
   console.log(`Medios created: ${mediosCount}`);
 
   // Seed senadores
-  const senPath = path.join('/home/z/my-project/connect/data', 'senadores_completo.json');
+  const senPath = path.join(__dirname, 'data', 'senadores_completo.json');
   const senadores = JSON.parse(fs.readFileSync(senPath, 'utf-8'));
   let senCount = 0;
   for (const s of senadores) {
@@ -39,7 +39,7 @@ async function main() {
   console.log(`Senadores created: ${senCount}`);
 
   // Seed diputados
-  const dipPath = path.join('/home/z/my-project/connect/data', 'diputados_2025_2030_completo.json');
+  const dipPath = path.join(__dirname, 'data', 'diputados_2025_2030_completo.json');
   const dipData = JSON.parse(fs.readFileSync(dipPath, 'utf-8'));
   const diputados = dipData.diputados;
   let dipCount = 0;

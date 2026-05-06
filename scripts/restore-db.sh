@@ -16,8 +16,10 @@ set -euo pipefail
 # ─── Config ──────────────────────────────────────────────────
 REPO_DIR="/home/z/my-project/connect-repo"
 BACKUP_DIR="${REPO_DIR}/backups"
-DB_PATH="/home/z/my-project/connect/db/custom.db"
-ALT_DB_PATH="/home/z/my-project/upload/db/dev.db"
+# DB destino principal: persistente en Z.ai sandbox
+DB_PATH="/home/z/my-project/upload/db/dev.db"
+# Fallback: DB en el repo
+ALT_DB_PATH="${REPO_DIR}/db/custom.db"
 
 # ─── Colors ──────────────────────────────────────────────────
 RED='\033[0;31m'
