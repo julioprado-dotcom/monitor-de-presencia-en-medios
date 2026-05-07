@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const count = Math.min(20, Math.max(1, parseInt(searchParams.get('count') || '5')));
+    const clientId = searchParams.get('clientId') || undefined; // FASE 4D: optional client context
 
     const personas = await db.persona.findMany({
       where: { activa: true },
@@ -293,6 +294,7 @@ export async function POST(request: NextRequest) {
       clasificadas: totalClasificadas,
       mencionesTematicas: totalTematicas,
       errores: totalErrores,
+      ...(clientId ? { clientId } : {}),
       detalles,
     });
   } catch (error: unknown) {

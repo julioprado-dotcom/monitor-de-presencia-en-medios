@@ -41,6 +41,7 @@ export interface AnalyzeResult {
   tipoMencion: string;
   sentimiento: string;                    // backward compat — mapped from tratamiento
   tratamientoPeriodistico: string;        // the actual classification
+  intencionMedio: string;                 // FASE 4D: informativa|opinion|critica|elogiosa|reactiva|sin_intencion
   confianzaClasificacion: string;         // "alta" | "media" | "baja"
   ejesTematicos: string[];
   preguntasFundamentales: Record<string, unknown> | null;  // the 8 fundamental questions
@@ -113,12 +114,13 @@ function buildSystemPrompt(
 ): string {
   const escalaSection = buildEscalaPrompt(escala);
 
-  return `Eres un analista de medios boliviano especializado en cobertura política y legislativa. Analiza la siguiente mención de un legislador boliviano en un medio de comunicación y clasifícala usando la escala de TRATAMIENTO PERIODÍSTICO (NO sentimiento).
+  return `Eres un analista de medios boliviano especializado en cobertura política y legislativa. Analiza la siguiente mención de un legislador boliviano en un medio de comunicación y clasifícala usando la escala de TRATAMIENTO PERIODÍSTICO (NO sentimiento) y la INTENCIÓN DEL MEDIO.
 
 Responde ÚNICAMENTE con un JSON válido (sin markdown, sin backticks) con esta estructura exacta:
 {
   "tipoMencion": "cita_directa | mencion_pasiva | cobertura_declaracion | contexto | foto_video",
   "tratamiento_periodistico": "${escala.map(e => e.codigo).join(' | ')}",
+  "intencion_medio": "informativa | opinion | critica | elogiosa | reactiva | sin_intencion",
   "confianza_clasificacion": "alta | media | baja",
   "ejesTematicos": ["slug1", "slug2"],
   "preguntas_fundamentales": {
@@ -139,6 +141,14 @@ TIPOS DE MENCIÓN:
 - cobertura_declaracion: cobertura de una declaración o rueda de prensa del legislador
 - contexto: aparece mencionado en el contexto de un artículo sobre otro tema
 - foto_video: aparece en fotografía o video
+
+INTENCIÓN DEL MEDIO (qué busca el medio al publicar, independiente del tratamiento):
+- informativa: busca informar sobre un hecho/evento, sin tomar posición
+- opinion: publica posición editorial, columna o análisis valorativo
+- critica: busca cuestionar, denunciar o generar descrédito
+- elogiosa: busca resaltar positivamente, promocionar o legitimar
+- reactiva: responde a declaración/acusación/publicación previa de otro medio o actor
+- sin_intencion: no se puede determinar o el texto es insuficiente
 
 ${escalaSection}
 
@@ -180,6 +190,7 @@ export async function analyzeMencion(titulo: string, texto: string): Promise<Ana
     tipoMencion: 'contexto',
     sentimiento: 'sin_tratamiento',
     tratamientoPeriodistico: 'sin_tratamiento',
+    intencionMedio: 'sin_intencion',
     confianzaClasificacion: 'baja',
     ejesTematicos: [],
     preguntasFundamentales: null,
@@ -285,6 +296,11 @@ export async function analyzeMencion(titulo: string, texto: string): Promise<Ana
     const preguntasFundamentales: Record<string, unknown> | null =
       pfRaw && typeof pfRaw === 'object' && !Array.isArray(pfRaw) ? (pfRaw as Record<string, unknown>) : null;
 
+    // ── Intención del medio (FASE 4D) ──────────────────────────
+    const VALID_INTENCIONES = ['informativa', 'opinion', 'critica', 'elogiosa', 'reactiva', 'sin_intencion'];
+    const intencionRaw = String(parsed.intencion_medio || '').toLowerCase().trim();
+    const intencionMedio = VALID_INTENCIONES.includes(intencionRaw) ? intencionRaw : 'sin_intencion';
+
     // ── Check prohibited terminology ───────────────────────────
     if (terminologiaProhibida) {
       const foundTerms = checkProhibitedTerms(fullText, terminologiaProhibida);
@@ -299,6 +315,7 @@ export async function analyzeMencion(titulo: string, texto: string): Promise<Ana
       tipoMencion: parsed.tipoMencion || 'contexto',
       sentimiento: tratamientoRaw,               // backward compat
       tratamientoPeriodistico: tratamientoRaw,
+      intencionMedio,
       confianzaClasificacion: confianzaValida,
       ejesTematicos: ejesValidados,
       preguntasFundamentales,
@@ -318,6 +335,7 @@ export async function applyAnalysisToMencion(mencionId: string, result: AnalyzeR
       tipoMencion: result.tipoMencion,
       sentimiento: result.tratamientoPeriodistico,       // compatibility mapping
       tratamientoPeriodistico: result.tratamientoPeriodistico,
+      intencionMedio: result.intencionMedio,              // FASE 4D
       confianzaClasificacion: result.confianzaClasificacion,
       preguntasFundamentales: result.preguntasFundamentales
         ? (result.preguntasFundamentales as Prisma.InputJsonValue)

@@ -1,12 +1,13 @@
 // Extraer menciones de legisladores Y temas relevantes de texto de noticias usando LLM
 // DECODEX Bolivia — Pipeline A (scrape-fuente)
 // FASE 4: Integración del Marco Conceptual (MC) del sistema de IA
+// FASE 4D: Intención del Medio + Ejes por Cliente
 
 import db from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
 import { deduplicarMencion, actualizarCoberturaDuplicado } from '@/lib/deduplicacion';
 
-// ─── Interfaces (unchanged) ───────────────────────────────────
+// ─── Interfaces ──────────────────────────────────────────────────
 
 interface LegisladorMencionado {
   persona_id: string;
@@ -20,13 +21,21 @@ interface EjeMencionado {
   relevancia: 'alta' | 'media' | 'baja';
 }
 
+interface EjeClienteMencionado {
+  eje_cliente_id: number;
+  cita: string;
+  relevancia: 'alta' | 'media' | 'baja';
+}
+
 export interface ExtractionResult {
   es_relevante: boolean;
   tratamientoPeriodistico: string;
+  intencionMedio: string;
   confianzaClasificacion: string;
   resumen: string;
   legisladores_mencionados: LegisladorMencionado[];
   ejes_mencionados: EjeMencionado[];
+  ejes_cliente: EjeClienteMencionado[];
   temas_detectados: string[];
   preguntas_fundamentales: Record<string, unknown>;
   sentimiento_general: string; // backward compatibility
@@ -45,6 +54,19 @@ const DEFAULT_ESCALA = [
   { codigo: 'tratamiento_agregado', nombre: 'Agregado (deduplicado)' },
   { codigo: 'sin_tratamiento', nombre: 'Sin clasificar' },
 ];
+
+// ─── Default Intención del Medio ───────────────────────────────
+
+const DEFAULT_INTENCION = [
+  { codigo: 'informativa', nombre: 'Informativa', definicion: 'El medio busca informar sobre un hecho o evento, sin tomar posición ni buscar generar opinión.' },
+  { codigo: 'opinion', nombre: 'Opinión', definicion: 'El medio publica una posición editorial, columna de opinión o análisis valorativo.' },
+  { codigo: 'critica', nombre: 'Crítica', definicion: 'El medio busca cuestionar, denunciar o generar descrédito hacia un actor o situación.' },
+  { codigo: 'elogiosa', nombre: 'Elogiosa', definicion: 'El medio busca resaltar positivamente, promocionar o legitimar a un actor o acción.' },
+  { codigo: 'reactiva', nombre: 'Reactiva', definicion: 'El medio responde a una declaración, acusación o publicación previa de otro medio o actor.' },
+  { codigo: 'sin_intencion', nombre: 'Sin intención identificable', definicion: 'No se puede determinar la intención del medio o el texto es insuficiente.' },
+];
+
+const VALID_INTENCIONES = new Set(DEFAULT_INTENCION.map(i => i.codigo));
 
 // ─── Default Fundamental Questions ────────────────────────────
 
@@ -88,6 +110,7 @@ function safeJson<T>(field: unknown, fallback: T): T {
 
 /**
  * Build the system prompt dynamically from the Marco Conceptual.
+ * FASE 4D: Added INTENCIÓN DEL MEDIO section.
  */
 function buildSystemPrompt(marco: MarcoData | null): string {
   // ── Principios ──
@@ -182,6 +205,7 @@ function buildSystemPrompt(marco: MarcoData | null): string {
 2. Referencias a ejes temáticos monitoreados
 3. Keywords de interés político/económico
 4. Tratamiento periodístico (NUNCA uses la palabra "sentimiento")
+5. Intención del medio (qué busca el medio al publicar)
 
 CONTEXTO: Se te proporcionará:
 - Una lista de LEGISLADORES con sus IDs
@@ -208,6 +232,17 @@ ${terminologiaSection}${exclusionesSection}
 Debes intentar responder estas preguntas a partir del texto:
 ${preguntasSection}
 
+## INTENCIÓN DEL MEDIO (dimensión independiente del tratamiento)
+Clasifica QUÉ BUSCA EL MEDIO al publicar esta nota (no cómo trata al actor):
+- informativa: busca informar sobre un hecho/evento, sin tomar posición
+- opinion: publica posición editorial, columna o análisis valorativo
+- critica: busca cuestionar, denunciar o generar descrédito
+- elogiosa: busca resaltar positivamente, promocionar o legitimar
+- reactiva: responde a declaración/acusación/publicación previa de otro medio o actor
+- sin_intencion: no se puede determinar o el texto es insuficiente
+
+La intención y el tratamiento son dimensiones INDEPENDIENTES: una nota puede ser informativa (intención) pero con tratamiento crítico, o puede ser elogiosa (intención) con tratamiento informativo.
+
 ## REGLAS PARA LEGISLADORES
 - Solo incluir legisladores que estén en la lista proporcionada
 - persona_id debe ser EXACTAMENTE el ID proporcionado en la lista
@@ -221,6 +256,12 @@ ${preguntasSection}
 - cita debe ser un fragmento real del texto que justifica la clasificación
 - relevancia: "alta" (artículo central sobre el tema), "media" (mencionado significativamente), "baja" (referencia tangencial)
 - Máximo 3 ejes por artículo
+
+## REGLAS PARA EJES DEL CLIENTE
+- Solo incluye si se proporciona la sección "EJES TEMÁTICOS DEL CLIENTE"
+- CLIENTE_EJE_ID debe ser EXACTAMENTE el ID numérico proporcionado
+- Clasifica solo si el texto coincide CLARAMENTE con las keywords del eje del cliente
+- Máximo 3 ejes del cliente por artículo
 
 ## TEMAS DETECTADOS
 - Lista de 1-5 temas o conceptos clave que trata la noticia
@@ -247,6 +288,7 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin backticks) con esta 
 {
   "es_relevante": true,
   "tratamiento_periodistico": "tratamiento_informativo",
+  "intencion_medio": "informativa",
   "confianza_clasificacion": "alta",
   "resumen": "resumen fiel de max 200 palabras",
   "legisladores_mencionados": [
@@ -255,13 +297,16 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin backticks) con esta 
   "ejes_institucionales": [
     { "eje_id": "ID_DEL_EJE", "cita": "fragmento relevante del texto", "relevancia": "alta|media|baja" }
   ],
+  "ejes_cliente": [
+    { "eje_cliente_id": NUMERO_ID, "cita": "fragmento relevante del texto", "relevancia": "alta|media|baja" }
+  ],
   "temas_detectados": ["tema1", "tema2", "tema3"],
   "preguntas_fundamentales": {
     "que": "evento principal or null",
     "quien": { "declara": "nombre or null", "afectado_directo": "nombre or null", "mencionados": [] },
     "cuando": "fecha o null",
-    "como": "mecanismo o null",
-    "por_que": "causa o null",
+    "como": "mecanismo or null",
+    "por_que": "causa or null",
     "para_que": { "actor": "intención or null", "medio": "intención or null", "confianza": "alta|media|baja" },
     "a_quienes_afecta": { "directos": [], "indirectos": [], "potenciales": [], "mencionados_en_texto": false },
     "donde": "lugar or null"
@@ -271,8 +316,11 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin backticks) con esta 
 VALORES VÁLIDOS para tratamiento_periodistico:
 ${escala.map(e => e.codigo).join(', ')}
 
+VALORES VÁLIDOS para intencion_medio:
+informativa, opinion, critica, elogiosa, reactiva, sin_intencion
+
 Si es_relevante = false, devolver:
-{"es_relevante": false, "tratamiento_periodistico": "sin_tratamiento", "confianza_clasificacion": "baja", "resumen": "", "legisladores_mencionados": [], "ejes_institucionales": [], "temas_detectados": [], "preguntas_fundamentales": {}}`;
+{"es_relevante": false, "tratamiento_periodistico": "sin_tratamiento", "intencion_medio": "sin_intencion", "confianza_clasificacion": "baja", "resumen": "", "legisladores_mencionados": [], "ejes_institucionales": [], "ejes_cliente": [], "temas_detectados": [], "preguntas_fundamentales": {}}`;
 }
 
 /**
@@ -305,20 +353,27 @@ function tratamientoToSentimiento(tratamiento: string): string {
 /**
  * Extraer menciones (legisladores + ejes temáticos) de un texto usando LLM.
  * Integración con el Marco Conceptual del sistema de IA.
+ * FASE 4D: Añadido soporte para clientId (ejes personalizados) e intencionMedio.
  * Tolerancia a fallos: si el LLM falla, devuelve resultado vacío.
  */
+export interface ExtractorOptions {
+  clientId?: string;
+}
+
 export async function extraerMencionesDeTexto(
   texto: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   medioId: string,
+  options?: ExtractorOptions,
 ): Promise<ExtractionResult> {
   const emptyResult: ExtractionResult = {
     es_relevante: false,
     tratamientoPeriodistico: 'sin_tratamiento',
+    intencionMedio: 'sin_intencion',
     confianzaClasificacion: 'baja',
     resumen: '',
     legisladores_mencionados: [],
     ejes_mencionados: [],
+    ejes_cliente: [],
     temas_detectados: [],
     preguntas_fundamentales: {},
     sentimiento_general: 'no_clasificado',
@@ -344,7 +399,8 @@ export async function extraerMencionesDeTexto(
     const treintaDiasAtras = new Date();
     treintaDiasAtras.setDate(treintaDiasAtras.getDate() - 30);
 
-    const [personas, ejes, temasRecientes] = await Promise.all([
+    // Build parallel queries — include client ejes if clientId provided
+    const dbQueries: Promise<unknown>[] = [
       db.persona.findMany({
         where: { activa: true },
         select: { id: true, nombre: true, partidoSigla: true, camara: true },
@@ -353,13 +409,25 @@ export async function extraerMencionesDeTexto(
         where: { activo: true },
         select: { id: true, nombre: true, slug: true, keywords: true },
       }),
-      // Temas recientes (últimos 30 días) para detectar tendencias
       db.mencionTema.findMany({
         where: { mencion: { fechaCaptura: { gte: treintaDiasAtras } } },
         include: { ejeTematico: { select: { nombre: true, keywords: true } } },
         distinct: ['ejeTematicoId'],
       }),
-    ]);
+    ];
+
+    // Load client-specific ejes if clientId is provided (FASE 4D)
+    let ejesCliente: Array<{ id: number; nombre: string; keywords: string }> = [];
+    if (options?.clientId) {
+      dbQueries.push(
+        db.ejeTematicoCliente.findMany({
+          where: { clienteId: options.clientId, activo: true },
+          select: { id: true, nombre: true, keywords: true },
+        }).then(result => { ejesCliente = result; }),
+      );
+    }
+
+    const [personas, ejes, temasRecientes] = await Promise.all(dbQueries) as [any[], any[], any[]];
 
     if (personas.length === 0 && ejes.length === 0) return emptyResult;
 
@@ -381,7 +449,7 @@ export async function extraerMencionesDeTexto(
     const todasKeywords = new Set<string>();
     for (const eje of ejes) {
       if (eje.keywords) {
-        for (const kw of eje.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean)) {
+        for (const kw of eje.keywords.split(',').map((k: string) => k.trim().toLowerCase()).filter(Boolean)) {
           todasKeywords.add(kw);
         }
       }
@@ -389,7 +457,7 @@ export async function extraerMencionesDeTexto(
     // Agregar keywords de temas recientes para detección de tendencias
     for (const tm of temasRecientes) {
       if (tm.ejeTematico.keywords) {
-        for (const kw of tm.ejeTematico.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean)) {
+        for (const kw of tm.ejeTematico.keywords.split(',').map((k: string) => k.trim().toLowerCase()).filter(Boolean)) {
           todasKeywords.add(kw);
         }
       }
@@ -397,6 +465,12 @@ export async function extraerMencionesDeTexto(
     const listaKeywords = todasKeywords.size > 0
       ? Array.from(todasKeywords).slice(0, 100).join(', ')
       : '';
+
+    // 6b. Build client ejes section for prompt (if any)
+    let ejesClienteSection = '';
+    if (ejesCliente.length > 0) {
+      ejesClienteSection = `\nEJES TEMÁTICOS DEL CLIENTE (clasifica solo si el texto coincide claramente):\n${ejesCliente.map(e => `- CLIENTE_EJE_ID: ${e.id} | ${e.nombre} (keywords: ${e.keywords})`).join('\n')}\n`;
+    }
 
     // 7. Truncar texto si es muy largo (max ~4000 chars para el LLM)
     const textoTruncado = texto.length > 4000
@@ -406,6 +480,7 @@ export async function extraerMencionesDeTexto(
     // 8. Construir prompt del usuario
     let userContent = `LEGISLADORES MONITOREADOS:\n${listaLegisladores}\n\n`;
     userContent += `EJES TEMÁTICOS:\n${listaEjes}\n\n`;
+    userContent += ejesClienteSection;
     if (listaKeywords) {
       userContent += `KEYWORDS DE INTERÉS: ${listaKeywords}\n\n`;
     }
@@ -430,6 +505,7 @@ export async function extraerMencionesDeTexto(
     // 10. Validar y normalizar resultado
     const validPersonIds = new Set(personas.map(p => p.id));
     const validEjeIds = new Set(ejes.map(e => e.id));
+    const validEjeClienteIds = new Set(ejesCliente.map(e => e.id));
     const relevanciasValidas = new Set(['alta', 'media', 'baja']);
     const tratamientosValidos = new Set(DEFAULT_ESCALA.map(e => e.codigo));
     const confianzasValidas = new Set(['alta', 'media', 'baja']);
@@ -465,6 +541,23 @@ export async function extraerMencionesDeTexto(
           }))
       : [];
 
+    // Ejes del cliente (LLM returns "ejes_cliente") — FASE 4D
+    const ejesClienteRaw = parsed.ejes_cliente || [];
+    const ejesClienteParsed = Array.isArray(ejesClienteRaw)
+      ? ejesClienteRaw
+          .filter((e: Record<string, unknown>) =>
+            e.eje_cliente_id && validEjeClienteIds.has(Number(e.eje_cliente_id)) && e.cita
+          )
+          .slice(0, 3)
+          .map((e: { eje_cliente_id: number; cita: string; relevancia?: string }) => ({
+            eje_cliente_id: Number(e.eje_cliente_id),
+            cita: String(e.cita),
+            relevancia: relevanciasValidas.has(String(e.relevancia || ''))
+              ? String(e.relevancia) as 'alta' | 'media' | 'baja'
+              : 'media' as const,
+          }))
+      : [];
+
     // Temas
     const temas = Array.isArray(parsed.temas_detectados)
       ? parsed.temas_detectados
@@ -477,6 +570,10 @@ export async function extraerMencionesDeTexto(
     const tratamiento = tratamientosValidos.has(String(parsed.tratamiento_periodistico || ''))
       ? String(parsed.tratamiento_periodistico)
       : 'sin_tratamiento';
+
+    // Intención del medio — FASE 4D
+    const intencionRaw = String(parsed.intencion_medio || '').toLowerCase().trim();
+    const intencionMedio = VALID_INTENCIONES.has(intencionRaw) ? intencionRaw : 'sin_intencion';
 
     // Confianza clasificación
     const confianza = confianzasValidas.has(String(parsed.confianza_clasificacion || ''))
@@ -494,10 +591,12 @@ export async function extraerMencionesDeTexto(
     return {
       es_relevante: parsed.es_relevante === true || legisladores.length > 0 || ejesMencionados.length > 0,
       tratamientoPeriodistico: tratamiento,
+      intencionMedio,
       confianzaClasificacion: confianza,
       resumen: String(parsed.resumen || '').substring(0, 200),
       legisladores_mencionados: legisladores,
       ejes_mencionados: ejesMencionados,
+      ejes_cliente: ejesClienteParsed,
       temas_detectados: temas,
       preguntas_fundamentales,
       sentimiento_general: sentimiento,
@@ -564,7 +663,8 @@ export function extraerTextoDeHtml(html: string): string {
  * - Si hay legisladores: crear Mencion con personaId por cada uno, vincular ejes via MencionTema
  * - Si NO hay legisladores PERO hay ejes: crear Mencion sin personaId (referencia_tematica)
  *
- * FASE 4: Ahora incluye tratamientoPeriodistico, confianzaClasificacion y preguntasFundamentales.
+ * FASE 4: tratamientoPeriodistico, confianzaClasificacion, preguntasFundamentales
+ * FASE 4D: intencionMedio, ejes_cliente (MencionClienteEje)
  */
 export async function crearMencionesExtraidas(
   resultado: ExtractionResult,
@@ -580,6 +680,7 @@ export async function crearMencionesExtraidas(
   // Shared data fields for all menciones
   const sharedData = {
     tratamientoPeriodistico: resultado.tratamientoPeriodistico,
+    intencionMedio: resultado.intencionMedio,
     confianzaClasificacion: resultado.confianzaClasificacion,
     preguntasFundamentales: resultado.preguntas_fundamentales as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     sentimiento: resultado.tratamientoPeriodistico, // compatibility mapping
@@ -657,6 +758,21 @@ export async function crearMencionesExtraidas(
         }
       }
 
+      // Vincular ejes del cliente via MencionClienteEje (FASE 4D)
+      for (const ejeCli of resultado.ejes_cliente) {
+        try {
+          await db.mencionClienteEje.create({
+            data: {
+              mencionId: mencion.id,
+              ejeClienteId: ejeCli.eje_cliente_id,
+              confianza: ejeCli.relevancia === 'alta' ? 0.9 : ejeCli.relevancia === 'media' ? 0.7 : 0.5,
+            },
+          });
+        } catch {
+          // Duplicado o error, ignorar
+        }
+      }
+
       creadas++;
     } catch {
       // Tolerancia a fallos: continuar con la siguiente
@@ -690,6 +806,21 @@ export async function crearMencionesExtraidas(
           try {
             await db.mencionTema.create({
               data: { mencionId: mencion.id, ejeTematicoId: ejeId },
+            });
+          } catch {
+            // Duplicado o error, ignorar
+          }
+        }
+
+        // Vincular ejes del cliente (FASE 4D)
+        for (const ejeCli of resultado.ejes_cliente) {
+          try {
+            await db.mencionClienteEje.create({
+              data: {
+                mencionId: mencion.id,
+                ejeClienteId: ejeCli.eje_cliente_id,
+                confianza: ejeCli.relevancia === 'alta' ? 0.9 : ejeCli.relevancia === 'media' ? 0.7 : 0.5,
+              },
             });
           } catch {
             // Duplicado o error, ignorar
