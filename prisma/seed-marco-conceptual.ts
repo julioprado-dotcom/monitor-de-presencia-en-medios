@@ -299,6 +299,7 @@ async function main() {
       { codigo: "tratamiento_agresivo", nombre: "Agresivo", definicion: "Ataque personal, descalificación, titilarización sin fundamento." },
       { codigo: "tratamiento_elogioso", nombre: "Elogioso", definicion: "Reconocimiento, perfil positivo, destacado deliberado." },
       { codigo: "tratamiento_ambiguo", nombre: "Ambiguo", definicion: "No se puede determinar el tratamiento. Texto insuficiente, cita fuera de contexto." },
+      { codigo: "tratamiento_agregado", nombre: "Agregado (deduplicado)", definicion: "Cobertura adicional de un evento ya registrado por otro medio. El tratamiento se hereda de la mención original o se clasifica de forma independiente si aporta ángulo distinto." },
       { codigo: "sin_tratamiento", nombre: "Sin clasificar", definicion: "No aplica o no hay suficiente información para clasificar." }
     ]
   };

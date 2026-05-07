@@ -343,7 +343,7 @@ export async function deduplicarMencion(
     take: 30, // limit candidates
   });
 
-  if (candidateResults.length === 0) {
+  if (candidados.length === 0) {
     console.log(`[DEDUP] Evaluando medio ${input.medioId}... 0 candidatos. Creando original.`);
     return {
       decision: 'crear_original',
@@ -352,7 +352,7 @@ export async function deduplicarMencion(
     };
   }
 
-  console.log(`[DEDUP] Evaluando medio ${input.medioId}... ${candidateResults.length} candidatos encontrados. Huella: ${huella}`);
+  console.log(`[DEDUP] Evaluando medio ${input.medioId}... ${candidados.length} candidatos encontrados. Huella: ${huella}`);
 
   // ─── PASO 3: Heurística rápida ───────────────────────────────
   const dudosos: CandidatoDudoso[] = [];

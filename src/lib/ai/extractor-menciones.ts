@@ -42,6 +42,7 @@ const DEFAULT_ESCALA = [
   { codigo: 'tratamiento_agresivo', nombre: 'Agresivo' },
   { codigo: 'tratamiento_elogioso', nombre: 'Elogioso' },
   { codigo: 'tratamiento_ambiguo', nombre: 'Ambiguo' },
+  { codigo: 'tratamiento_agregado', nombre: 'Agregado (deduplicado)' },
   { codigo: 'sin_tratamiento', nombre: 'Sin clasificar' },
 ];
 
@@ -580,7 +581,7 @@ export async function crearMencionesExtraidas(
   const sharedData = {
     tratamientoPeriodistico: resultado.tratamientoPeriodistico,
     confianzaClasificacion: resultado.confianzaClasificacion,
-    preguntasFundamentales: resultado.preguntas_fundamentales,
+    preguntasFundamentales: resultado.preguntas_fundamentales as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     sentimiento: resultado.tratamientoPeriodistico, // compatibility mapping
     temas: resultado.temas_detectados.join(', '),
   };
@@ -621,6 +622,14 @@ export async function crearMencionesExtraidas(
         continue;
       }
 
+      // Build dedup log
+      const dedupLog = JSON.stringify({
+        decision: dedupResult.decision,
+        razon: dedupResult.razon,
+        timestamp: new Date().toISOString(),
+        ...(dedupResult.mencionOriginalId ? { candidatoId: dedupResult.mencionOriginalId } : {}),
+      });
+
       const mencion = await db.mencion.create({
         data: {
           personaId: leg.persona_id,
@@ -632,6 +641,7 @@ export async function crearMencionesExtraidas(
           tipoMencion: 'no_clasificado',
           verificado: false,
           ...(dedupResult.eventoId ? { eventoId: dedupResult.eventoId } : {}),
+          deduplicacionLog: dedupLog,
           ...sharedData,
         },
       });

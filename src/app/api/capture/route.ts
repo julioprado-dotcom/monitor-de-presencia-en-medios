@@ -126,6 +126,13 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
+          const dedupLog = JSON.stringify({
+            decision: dedupResult.decision,
+            razon: dedupResult.razon,
+            timestamp: new Date().toISOString(),
+            ...(dedupResult.mencionOriginalId ? { candidatoId: dedupResult.mencionOriginalId } : {}),
+          });
+
           const mencion = await db.mencion.create({
             data: {
               personaId: persona.id,
@@ -137,6 +144,7 @@ export async function POST(request: NextRequest) {
               sentimiento: 'no_clasificado',
               verificado: false,
               ...(dedupResult.eventoId ? { eventoId: dedupResult.eventoId } : {}),
+              deduplicacionLog: dedupLog,
             },
           });
           nuevasParaPersona++;

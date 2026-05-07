@@ -105,6 +105,8 @@ model Mencion {
   eventoId            String?
   /// JSON con detalles de coberturas adicionales (cross-medio)
   coberturasAdicionales String?
+  /// Log de deduplicación (JSON): { decision, razon, timestamp, candidatoId? }
+  deduplicacionLog String?
 
   persona       Persona?          @relation(fields: [personaId], references: [id])
   medio         Medio            @relation(fields: [medioId], references: [id])
