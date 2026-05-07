@@ -544,3 +544,64 @@ model MencionClienteEje {
   @@unique([mencionId, ejeClienteId])
   @@map("mencion_cliente_eje")
 }
+
+// ─── REPORTE SECTORIAL (Producto Premium) ──────────────────────
+
+enum EstadoReporte {
+  borrador
+  generado
+  enviado
+  fallido
+}
+
+model ReporteSectorial {
+  id               String        @id @default(cuid())
+  sector           String        // "minero", "cafetero", etc.
+  titulo           String
+  periodoInicio    DateTime      // lunes de la semana
+  periodoFin       DateTime      // domingo de la semana
+  includeManana    Boolean       @default(true)
+  resumenEjecutivo String?
+  contenido        String // JSON con todas las secciones
+  contenidoHtml    String? // HTML para email
+  estado           EstadoReporte @default(borrador)
+  mencionCount     Int           @default(0)
+  medioCount       Int           @default(0)
+  indiceExposicion Float?
+  creadoEn         DateTime      @default(now())
+  generadoEn       DateTime?
+  enviadoEn        DateTime?
+
+  ejes             ReporteEje[]
+  envios           EnvioReporte[]
+
+  @@index([sector, periodoInicio])
+  @@index([estado])
+}
+
+model ReporteEje {
+  id               String   @id @default(cuid())
+  reporteId        String
+  reporte          ReporteSectorial @relation(fields: [reporteId], references: [id], onDelete: Cascade)
+  ejeTematico      String
+  mencionCount     Int      @default(0)
+  tratamientoTop   String?
+  medioTop         String?
+  tendencia        String?  // "sube", "baja", "estable"
+  variacion        Int?     // +/- menciones vs semana anterior
+
+  @@index([reporteId])
+}
+
+model EnvioReporte {
+  id               String   @id @default(cuid())
+  reporteId        String
+  reporte          ReporteSectorial @relation(fields: [reporteId], references: [id], onDelete: Cascade)
+  canal            String   // "email", "telegram"
+  destinatario     String
+  estado           String   @default("pendiente")
+  enviadoEn        DateTime?
+  error            String?
+
+  @@index([reporteId])
+}
