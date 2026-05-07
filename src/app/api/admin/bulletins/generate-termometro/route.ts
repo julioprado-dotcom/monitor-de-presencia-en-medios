@@ -16,6 +16,7 @@ import { formatearMencionesPrompt, construirPrompt, registrarReporte, generarTit
 import { PRODUCTOS } from '@/constants/products';
 import { guardedParse, RATE } from '@/lib/rate-guard';
 import { generateTermometroSchema } from '@/lib/validations';
+import { safeError } from '@/lib/safe-error';
 
 // ============================================
 // Ejes para indicadores generales del clima
@@ -145,9 +146,9 @@ export async function POST(request: NextRequest) {
       console.error(`[TIMEOUT] LLM call exceeded 60s in generate-termometro`);
     }
     console.error('[generate-termometro] Error:', error);
-    const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+    const { error: msg, code, details } = safeError(error);
     return NextResponse.json(
-      { exito: false, error: `Error al generar El Termometro: ${mensaje}` },
+      { exito: false, error: msg, code, ...(details && { details }) },
       { status: 500 }
     );
   }

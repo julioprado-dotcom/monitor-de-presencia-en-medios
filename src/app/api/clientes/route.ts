@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clienteCreateSchema } from '@/lib/validations';
 import { guardedParse, RATE } from '@/lib/rate-guard';
+import { safeError } from '@/lib/safe-error';
 
 export async function GET(request: NextRequest) {
   try {
@@ -122,11 +123,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ id: cliente.id, cliente }, { status: 201 });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Error desconocido';
-    if (msg.includes('Unique')) {
+    const { error: msg, code, details } = safeError(error);
+    if (code === 'DUPLICATE') {
       return NextResponse.json({ error: 'Ya existe un cliente con ese email' }, { status: 409 });
     }
-    console.error('Error creating cliente:', error);
-    return NextResponse.json({ error: 'Error al crear cliente' }, { status: 500 });
+    console.error('Error creating cliente:', details ?? msg);
+    return NextResponse.json({ error: msg, code, ...(details && { details }) }, { status: 500 });
   }
 }

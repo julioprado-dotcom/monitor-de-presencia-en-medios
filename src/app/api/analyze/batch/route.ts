@@ -3,6 +3,7 @@ import db from '@/lib/db';
 import { guardedParse, RATE } from '@/lib/rate-guard';
 import { analyzeBatchSchema } from '@/lib/validations';
 import { analyzeMencion, applyAnalysisToMencion, EJES_TEMATICOS } from '@/lib/analyze';
+import { safeError } from '@/lib/safe-error';
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
       detalles,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido';
-    return NextResponse.json({ error: 'Error en el análisis batch', details: message }, { status: 500 });
+    const { error: msg, code, details } = safeError(error);
+    return NextResponse.json({ error: msg, code, ...(details && { details }) }, { status: 500 });
   }
 }

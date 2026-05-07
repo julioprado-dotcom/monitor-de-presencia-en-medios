@@ -2,6 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
+import { safeError } from '@/lib/safe-error'
 
 export async function GET() {
   try {
@@ -20,8 +21,8 @@ export async function GET() {
 
     return NextResponse.json(fuentes)
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Error interno del servidor'
-    console.error('[API /jobs/fuentes GET]', msg)
+    const { error: msg, code, details } = safeError(error)
+    console.error('[API /jobs/fuentes GET]', details ?? msg)
     // Return empty array with 200 on DB failure
     return NextResponse.json([])
   }

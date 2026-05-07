@@ -17,6 +17,7 @@ import { getIndicadoresParaEjes, formatearIndicadoresMultiplesPrompt } from '@/l
 import { formatearMencionesPorEje, construirPrompt, registrarReporte, generarTituloProducto, getDedicatedResumen, getSemanaAnho } from '@/lib/reportes-utils';
 import { guardedParse, RATE } from '@/lib/rate-guard';
 import { generateRadarSchema } from '@/lib/validations';
+import { safeError } from '@/lib/safe-error';
 
 // ============================================
 // Los 11 Ejes Tematicos de DECODEX
@@ -198,9 +199,9 @@ export async function POST(request: NextRequest) {
       console.error(`[TIMEOUT] LLM call exceeded 60s in generate-radar`);
     }
     console.error('[generate-radar] Error:', error);
-    const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+    const { error: msg, code, details } = safeError(error);
     return NextResponse.json(
-      { exito: false, error: `Error al generar El Radar: ${mensaje}` },
+      { exito: false, error: msg, code, ...(details && { details }) },
       { status: 500 }
     );
   }

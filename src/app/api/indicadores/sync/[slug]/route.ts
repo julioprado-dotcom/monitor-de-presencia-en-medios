@@ -6,6 +6,7 @@
 
 import { NextResponse } from 'next/server'
 import { capturarUno } from '@/lib/indicadores/capturer-tier1'
+import { safeError } from '@/lib/safe-error'
 
 export async function POST(
   _request: Request,
@@ -47,10 +48,10 @@ export async function POST(
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    const mensaje = error instanceof Error ? error.message : 'Error desconocido'
-    console.error(`[sync/${slug}] Error:`, mensaje)
+    const { error: msg, code, details } = safeError(error)
+    console.error(`[sync/${slug}] Error:`, details ?? msg)
     return NextResponse.json(
-      { exito: false, error: mensaje },
+      { exito: false, error: msg, code, ...(details && { details }) },
       { status: 500 }
     )
   }

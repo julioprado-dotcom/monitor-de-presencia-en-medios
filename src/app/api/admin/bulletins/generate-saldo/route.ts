@@ -14,6 +14,7 @@ import { getMencionesForBulletin, formatFechaBolivia, getProductConfig } from '@
 import { getIndicadoresParaEjes, formatearIndicadoresPrompt } from '@/lib/indicadores/injector'
 import { guardedParse, RATE } from '@/lib/rate-guard'
 import { generateSaldoSchema } from '@/lib/validations'
+import { safeError } from '@/lib/safe-error'
 
 // ─── Endpoint POST ────────────────────────────────────────────────
 
@@ -117,10 +118,9 @@ REGLA: Compara la evolución del día. Si hay datos del Termómetro (apertura), 
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
       console.error(`[TIMEOUT] LLM call exceeded 60s in generate-saldo`);
     }
-    const mensaje = error instanceof Error ? error.message : 'Error desconocido'
-    console.error('Error generando Saldo del Día:', error)
+    const { error: msg, code, details } = safeError(error)
     return NextResponse.json(
-      { exito: false, error: mensaje },
+      { exito: false, error: msg, code, ...(details && { details }) },
       { status: 500 }
     )
   }

@@ -18,6 +18,7 @@ import { getIndicadoresParaEje, formatearIndicadoresPrompt } from '@/lib/indicad
 import { formatearMencionesPrompt, construirPrompt, registrarReporte, generarTituloProducto, getDedicatedResumen, formatFechaBolivia } from '@/lib/reportes-utils';
 import { guardedParse, RATE } from '@/lib/rate-guard';
 import { generateFocoSchema } from '@/lib/validations';
+import { safeError } from '@/lib/safe-error';
 
 // ============================================
 // POST Handler
@@ -155,10 +156,9 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
       console.error(`[TIMEOUT] LLM call exceeded 60s in generate-foco`);
     }
-    console.error('[generate-foco] Error:', error);
-    const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+    const { error: msg, code, details } = safeError(error);
     return NextResponse.json(
-      { exito: false, error: `Error al generar El Foco: ${mensaje}` },
+      { exito: false, error: msg, code, ...(details && { details }) },
       { status: 500 }
     );
   }

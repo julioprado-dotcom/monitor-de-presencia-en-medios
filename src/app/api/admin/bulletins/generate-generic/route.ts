@@ -19,6 +19,7 @@ import { validateContent } from '@/lib/quality/validator';
 import { type TipoBoletin } from '@/types/bulletin';
 import { guardedParse, RATE } from '@/lib/rate-guard';
 import { generateGenericSchema } from '@/lib/validations';
+import { safeError } from '@/lib/safe-error';
 
 // ============================================
 // Mapa de ejes tematicos sugeridos por tipo de producto.
@@ -191,9 +192,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[generate-generic] Error:', error);
-    const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+    const { error: msg, code, details } = safeError(error);
     return NextResponse.json(
-      { exito: false, error: `Error en generador generico: ${mensaje}` },
+      { exito: false, error: msg, code, ...(details && { details }) },
       { status: 500 }
     );
   }

@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { safeError } from '@/lib/safe-error';
 
 // ─── GET: Detalle de un eje con menciones paginadas ─────────────
 
@@ -65,8 +66,8 @@ export async function GET(
       },
     });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Error desconocido';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const { error: msg, code, details } = safeError(error);
+    return NextResponse.json({ error: msg, code, ...(details && { details }) }, { status: 500 });
   }
 }
 
@@ -121,8 +122,8 @@ export async function PATCH(
       keywords: JSON.parse(actualizado.keywords || '[]'),
     });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Error desconocido';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const { error: msg, code, details } = safeError(error);
+    return NextResponse.json({ error: msg, code, ...(details && { details }) }, { status: 500 });
   }
 }
 
@@ -153,7 +154,7 @@ export async function DELETE(
       eje: desactivado,
     });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Error desconocido';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const { error: msg, code, details } = safeError(error);
+    return NextResponse.json({ error: msg, code, ...(details && { details }) }, { status: 500 });
   }
 }

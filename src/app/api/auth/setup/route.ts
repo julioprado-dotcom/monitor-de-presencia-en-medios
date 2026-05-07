@@ -3,6 +3,7 @@ import db from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { guardedParse, RATE } from '@/lib/rate-guard';
 import { authSetupSchema } from '@/lib/validations';
+import { safeError } from '@/lib/safe-error';
 
 // POST /api/auth/setup — Crear usuario admin inicial
 // Solo funciona si NO existe ningún usuario en la base de datos
@@ -40,18 +41,18 @@ export async function POST(request: NextRequest) {
       user: userSafe,
     }, { status: 201 });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido';
+    const { error: msg, code, details } = safeError(error);
 
-    if (message.includes('Unique')) {
+    if (code === 'DUPLICATE') {
       return NextResponse.json(
         { error: 'Ya existe un usuario con ese email' },
         { status: 409 }
       );
     }
 
-    console.error('Error creating admin user:', message);
+    console.error('Error creating admin user:', details ?? msg);
     return NextResponse.json(
-      { error: 'Error al crear usuario' },
+      { error: msg, code, ...(details && { details }) },
       { status: 500 }
     );
   }

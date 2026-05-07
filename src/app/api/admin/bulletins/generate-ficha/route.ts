@@ -18,6 +18,7 @@ import { formatearMencionesPrompt, construirPrompt, registrarReporte, generarTit
 import { type MencionEnriquecida } from '@/types/bulletin';
 import { guardedParse, RATE } from '@/lib/rate-guard';
 import { generateFichaSchema } from '@/lib/validations';
+import { safeError } from '@/lib/safe-error';
 
 // ============================================
 // POST Handler
@@ -185,9 +186,9 @@ export async function POST(request: NextRequest) {
       console.error(`[TIMEOUT] LLM call exceeded 60s in generate-ficha`);
     }
     console.error('[generate-ficha] Error:', error);
-    const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+    const { error: msg, code, details } = safeError(error);
     return NextResponse.json(
-      { exito: false, error: `Error al generar Ficha Persona: ${mensaje}` },
+      { exito: false, error: msg, code, ...(details && { details }) },
       { status: 500 }
     );
   }

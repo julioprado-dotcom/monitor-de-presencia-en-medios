@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { suscriptorCreateSchema, suscriptorUpdateSchema } from '@/lib/validations';
-import { guardedParse, rateGuard, RATE, safeError } from '@/lib/rate-guard';
+import { guardedParse, rateGuard, RATE } from '@/lib/rate-guard';
+import { safeError as safeErrorGuard } from '@/lib/rate-guard';
+import { safeError } from '@/lib/safe-error';
 import { isRateLimited, getClientIp } from '@/lib/rate-limit';
 
 /* ═══════════════════════════════════════════════════════════
@@ -89,12 +91,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ id: suscriptor.id, suscriptor }, { status: 201 });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Error desconocido';
-    if (msg.includes('Unique')) {
+    const { error: msg, code, details } = safeError(error);
+    if (code === 'DUPLICATE') {
       return NextResponse.json({ error: 'Ya existe un suscriptor con ese email' }, { status: 409 });
     }
-    console.error('Error creating suscriptor:', error);
-    return NextResponse.json({ error: 'Error al crear suscriptor' }, { status: 500 });
+    console.error('Error creating suscriptor:', details ?? msg);
+    return NextResponse.json({ error: msg, code, ...(details && { details }) }, { status: 500 });
   }
 }
 
@@ -136,10 +138,11 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ suscriptor });
   } catch (error: unknown) {
-    if (error instanceof Error && error.message.includes('Unique')) {
+    const { code } = safeError(error);
+    if (code === 'DUPLICATE') {
       return NextResponse.json({ error: 'Ya existe un suscriptor con ese email' }, { status: 409 });
     }
-    return NextResponse.json({ error: safeError(error, 'suscriptores') }, { status: 500 });
+    return NextResponse.json({ error: safeErrorGuard(error, 'suscriptores') }, { status: 500 });
   }
 }
 
