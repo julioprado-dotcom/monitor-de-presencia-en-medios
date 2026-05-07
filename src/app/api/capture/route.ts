@@ -3,6 +3,7 @@ import db from '@/lib/db';
 import { safeError } from '@/lib/rate-guard';
 import ZAI from 'z-ai-web-dev-sdk';
 import { analyzeMencion, applyAnalysisToMencion } from '@/lib/analyze';
+import { deduplicarMencion, actualizarCoberturaDuplicado } from '@/lib/deduplicacion';
 
 const SITES_QUERY = 'site:la-razon.com OR site:eldeber.com.bo OR site:lostiempos.com OR site:opinion.com.bo OR site:correodelsur.com OR site:elpotosi.net OR site:lapatria.bo OR site:eldiario.net OR site:jornadanet.com OR site:unitel.bo OR site:reduno.bo OR site:atb.com.bo OR site:boliviaverifica.bo OR site:abi.bo OR site:eju.tv OR site:elmundo.com.bo OR site:vision360.bo';
 
@@ -100,6 +101,31 @@ export async function POST(request: NextRequest) {
           const medioId = medioNombre ? (medioMap.get(medioNombre) || null) : null;
           if (!medioId) continue;
 
+          // DEDUPLICACION CROSS-MEDIO (FASE 4C)
+          const snippetText = item.snippet || '';
+          const dedupResult = await deduplicarMencion({
+            personaId: persona.id,
+            ejesTematicos: [],
+            resumen: snippetText,
+            fecha: new Date(),
+            medioId,
+            textoOriginal: snippetText,
+          });
+
+          if (dedupResult.decision === 'es_duplicado' && dedupResult.mencionOriginalId) {
+            await actualizarCoberturaDuplicado(dedupResult.mencionOriginalId, {
+              medioId,
+              medioNombre: medioNombre || 'Desconocido',
+              resumen: snippetText,
+              fecha: new Date(),
+            });
+            console.log(`[DEDUP capture] Deduplicada: ${medioNombre} → #${dedupResult.mencionOriginalId}`);
+            nuevasParaPersona++;
+            totalMencionesNuevas++;
+            allProcessedUrls.add(itemUrl);
+            continue;
+          }
+
           const mencion = await db.mencion.create({
             data: {
               personaId: persona.id,
@@ -110,6 +136,7 @@ export async function POST(request: NextRequest) {
               tipoMencion: 'no_clasificado',
               sentimiento: 'no_clasificado',
               verificado: false,
+              ...(dedupResult.eventoId ? { eventoId: dedupResult.eventoId } : {}),
             },
           });
           nuevasParaPersona++;

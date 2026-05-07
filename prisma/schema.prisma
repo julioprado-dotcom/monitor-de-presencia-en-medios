@@ -101,6 +101,10 @@ model Mencion {
   mencionOriginalId   String?
   /// JSON array con IDs de medios adicionales donde aparece la misma noticia
   mediosRelacionados  String?
+  /// ID compuesto para agrupar evoluciones de un evento: "{actor}|{tema}|{fecha_inicio}"
+  eventoId            String?
+  /// JSON con detalles de coberturas adicionales (cross-medio)
+  coberturasAdicionales String?
 
   persona       Persona?          @relation(fields: [personaId], references: [id])
   medio         Medio            @relation(fields: [medioId], references: [id])

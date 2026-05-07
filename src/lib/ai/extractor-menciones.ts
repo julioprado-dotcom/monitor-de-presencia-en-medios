@@ -4,6 +4,7 @@
 
 import db from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
+import { deduplicarMencion, actualizarCoberturaDuplicado } from '@/lib/deduplicacion';
 
 // ─── Interfaces (unchanged) ───────────────────────────────────
 
@@ -596,6 +597,30 @@ export async function crearMencionesExtraidas(
         continue;
       }
 
+      // DEDUPLICACION CROSS-MEDIO (FASE 4C)
+      const dedupResult = await deduplicarMencion({
+        personaId: leg.persona_id,
+        ejesTematicos: ejeIds,
+        resumen: resultado.resumen,
+        fecha: new Date(),
+        medioId,
+        textoOriginal: leg.contexto || leg.cita,
+      });
+
+      if (dedupResult.decision === 'es_duplicado' && dedupResult.mencionOriginalId) {
+        const medioObj = await db.medio.findUnique({ where: { id: medioId }, select: { nombre: true } });
+        await actualizarCoberturaDuplicado(dedupResult.mencionOriginalId, {
+          medioId,
+          medioNombre: medioObj?.nombre || 'Desconocido',
+          resumen: resultado.resumen,
+          fecha: new Date(),
+          tratamientoPeriodistico: resultado.tratamientoPeriodistico,
+        });
+        console.log(`[DEDUP] Mencion deduplicada: medio ${medioObj?.nombre || medioId} → original #${dedupResult.mencionOriginalId}`);
+        creadas++;
+        continue;
+      }
+
       const mencion = await db.mencion.create({
         data: {
           personaId: leg.persona_id,
@@ -606,6 +631,7 @@ export async function crearMencionesExtraidas(
           url,
           tipoMencion: 'no_clasificado',
           verificado: false,
+          ...(dedupResult.eventoId ? { eventoId: dedupResult.eventoId } : {}),
           ...sharedData,
         },
       });
