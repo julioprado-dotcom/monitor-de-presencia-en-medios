@@ -129,6 +129,12 @@
   html {
     @apply font-sans;
   }
+  a, button, [role="button"], [onclick], summary, input[type="checkbox"], input[type="radio"], select, label[for], .cursor-pointer {
+    cursor: pointer;
+  }
+  input, textarea, [contenteditable="true"] {
+    cursor: text;
+  }
 }
 
 /* ─── Scrollbar styling ─── */
