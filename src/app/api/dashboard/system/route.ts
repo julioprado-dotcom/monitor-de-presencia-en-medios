@@ -265,9 +265,19 @@ export async function GET() {
     const oks = diagnoses.filter(d => d.severity === 'ok');
 
     // Score de salud: 100 si todo ok, baja con warnings/criticals
-    // Excluir warnings informativos que no afectan la operacion real
-    const nonTrivialWarnings = warnings.filter(d => d.id !== 'dev-overhead' && d.id !== 'auth');
-    const healthScore = Math.max(0, 100 - (criticals.length * 30) - (nonTrivialWarnings.length * 10));
+    // Filtrar diagnósticos que NO representan problemas reales de producción
+    const devModePattern = /next dev|hot reload|development|dev server|compilation|fast refresh|hmr/i;
+    const nonTrivialDiagnoses = diagnoses.filter(d => {
+      // Excluir por ID: diagnósticos que son info/dev-only
+      if (d.id === 'dev-overhead' || d.id === 'auth') return false;
+      // Excluir por texto: cualquier mensaje que sea solo info de modo desarrollo
+      const texto = (d.message + ' ' + d.detail).toLowerCase();
+      if (devModePattern.test(texto)) return false;
+      return true;
+    });
+    const realCriticals = nonTrivialDiagnoses.filter(d => d.severity === 'critical');
+    const realWarnings = nonTrivialDiagnoses.filter(d => d.severity === 'warning');
+    const healthScore = Math.max(0, 100 - (realCriticals.length * 30) - (realWarnings.length * 10));
 
     return NextResponse.json({
       healthScore,
