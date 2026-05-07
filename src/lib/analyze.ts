@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import ZAI from 'z-ai-web-dev-sdk';
 import db from '@/lib/db';
 
@@ -19,15 +20,117 @@ export const EJES_TEMATICOS = [
 
 export const VALID_SLUGS = new Set(EJES_TEMATICOS.map(e => e.slug));
 
-// ─── System prompt ────────────────────────────────────────────
+// ─── Default escala when Marco Conceptual is not loaded ──────
 
-const SYSTEM_PROMPT = `Eres un analista de medios boliviano especializado en cobertura política y legislativa. Analiza la siguiente mención de un legislador boliviano en un medio de comunicación y clasifícala.
+const DEFAULT_ESCALA = [
+  { codigo: 'tratamiento_informativo', nombre: 'Informativo', definicion: 'Cobertura factual, sin carga valorativa.' },
+  { codigo: 'tratamiento_analitico', nombre: 'Analítico', definicion: 'Incluye contexto, antecedentes, múltiples fuentes.' },
+  { codigo: 'tratamiento_critico', nombre: 'Crítico', definicion: 'Cuestionamiento fundamentado con evidencia.' },
+  { codigo: 'tratamiento_editorial', nombre: 'Editorializante', definicion: 'Opinión del medio, toma de posición.' },
+  { codigo: 'tratamiento_agresivo', nombre: 'Agresivo', definicion: 'Ataque personal, descalificación.' },
+  { codigo: 'tratamiento_elogioso', nombre: 'Elogioso', definicion: 'Reconocimiento, perfil positivo.' },
+  { codigo: 'tratamiento_ambiguo', nombre: 'Ambiguo', definicion: 'No se puede determinar el tratamiento.' },
+  { codigo: 'sin_tratamiento', nombre: 'Sin clasificar', definicion: 'Insuficiente información.' },
+];
+
+const VALID_TRATAMIENTOS = new Set(DEFAULT_ESCALA.map(e => e.codigo));
+
+// ─── Tipo de retorno ──────────────────────────────────────────
+
+export interface AnalyzeResult {
+  tipoMencion: string;
+  sentimiento: string;                    // backward compat — mapped from tratamiento
+  tratamientoPeriodistico: string;        // the actual classification
+  confianzaClasificacion: string;         // "alta" | "media" | "baja"
+  ejesTematicos: string[];
+  preguntasFundamentales: Record<string, unknown> | null;  // the 8 fundamental questions
+}
+
+// ─── Helpers ──────────────────────────────────────────────────
+
+/**
+ * Build the treatment scale section of the system prompt.
+ * Accepts the array from marco.escalaTratamiento.categorias or falls back to DEFAULT_ESCALA.
+ */
+function buildEscalaPrompt(categorias: Array<{ codigo: string; nombre: string; definicion: string }>): string {
+  const lines = categorias.map((c, i) => `${i + 1}. ${c.codigo}: ${c.nombre} — ${c.definicion}`).join('\n');
+  return `TRATAMIENTO PERIODÍSTICO (del medio/fuente hacia el legislador):
+${lines}`;
+}
+
+/**
+ * Extract the categorias array from the marco's escalaTratamiento JSON field.
+ */
+function extractCategorias(escalaJson: unknown): Array<{ codigo: string; nombre: string; definicion: string }> | null {
+  if (!escalaJson || typeof escalaJson !== 'object') return null;
+  const obj = escalaJson as Record<string, unknown>;
+  const cats = obj.categorias;
+  if (!Array.isArray(cats)) return null;
+  return cats
+    .filter(
+      (c: unknown) =>
+        c !== null &&
+        typeof c === 'object' &&
+        typeof (c as Record<string, unknown>).codigo === 'string' &&
+        typeof (c as Record<string, unknown>).nombre === 'string',
+    )
+    .map((c: unknown) => {
+      const item = c as Record<string, unknown>;
+      return {
+        codigo: String(item.codigo),
+        nombre: String(item.nombre),
+        definicion: item.definicion ? String(item.definicion) : '',
+      };
+    });
+}
+
+/**
+ * Check text against prohibited terminology from Marco Conceptual.
+ * Returns list of found terms (empty = clean).
+ */
+function checkProhibitedTerms(
+  texto: string,
+  terminologiaProhibida: unknown,
+): string[] {
+  if (!terminologiaProhibida || typeof terminologiaProhibida !== 'object') return [];
+  const obj = terminologiaProhibida as Record<string, unknown>;
+  const terms = obj.terminos;
+  if (!Array.isArray(terms)) return [];
+  const found: string[] = [];
+  const lowerText = texto.toLowerCase();
+  for (const t of terms) {
+    if (typeof t === 'string' && t.trim() && lowerText.includes(t.trim().toLowerCase())) {
+      found.push(t.trim());
+    }
+  }
+  return found;
+}
+
+// ─── Build system prompt dynamically ──────────────────────────
+
+function buildSystemPrompt(
+  escala: Array<{ codigo: string; nombre: string; definicion: string }>,
+): string {
+  const escalaSection = buildEscalaPrompt(escala);
+
+  return `Eres un analista de medios boliviano especializado en cobertura política y legislativa. Analiza la siguiente mención de un legislador boliviano en un medio de comunicación y clasifícala usando la escala de TRATAMIENTO PERIODÍSTICO (NO sentimiento).
 
 Responde ÚNICAMENTE con un JSON válido (sin markdown, sin backticks) con esta estructura exacta:
 {
   "tipoMencion": "cita_directa | mencion_pasiva | cobertura_declaracion | contexto | foto_video",
-  "sentimiento": "positivo | negativo | neutral | critico | elogioso",
-  "ejesTematicos": ["slug1", "slug2"]
+  "tratamiento_periodistico": "${escala.map(e => e.codigo).join(' | ')}",
+  "confianza_clasificacion": "alta | media | baja",
+  "ejesTematicos": ["slug1", "slug2"],
+  "preguntas_fundamentales": {
+    "que": "... or null",
+    "quien": { "declara": "... or null", "afectado_directo": "... or null", "mencionados": [] },
+    "cuando": "... or null",
+    "como": "... or null",
+    "por_que": "... or null",
+    "para_que": { "actor": "... or null", "medio": "... or null", "confianza": "alta|media|baja" },
+    "a_quienes_afecta": { "directos": [], "indirectos": [], "potenciales": [], "mencionados_en_texto": false },
+    "donde": "... or null"
+  }
 }
 
 TIPOS DE MENCIÓN:
@@ -37,12 +140,22 @@ TIPOS DE MENCIÓN:
 - contexto: aparece mencionado en el contexto de un artículo sobre otro tema
 - foto_video: aparece en fotografía o video
 
-SENTIMIENTO (del medio/fuente hacia el legislador, no del legislador):
-- positivo: cobertura favorable o logros del legislador
-- negativo: críticas, controversias o cobertura desfavorable
-- neutral: cobertura informativa sin sesgo aparente
-- critico: análisis crítico o cuestionamiento directo
-- elogioso: reconocimiento o alabanza
+${escalaSection}
+
+CONFIANZA DE CLASIFICACIÓN:
+- alta: el texto es claro y no deja duda sobre el tratamiento
+- media: hay indicios pero la interpretación puede variar
+- baja: el texto es insuficiente o ambiguo para clasificar con certeza
+
+PREGUNTAS FUNDAMENTALES — Responde SOLO con lo que el texto diga explícitamente. Si el texto no responde una pregunta, usa null. NO inventes ni infieras datos.
+- que: ¿Qué ocurrió / qué se declara?
+- quien: ¿Quién declara? ¿Quién es afectado directo? ¿Quiénes son mencionados?
+- cuando: ¿Cuándo ocurrió?
+- como: ¿Cómo ocurrió?
+- por_que: ¿Por qué ocurrió?
+- para_que: ¿Con qué propósito? Incluye actor, medio y confianza de la atribución.
+- a_quienes_afecta: ¿A quiénes afecta? Listar directos, indirectos, potenciales y si se mencionan en el texto.
+- donde: ¿Dónde ocurrió?
 
 EJES TEMÁTICOS — clasifica en máximo 3 ejes (de mayor a menor relevancia):
 1. hidrocarburos-energia: gas, petróleo, YPFB, litio, electricidad, subsidios, gasolina, diésel
@@ -58,23 +171,55 @@ EJES TEMÁTICOS — clasifica en máximo 3 ejes (de mayor a menor relevancia):
 11. relaciones-internacionales: fronteras, migración, embajadas, cooperación, tratados
 
 Si la mención no encaja en ningún eje, devuelve un array vacío.`;
-
-// ─── Tipo de retorno ──────────────────────────────────────────
-
-export interface AnalyzeResult {
-  tipoMencion: string;
-  sentimiento: string;
-  ejesTematicos: string[];
 }
 
 // ─── Función principal de análisis ────────────────────────────
 
 export async function analyzeMencion(titulo: string, texto: string): Promise<AnalyzeResult> {
+  const defaultResult: AnalyzeResult = {
+    tipoMencion: 'contexto',
+    sentimiento: 'sin_tratamiento',
+    tratamientoPeriodistico: 'sin_tratamiento',
+    confianzaClasificacion: 'baja',
+    ejesTematicos: [],
+    preguntasFundamentales: null,
+  };
+
   try {
+    // ── Load active Marco Conceptual ──────────────────────────
+    let escala = DEFAULT_ESCALA;
+    let terminologiaProhibida: unknown = null;
+
+    try {
+      const marco = await db.marcoConceptual.findFirst({ where: { activa: true } });
+
+      if (marco) {
+        // Extract treatment scale categories
+        const cats = extractCategorias(marco.escalaTratamiento);
+        if (cats && cats.length > 0) {
+          escala = cats;
+          console.log(`[MC] Marco Conceptual v${marco.version} loaded — ${cats.length} categorías de tratamiento.`);
+        } else {
+          console.warn('[MC] Marco Conceptual found but escalaTratamiento.categorias is empty or malformed. Using DEFAULT_ESCALA.');
+        }
+
+        // Store prohibited terminology for post-check
+        terminologiaProhibida = marco.terminologiaProhibida;
+      } else {
+        console.warn('[MC] No active Marco Conceptual found in DB. Using DEFAULT_ESCALA.');
+      }
+    } catch (err) {
+      console.warn('[MC] Error loading Marco Conceptual from DB. Using DEFAULT_ESCALA.', err);
+    }
+
+    // ── Build prompt and call LLM ─────────────────────────────
+    const systemPrompt = buildSystemPrompt(escala);
+    const fullText = `${titulo}\n${texto}`.trim();
+
     const zai = await ZAI.create();
     const completion = await zai.chat.completions.create({
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         {
           role: 'user',
           content: `Analiza esta mención:\n\nTítulo: ${titulo}\nTexto: ${texto}`,
@@ -86,26 +231,81 @@ export async function analyzeMencion(titulo: string, texto: string): Promise<Ana
     const raw = (completion?.choices?.[0]?.message?.content || '').trim();
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return { tipoMencion: 'contexto', sentimiento: 'neutral', ejesTematicos: [] };
+      return defaultResult;
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
-    const ejesRaw = Array.isArray(parsed.ejesTematicos) ? parsed.ejesTematicos :
-                    Array.isArray(parsed.ejes) ? parsed.ejes :
-                    Array.isArray(parsed.temas) ? parsed.temas : [];
+
+    // ── Validate tratamiento_periodistico ──────────────────────
+    let tratamientoRaw = String(
+      parsed.tratamiento_periodistico || parsed.tratamientoPeriodistico || parsed.tratamiento || 'sin_tratamiento',
+    )
+      .toLowerCase()
+      .trim();
+    // Accept with or without "tratamiento_" prefix
+    if (
+      !VALID_TRATAMIENTOS.has(tratamientoRaw) &&
+      tratamientoRaw.startsWith('tratamiento_')
+    ) {
+      // Already has prefix, keep as-is
+    } else if (!VALID_TRATAMIENTOS.has(tratamientoRaw)) {
+      // Try adding prefix
+      const withPrefix = `tratamiento_${tratamientoRaw}`;
+      if (VALID_TRATAMIENTOS.has(withPrefix)) {
+        tratamientoRaw = withPrefix;
+      } else {
+        tratamientoRaw = 'sin_tratamiento';
+      }
+    }
+
+    // ── Validate confianza_clasificacion ───────────────────────
+    const confianzaRaw = String(
+      parsed.confianza_clasificacion || parsed.confianzaClasificacion || 'media',
+    )
+      .toLowerCase()
+      .trim();
+    const confianzaValida = ['alta', 'media', 'baja'].includes(confianzaRaw) ? confianzaRaw : 'media';
+
+    // ── Validate ejes temáticos ────────────────────────────────
+    const ejesRaw = Array.isArray(parsed.ejesTematicos)
+      ? parsed.ejesTematicos
+      : Array.isArray(parsed.ejes)
+        ? parsed.ejes
+        : Array.isArray(parsed.temas)
+          ? parsed.temas
+          : [];
 
     const ejesValidados = ejesRaw
-      .map((s: string) => s.toLowerCase().trim())
+      .map((s: string) => String(s).toLowerCase().trim())
       .filter((s: string) => VALID_SLUGS.has(s))
       .slice(0, 3);
 
+    // ── Extract preguntas_fundamentales ────────────────────────
+    const pfRaw = parsed.preguntas_fundamentales || parsed.preguntasFundamentales || null;
+    const preguntasFundamentales: Record<string, unknown> | null =
+      pfRaw && typeof pfRaw === 'object' && !Array.isArray(pfRaw) ? (pfRaw as Record<string, unknown>) : null;
+
+    // ── Check prohibited terminology ───────────────────────────
+    if (terminologiaProhibida) {
+      const foundTerms = checkProhibitedTerms(fullText, terminologiaProhibida);
+      if (foundTerms.length > 0) {
+        console.warn(
+          `[MC] ⚠ Términos prohibidos detectados en mención "${titulo.substring(0, 60)}...": ${foundTerms.join(', ')}`,
+        );
+      }
+    }
+
     return {
       tipoMencion: parsed.tipoMencion || 'contexto',
-      sentimiento: parsed.sentimiento || 'neutral',
+      sentimiento: tratamientoRaw,               // backward compat
+      tratamientoPeriodistico: tratamientoRaw,
+      confianzaClasificacion: confianzaValida,
       ejesTematicos: ejesValidados,
+      preguntasFundamentales,
     };
-  } catch {
-    return { tipoMencion: 'contexto', sentimiento: 'neutral', ejesTematicos: [] };
+  } catch (err) {
+    console.error('[analyze] Error in analyzeMencion:', err);
+    return defaultResult;
   }
 }
 
@@ -116,7 +316,12 @@ export async function applyAnalysisToMencion(mencionId: string, result: AnalyzeR
     where: { id: mencionId },
     data: {
       tipoMencion: result.tipoMencion,
-      sentimiento: result.sentimiento,
+      sentimiento: result.tratamientoPeriodistico,       // compatibility mapping
+      tratamientoPeriodistico: result.tratamientoPeriodistico,
+      confianzaClasificacion: result.confianzaClasificacion,
+      preguntasFundamentales: result.preguntasFundamentales
+        ? (result.preguntasFundamentales as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
       temas: result.ejesTematicos.join(', '),
     },
   });

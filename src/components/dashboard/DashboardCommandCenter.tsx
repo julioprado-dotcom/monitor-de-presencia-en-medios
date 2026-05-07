@@ -255,6 +255,13 @@ export function DashboardCommandCenter() {
   // AI Health state
   const [aiHealth, setAiHealth] = useState<AiHealthData | null>(null);
 
+  // Marco Conceptual state
+  const [mcResumen, setMcResumen] = useState<{
+    inicializado: boolean;
+    version: number | null;
+    vacios: string[];
+  } | null>(null);
+
   // Fetch entregas hoy
   const fetchEntregasHoy = useCallback(async () => {
     try {
@@ -330,6 +337,20 @@ export function DashboardCommandCenter() {
     const interval = setInterval(fetchAiHealth, 20000); // refresh cada 20s
     return () => clearInterval(interval);
   }, [fetchAiHealth]);
+
+  // Fetch Marco Conceptual resumen
+  useEffect(() => {
+    const fetchMC = async () => {
+      try {
+        const res = await fetch('/api/marco-conceptual/resumen');
+        const data = await res.json();
+        setMcResumen(data);
+      } catch { /* silent */ }
+    };
+    fetchMC();
+    const interval = setInterval(fetchMC, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ─── Computed values ────────────────────────────────────
 
@@ -572,6 +593,27 @@ export function DashboardCommandCenter() {
                       size="sm"
                       horizontal={true}
                     />
+                    {/* Indicador Marco Conceptual */}
+                    {mcResumen && (
+                      <div className="flex items-center gap-1.5">
+                        {mcResumen.inicializado ? (
+                          <>
+                            <span className="text-[9px] font-medium text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                              MC v{mcResumen.version}
+                            </span>
+                            {mcResumen.vacios && mcResumen.vacios.length > 0 && (
+                              <span className="text-[9px] text-amber-500" title={`Directrices vacías: ${mcResumen.vacios.join(', ')}`}>
+                                <AlertTriangle className="h-3 w-3" />
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-[9px] font-medium text-red-500 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded">
+                            MC no configurado
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

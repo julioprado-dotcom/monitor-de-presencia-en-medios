@@ -1,10 +1,11 @@
 // Extraer menciones de legisladores Y temas relevantes de texto de noticias usando LLM
 // DECODEX Bolivia — Pipeline A (scrape-fuente)
+// FASE 4: Integración del Marco Conceptual (MC) del sistema de IA
 
 import db from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
 
-// ─── Interfaces ────────────────────────────────────────────────
+// ─── Interfaces (unchanged) ───────────────────────────────────
 
 interface LegisladorMencionado {
   persona_id: string;
@@ -20,95 +21,324 @@ interface EjeMencionado {
 
 export interface ExtractionResult {
   es_relevante: boolean;
+  tratamientoPeriodistico: string;
+  confianzaClasificacion: string;
+  resumen: string;
   legisladores_mencionados: LegisladorMencionado[];
   ejes_mencionados: EjeMencionado[];
   temas_detectados: string[];
-  sentimiento_general: string;
-  resumen: string;
+  preguntas_fundamentales: Record<string, unknown>;
+  sentimiento_general: string; // backward compatibility
 }
 
-// ─── System Prompt ─────────────────────────────────────────────
+// ─── Default Treatment Scale ──────────────────────────────────
 
-const SYSTEM_PROMPT = `Eres un extractor avanzado de informacion politica boliviana. Analiza textos de noticias y detecta:
+const DEFAULT_ESCALA = [
+  { codigo: 'tratamiento_informativo', nombre: 'Informativo' },
+  { codigo: 'tratamiento_analitico', nombre: 'Analítico' },
+  { codigo: 'tratamiento_critico', nombre: 'Crítico' },
+  { codigo: 'tratamiento_editorial', nombre: 'Editorializante' },
+  { codigo: 'tratamiento_agresivo', nombre: 'Agresivo' },
+  { codigo: 'tratamiento_elogioso', nombre: 'Elogioso' },
+  { codigo: 'tratamiento_ambiguo', nombre: 'Ambiguo' },
+  { codigo: 'sin_tratamiento', nombre: 'Sin clasificar' },
+];
+
+// ─── Default Fundamental Questions ────────────────────────────
+
+const DEFAULT_PREGUNTAS = [
+  { codigo: 'que', nombre: '¿Qué pasó?', descripcion: 'Evento principal' },
+  { codigo: 'quien', nombre: '¿Quién?', descripcion: 'Actores involucrados' },
+  { codigo: 'cuando', nombre: '¿Cuándo?', descripcion: 'Temporalidad' },
+  { codigo: 'como', nombre: '¿Cómo?', descripcion: 'Mecanismo / modalidad' },
+  { codigo: 'por_que', nombre: '¿Por qué?', descripcion: 'Causas (no intenciones)' },
+  { codigo: 'para_que', nombre: '¿Para qué?', descripcion: 'Intenciones declaradas o inferidas' },
+  { codigo: 'a_quienes_afecta', nombre: '¿A quiénes afecta?', descripcion: 'Grupos impactados' },
+  { codigo: 'donde', nombre: '¿Dónde?', descripcion: 'Lugar / ámbito geográfico' },
+];
+
+// ─── Default Principles ───────────────────────────────────────
+
+const DEFAULT_PRINCIPIOS = [
+  { codigo: 'fiel_al_origen', nombre: 'Fidelidad al texto fuente', reglas_operativas: 'Nunca mejorar, suavizar ni reinterpretar el tono original' },
+  { codigo: 'no_inventar', nombre: 'Cero invención', reglas_operativas: 'Si el texto no responde una pregunta, devolver null' },
+  { codigo: 'tratamiento_no_sentimiento', nombre: 'Tratamiento periodístico (NO sentimiento)', reglas_operativas: 'Usar la escala de tratamiento, nunca la palabra sentimiento' },
+  { codigo: 'clasificacion_fiel', nombre: 'Clasificación fiel', reglas_operativas: 'Si el texto es 100% crítico, clasificar como 100% crítico. No inventar balance' },
+  { codigo: 'terminologia_controlada', nombre: 'Terminología controlada', reglas_operativas: 'Usar solo términos permitidos. Nunca usar términos prohibidos' },
+  { codigo: 'ironia_editorial', nombre: 'Ironía/sarcasmo → editorial', reglas_operativas: 'Detectar ironía o sarcasmo y clasificar como tratamiento_editorial' },
+  { codigo: 'resumen_fiel', nombre: 'Resumen fiel', reglas_operativas: 'Máximo 200 palabras, reflejar calidad y tono ORIGINAL' },
+  { codigo: 'separar_causa_intencion', nombre: 'Separar causa de intención', reglas_operativas: '"por qué" = causa, "para qué" = intención. Son preguntas distintas' },
+  { codigo: 'contexto_boliviano', nombre: 'Contexto boliviano', reglas_operativas: 'Aplicar conocimiento del contexto político e institucional de Bolivia' },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────
+
+type MarcoData = NonNullable<Awaited<ReturnType<typeof db.marcoConceptual.findFirst>>>;
+
+function safeJson<T>(field: unknown, fallback: T): T {
+  if (field === null || field === undefined) return fallback;
+  try {
+    return typeof field === 'string' ? (JSON.parse(field) as T) : (field as T);
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Build the system prompt dynamically from the Marco Conceptual.
+ */
+function buildSystemPrompt(marco: MarcoData | null): string {
+  // ── Principios ──
+  const principios = marco
+    ? safeJson<{ codigo: string; nombre: string; reglas_operativas?: string }[]>(marco.principios, DEFAULT_PRINCIPIOS)
+    : DEFAULT_PRINCIPIOS;
+
+  const principiosSection = principios
+    .map((p, i) => `${i + 1}. **${p.nombre}** (${p.codigo})\n   - ${p.reglas_operativas || ''}`)
+    .join('\n');
+
+  // ── Escala de Tratamiento Periodístico ──
+  let escala: { codigo: string; nombre: string }[];
+  if (marco) {
+    const escalaRaw = safeJson<{ categorias?: { codigo: string; nombre: string }[] } | { codigo: string; nombre: string }[]>(
+      marco.escalaTratamiento,
+      DEFAULT_ESCALA,
+    );
+    escala = Array.isArray(escalaRaw) && escalaRaw.length > 0 && 'codigo' in escalaRaw[0]
+      ? escalaRaw as { codigo: string; nombre: string }[]
+      : ('categorias' in (escalaRaw as Record<string, unknown>)
+          ? ((escalaRaw as { categorias: { codigo: string; nombre: string }[] }).categorias)
+          : DEFAULT_ESCALA);
+  } else {
+    escala = DEFAULT_ESCALA;
+  }
+
+  const escalaSection = escala
+    .map(e => `- **${e.codigo}**: ${e.nombre}`)
+    .join('\n');
+
+  // ── Criterios de Relevancia ──
+  let criteriosRelevancia: string[] = [];
+  if (marco) {
+    const cr = safeJson<string[] | { criterio: string }[]>(marco.criteriosRelevancia, []);
+    if (Array.isArray(cr)) {
+      criteriosRelevancia = cr.map(c => typeof c === 'string' ? c : c.criterio || '').filter(Boolean);
+    }
+  }
+  if (criteriosRelevancia.length === 0) {
+    criteriosRelevancia = [
+      'Menciona al menos un legislador monitoreado',
+      'Se refiere a al menos un eje temático monitoreado',
+      'Contiene al menos una keyword de interés',
+    ];
+  }
+
+  const criteriosSection = criteriosRelevancia.map(c => `- ${c}`).join('\n');
+
+  // ── Terminología ──
+  const terminosPermitidos: string[] = marco
+    ? safeJson<string[]>(marco.terminologiaPermitida, [])
+    : [];
+  const terminosProhibidos: string[] = marco
+    ? safeJson<string[]>(marco.terminologiaProhibida, [])
+    : [];
+
+  let terminologiaSection = '';
+  if (terminosPermitidos.length > 0) {
+    terminologiaSection += `\n**Términos PERMITIDOS** (usar estos):\n${terminosPermitidos.map(t => `- ${t}`).join('\n')}\n`;
+  }
+  if (terminosProhibidos.length > 0) {
+    terminologiaSection += `\n**Términos PROHIBIDOS** (NUNCA usar estos):\n${terminosProhibidos.map(t => `- ${t}`).join('\n')}\n`;
+  }
+
+  // ── Exclusiones Éticas ──
+  const exclusionesRaw: unknown[] = marco
+    ? safeJson<unknown[]>(marco.exclusionesEtica, [])
+    : [];
+  let exclusionesSection = '';
+  if (exclusionesRaw.length > 0) {
+    const exclusionesList = exclusionesRaw
+      .map((e) => typeof e === 'string' ? e : (e as Record<string, string>)?.exclusion || '')
+      .filter(Boolean);
+    if (exclusionesList.length > 0) {
+      exclusionesSection = `\n**Exclusiones éticas** (no procesar si la noticia trata de):\n${exclusionesList.map(ex => `- ${ex}`).join('\n')}\n`;
+    }
+  }
+
+  // ── Preguntas Fundamentales ──
+  const preguntas = marco
+    ? safeJson<{ codigo: string; nombre: string; descripcion?: string }[]>(marco.preguntasFundamentales, DEFAULT_PREGUNTAS)
+    : DEFAULT_PREGUNTAS;
+
+  const preguntasSection = preguntas
+    .map(p => `- **${p.codigo}** (${p.nombre}): ${p.descripcion || ''}`)
+    .join('\n');
+
+  // ── Assemble full prompt ──
+  return `Eres un extractor avanzado de información política boliviana. Analiza textos de noticias y detecta:
 1. Menciones a legisladores bolivianos (de la lista proporcionada)
-2. Referencias a ejes tematicos monitoreados
-3. Keywords de interes politico/economico
+2. Referencias a ejes temáticos monitoreados
+3. Keywords de interés político/económico
+4. Tratamiento periodístico (NUNCA uses la palabra "sentimiento")
 
-CONTEXTO: Se te proporcionara:
+CONTEXTO: Se te proporcionará:
 - Una lista de LEGISLADORES con sus IDs
-- Una lista de EJES TEMATICOS con sus IDs y keywords
-- Una lista de KEYWORDS ADICIONALES de interes
+- Una lista de EJES TEMÁTICOS con sus IDs y keywords
+- Una lista de KEYWORDS ADICIONALES de interés
 
-Responde UNICAMENTE con un JSON valido (sin markdown, sin backticks) con esta estructura exacta:
+## PRINCIPIOS FUNDANTES (INMUTABLES)
+
+${principiosSection}
+
+## ESCALA DE TRATAMIENTO PERIODÍSTICO
+
+${escalaSection}
+
+## CRITERIOS DE RELEVANCIA
+
+es_relevante = true SI se cumple AL MENOS UNO de estos criterios:
+${criteriosSection}
+
+Si la noticia no menciona nada relevante, es_relevante = false y devuelve arrays vacíos.
+${terminologiaSection}${exclusionesSection}
+## LAS 8 PREGUNTAS FUNDAMENTALES
+
+Debes intentar responder estas preguntas a partir del texto:
+${preguntasSection}
+
+## REGLAS PARA LEGISLADORES
+- Solo incluir legisladores que estén en la lista proporcionada
+- persona_id debe ser EXACTAMENTE el ID proporcionado en la lista
+- cita debe ser un fragmento textual REAL del artículo (no inventado)
+- contexto debe resumir en qué contexto aparece el legislador
+- Máximo 5 legisladores por artículo
+
+## REGLAS PARA EJES TEMÁTICOS
+- Solo incluir ejes de la lista proporcionada
+- eje_id debe ser EXACTAMENTE el ID proporcionado
+- cita debe ser un fragmento real del texto que justifica la clasificación
+- relevancia: "alta" (artículo central sobre el tema), "media" (mencionado significativamente), "baja" (referencia tangencial)
+- Máximo 3 ejes por artículo
+
+## TEMAS DETECTADOS
+- Lista de 1-5 temas o conceptos clave que trata la noticia
+- Usar términos cortos y descriptivos (ej: "pensiones", "reforma laboral", "gas natural")
+
+## RESUMEN
+- Máximo 200 palabras
+- Debe reflejar la CALIDAD Y TONO ORIGINAL del texto fuente
+- No mejorar, suavizar ni reinterpretar
+
+## REGLAS CRÍTICAS
+- Usa "tratamiento periodístico" NUNCA "sentimiento"
+- Sé fiel al texto fuente — no mejorarlo, suavizarlo ni reinterpretarlo
+- Si el texto es 100% crítico, clasifícalo como 100% crítico — NO inventes balance
+- Si el texto fuente NO responde una pregunta fundamental → null (NUNCA inventes)
+- Usa terminología permitida, NUNCA uses términos prohibidos
+- Detecta ironía/sarcasmo → clasifica como tratamiento_editorial
+- Separa "por qué" (causa) de "para qué" (intención)
+- confianza_clasificacion: "alta" (muy seguro), "media" (razonablemente seguro), "baja" (poco seguro)
+
+## FORMATO DE SALIDA
+
+Responde ÚNICAMENTE con un JSON válido (sin markdown, sin backticks) con esta estructura exacta:
 {
   "es_relevante": true,
+  "tratamiento_periodistico": "tratamiento_informativo",
+  "confianza_clasificacion": "alta",
+  "resumen": "resumen fiel de max 200 palabras",
   "legisladores_mencionados": [
     { "persona_id": "ID_DE_PERSONA", "cita": "fragmento textual donde aparece el legislador", "contexto": "contexto en 20 palabras" }
   ],
-  "ejes_mencionados": [
+  "ejes_institucionales": [
     { "eje_id": "ID_DEL_EJE", "cita": "fragmento relevante del texto", "relevancia": "alta|media|baja" }
   ],
   "temas_detectados": ["tema1", "tema2", "tema3"],
-  "sentimiento_general": "positivo|negativo|neutro|mixto",
-  "resumen": "resumen de la noticia en 20 palabras maximo"
+  "preguntas_fundamentales": {
+    "que": "evento principal or null",
+    "quien": { "declara": "nombre or null", "afectado_directo": "nombre or null", "mencionados": [] },
+    "cuando": "fecha o null",
+    "como": "mecanismo o null",
+    "por_que": "causa o null",
+    "para_que": { "actor": "intención or null", "medio": "intención or null", "confianza": "alta|media|baja" },
+    "a_quienes_afecta": { "directos": [], "indirectos": [], "potenciales": [], "mencionados_en_texto": false },
+    "donde": "lugar or null"
+  }
 }
 
-REGLAS DE RELEVANCIA:
-- es_relevante = true SI menciona AL MENOS UN legislador O AL MENOS UN eje tematico O AL MENOS UN keyword de interes
-- Si la noticia no menciona nada relevante, es_relevante = false y devuelve arrays vacios
+VALORES VÁLIDOS para tratamiento_periodistico:
+${escala.map(e => e.codigo).join(', ')}
 
-REGLAS PARA LEGISLADORES:
-- Solo incluir legisladores que esten en la lista proporcionada
-- persona_id debe ser EXACTAMENTE el ID proporcionado en la lista
-- cita debe ser un fragmento textual REAL del articulo (no inventado)
-- contexto debe resumir en que contexto aparece el legislador
-- Maximo 5 legisladores por articulo
-
-REGLAS PARA EJES TEMATICOS:
-- Solo incluir ejes de la lista proporcionada
-- eje_id debe ser EXACTAMENTE el ID proporcionado
-- cita debe ser un fragmento real del texto que justifica la clasificacion
-- relevancia: "alta" (articulo central sobre el tema), "media" (mencionado significativamente), "baja" (referencia tangencial)
-- Maximo 3 ejes por articulo
-
-TEMAS DETECTADOS:
-- Lista de 1-5 temas o conceptos clave que trata la noticia
-- Usar terminos cortos y descriptivos (ej: "pensiones", "reforma laboral", "gas natural")
-
-SENTIMIENTO GENERAL:
-- Evalua el tono de la noticia sobre el TEMA PRINCIPAL (no solo sobre personas)
-- "positivo": noticia favorable, logros, avances
-- "negativo": criticas, problemas, crisis
-- "neutro": informativa sin sesgo aparente
-- "mixto": contiene elementos tanto positivos como negativos
-
-RESUMEN:
-- Maximo 20 palabras
-- Captura la esencia de la noticia
-
-Si es_relevante = false, devolver: {"es_relevante": false, "legisladores_mencionados": [], "ejes_mencionados": [], "temas_detectados": [], "sentimiento_general": "neutro", "resumen": ""}`;
-
-// ─── Funcion principal de extraccion ───────────────────────────
+Si es_relevante = false, devolver:
+{"es_relevante": false, "tratamiento_periodistico": "sin_tratamiento", "confianza_clasificacion": "baja", "resumen": "", "legisladores_mencionados": [], "ejes_institucionales": [], "temas_detectados": [], "preguntas_fundamentales": {}}`;
+}
 
 /**
- * Extraer menciones (legisladores + ejes tematicos) de un texto usando LLM.
- * Tolerancia a fallos: si el LLM falla, devuelve resultado vacio.
+ * Map tratamiento_periodistico to a backward-compatible sentimiento value.
+ */
+function tratamientoToSentimiento(tratamiento: string): string {
+  switch (tratamiento) {
+    case 'tratamiento_informativo':
+      return 'neutro';
+    case 'tratamiento_analitico':
+      return 'neutro';
+    case 'tratamiento_critico':
+      return 'negativo';
+    case 'tratamiento_editorial':
+      return 'neutro';
+    case 'tratamiento_agresivo':
+      return 'negativo';
+    case 'tratamiento_elogioso':
+      return 'positivo';
+    case 'tratamiento_ambiguo':
+      return 'mixto';
+    case 'sin_tratamiento':
+    default:
+      return 'no_clasificado';
+  }
+}
+
+// ─── Main extraction function ─────────────────────────────────
+
+/**
+ * Extraer menciones (legisladores + ejes temáticos) de un texto usando LLM.
+ * Integración con el Marco Conceptual del sistema de IA.
+ * Tolerancia a fallos: si el LLM falla, devuelve resultado vacío.
  */
 export async function extraerMencionesDeTexto(
   texto: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   medioId: string,
 ): Promise<ExtractionResult> {
   const emptyResult: ExtractionResult = {
     es_relevante: false,
+    tratamientoPeriodistico: 'sin_tratamiento',
+    confianzaClasificacion: 'baja',
+    resumen: '',
     legisladores_mencionados: [],
     ejes_mencionados: [],
     temas_detectados: [],
-    sentimiento_general: 'neutro',
-    resumen: '',
+    preguntas_fundamentales: {},
+    sentimiento_general: 'no_clasificado',
   };
 
   try {
-    // 1. Cargar datos de contexto desde la DB en paralelo
+    // 1. Load Marco Conceptual
+    let marco: MarcoData | null = null;
+    try {
+      marco = await db.marcoConceptual.findFirst({ where: { activa: true } });
+    } catch {
+      console.warn('[extractor-menciones] Error cargando marco conceptual, usando valores default');
+    }
+
+    if (!marco) {
+      console.warn('[extractor-menciones] Marco conceptual no inicializado, usando valores default');
+    }
+
+    // 2. Build system prompt from marco
+    const systemPrompt = buildSystemPrompt(marco);
+
+    // 3. Cargar datos de contexto desde la DB en paralelo
     const treintaDiasAtras = new Date();
     treintaDiasAtras.setDate(treintaDiasAtras.getDate() - 30);
 
@@ -121,7 +351,7 @@ export async function extraerMencionesDeTexto(
         where: { activo: true },
         select: { id: true, nombre: true, slug: true, keywords: true },
       }),
-      // Temas recientes (ultimos 30 dias) para detectar tendencias
+      // Temas recientes (últimos 30 días) para detectar tendencias
       db.mencionTema.findMany({
         where: { mencion: { fechaCaptura: { gte: treintaDiasAtras } } },
         include: { ejeTematico: { select: { nombre: true, keywords: true } } },
@@ -131,21 +361,21 @@ export async function extraerMencionesDeTexto(
 
     if (personas.length === 0 && ejes.length === 0) return emptyResult;
 
-    // 2. Construir seccion de legisladores
+    // 4. Construir sección de legisladores
     const listaLegisladores = personas.length > 0
       ? personas
-          .map(p => `- ID: ${p.id} | ${p.nombre} (${p.partidoSigla || 'Sin partido'}, ${p.camara || 'Sin camara'})`)
+          .map(p => `- ID: ${p.id} | ${p.nombre} (${p.partidoSigla || 'Sin partido'}, ${p.camara || 'Sin cámara'})`)
           .join('\n')
       : '(Sin legisladores registrados)';
 
-    // 3. Construir seccion de ejes tematicos con keywords
+    // 5. Construir sección de ejes temáticos con keywords
     const listaEjes = ejes.length > 0
       ? ejes
           .map(e => `- ID: ${e.id} | ${e.nombre} (keywords: ${e.keywords || 'sin keywords'})`)
           .join('\n')
-      : '(Sin ejes tematicos registrados)';
+      : '(Sin ejes temáticos registrados)';
 
-    // 4. Construir lista combinada de keywords de interes
+    // 6. Construir lista combinada de keywords de interés
     const todasKeywords = new Set<string>();
     for (const eje of ejes) {
       if (eje.keywords) {
@@ -154,7 +384,7 @@ export async function extraerMencionesDeTexto(
         }
       }
     }
-    // Agregar keywords de temas recientes para deteccion de tendencias
+    // Agregar keywords de temas recientes para detección de tendencias
     for (const tm of temasRecientes) {
       if (tm.ejeTematico.keywords) {
         for (const kw of tm.ejeTematico.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean)) {
@@ -166,24 +396,24 @@ export async function extraerMencionesDeTexto(
       ? Array.from(todasKeywords).slice(0, 100).join(', ')
       : '';
 
-    // 5. Truncar texto si es muy largo (max ~4000 chars para el LLM)
+    // 7. Truncar texto si es muy largo (max ~4000 chars para el LLM)
     const textoTruncado = texto.length > 4000
       ? texto.substring(0, 4000) + '...'
       : texto;
 
-    // 6. Construir prompt del usuario
+    // 8. Construir prompt del usuario
     let userContent = `LEGISLADORES MONITOREADOS:\n${listaLegisladores}\n\n`;
-    userContent += `EJES TEMATICOS:\n${listaEjes}\n\n`;
+    userContent += `EJES TEMÁTICOS:\n${listaEjes}\n\n`;
     if (listaKeywords) {
-      userContent += `KEYWORDS DE INTERES: ${listaKeywords}\n\n`;
+      userContent += `KEYWORDS DE INTERÉS: ${listaKeywords}\n\n`;
     }
     userContent += `TEXTO DE LA NOTICIA:\n${textoTruncado}`;
 
-    // 7. Llamada al LLM
+    // 9. Llamada al LLM
     const zai = await ZAI.create();
     const completion = await zai.chat.completions.create({
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent },
       ],
       temperature: 0.1,
@@ -195,11 +425,14 @@ export async function extraerMencionesDeTexto(
 
     const parsed = JSON.parse(jsonMatch[0]);
 
-    // 8. Validar y normalizar resultado
+    // 10. Validar y normalizar resultado
     const validPersonIds = new Set(personas.map(p => p.id));
     const validEjeIds = new Set(ejes.map(e => e.id));
     const relevanciasValidas = new Set(['alta', 'media', 'baja']);
+    const tratamientosValidos = new Set(DEFAULT_ESCALA.map(e => e.codigo));
+    const confianzasValidas = new Set(['alta', 'media', 'baja']);
 
+    // Legisladores (key in LLM output: legisladores_mencionados)
     const legisladores = Array.isArray(parsed.legisladores_mencionados)
       ? parsed.legisladores_mencionados
           .filter((m: Record<string, unknown>) =>
@@ -213,8 +446,10 @@ export async function extraerMencionesDeTexto(
           }))
       : [];
 
-    const ejesMencionados = Array.isArray(parsed.ejes_mencionados)
-      ? parsed.ejes_mencionados
+    // Ejes (LLM returns "ejes_institucionales", we map to ejes_mencionados)
+    const ejesRaw = parsed.ejes_institucionales || parsed.ejes_mencionados || [];
+    const ejesMencionados = Array.isArray(ejesRaw)
+      ? ejesRaw
           .filter((e: Record<string, unknown>) =>
             e.eje_id && validEjeIds.has(e.eje_id as string) && e.cita
           )
@@ -228,6 +463,7 @@ export async function extraerMencionesDeTexto(
           }))
       : [];
 
+    // Temas
     const temas = Array.isArray(parsed.temas_detectados)
       ? parsed.temas_detectados
           .map((t: string) => String(t).trim().toLowerCase())
@@ -235,30 +471,46 @@ export async function extraerMencionesDeTexto(
           .slice(0, 5)
       : [];
 
-    const sentimientosValidos = new Set(['positivo', 'negativo', 'neutro', 'mixto']);
-    const sentimiento = sentimientosValidos.has(String(parsed.sentimiento_general || ''))
-      ? String(parsed.sentimiento_general)
-      : 'neutro';
+    // Tratamiento periodístico
+    const tratamiento = tratamientosValidos.has(String(parsed.tratamiento_periodistico || ''))
+      ? String(parsed.tratamiento_periodistico)
+      : 'sin_tratamiento';
+
+    // Confianza clasificación
+    const confianza = confianzasValidas.has(String(parsed.confianza_clasificacion || ''))
+      ? String(parsed.confianza_clasificacion)
+      : 'baja';
+
+    // Preguntas fundamentales
+    const preguntas_fundamentales = parsed.preguntas_fundamentales && typeof parsed.preguntas_fundamentales === 'object'
+      ? parsed.preguntas_fundamentales as Record<string, unknown>
+      : {};
+
+    // Backward-compatible sentimiento
+    const sentimiento = tratamientoToSentimiento(tratamiento);
 
     return {
       es_relevante: parsed.es_relevante === true || legisladores.length > 0 || ejesMencionados.length > 0,
+      tratamientoPeriodistico: tratamiento,
+      confianzaClasificacion: confianza,
+      resumen: String(parsed.resumen || '').substring(0, 200),
       legisladores_mencionados: legisladores,
       ejes_mencionados: ejesMencionados,
       temas_detectados: temas,
+      preguntas_fundamentales,
       sentimiento_general: sentimiento,
-      resumen: String(parsed.resumen || '').substring(0, 200),
     };
   } catch (err) {
-    console.warn('[extractor-menciones] Error en extraccion LLM:', err);
+    console.warn('[extractor-menciones] Error en extracción LLM:', err);
     return emptyResult;
   }
 }
 
-// ─── Extraer texto de HTML ─────────────────────────────────────
+// ─── Extraer texto de HTML (UNCHANGED) ────────────────────────
 
 /**
  * Extraer texto relevante de un HTML.
- * Busca selectores comunes de contenido de articulos.
+ * Busca selectores comunes de contenido de artículos.
  */
 export function extraerTextoDeHtml(html: string): string {
   // Remover scripts y styles
@@ -304,11 +556,13 @@ export function extraerTextoDeHtml(html: string): string {
 // ─── Crear menciones en DB ─────────────────────────────────────
 
 /**
- * Crear menciones en la DB a partir del resultado de extraccion.
+ * Crear menciones en la DB a partir del resultado de extracción.
  *
- * Logica:
+ * Lógica:
  * - Si hay legisladores: crear Mencion con personaId por cada uno, vincular ejes via MencionTema
  * - Si NO hay legisladores PERO hay ejes: crear Mencion sin personaId (referencia_tematica)
+ *
+ * FASE 4: Ahora incluye tratamientoPeriodistico, confianzaClasificacion y preguntasFundamentales.
  */
 export async function crearMencionesExtraidas(
   resultado: ExtractionResult,
@@ -320,6 +574,15 @@ export async function crearMencionesExtraidas(
 
   let creadas = 0;
   const ejeIds = resultado.ejes_mencionados.map(e => e.eje_id);
+
+  // Shared data fields for all menciones
+  const sharedData = {
+    tratamientoPeriodistico: resultado.tratamientoPeriodistico,
+    confianzaClasificacion: resultado.confianzaClasificacion,
+    preguntasFundamentales: resultado.preguntas_fundamentales,
+    sentimiento: resultado.tratamientoPeriodistico, // compatibility mapping
+    temas: resultado.temas_detectados.join(', '),
+  };
 
   // 1. Crear menciones por legislador (si hay)
   for (const leg of resultado.legisladores_mencionados) {
@@ -342,13 +605,12 @@ export async function crearMencionesExtraidas(
           textoCompleto: leg.contexto,
           url,
           tipoMencion: 'no_clasificado',
-          sentimiento: resultado.sentimiento_general,
           verificado: false,
-          temas: resultado.temas_detectados.join(', '),
+          ...sharedData,
         },
       });
 
-      // Vincular ejes tematicos via MencionTema
+      // Vincular ejes temáticos via MencionTema
       for (const ejeId of ejeIds) {
         try {
           await db.mencionTema.create({
@@ -365,7 +627,7 @@ export async function crearMencionesExtraidas(
     }
   }
 
-  // 2. Si NO hay legisladores PERO hay ejes tematicos: crear mencion tematica
+  // 2. Si NO hay legisladores PERO hay ejes temáticos: crear mencion temática
   if (resultado.legisladores_mencionados.length === 0 && resultado.ejes_mencionados.length > 0) {
     try {
       // Verificar si ya existe una mencion tematica para esta URL
@@ -382,13 +644,12 @@ export async function crearMencionesExtraidas(
             textoCompleto: resultado.resumen || '',
             url,
             tipoMencion: 'referencia_tematica',
-            sentimiento: resultado.sentimiento_general,
             verificado: false,
-            temas: resultado.temas_detectados.join(', '),
+            ...sharedData,
           },
         });
 
-        // Vincular ejes tematicos via MencionTema
+        // Vincular ejes temáticos via MencionTema
         for (const ejeId of ejeIds) {
           try {
             await db.mencionTema.create({

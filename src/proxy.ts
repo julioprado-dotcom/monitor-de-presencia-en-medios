@@ -33,6 +33,7 @@ const PUBLIC_ENDPOINTS: Array<{ path: string; methods: string[] }> = [
   { path: '/api/entregas',                  methods: ['GET'] },
   { path: '/api/jobs/stats',                methods: ['GET'] },
   { path: '/api/jobs/fuentes',              methods: ['GET'] },
+  { path: '/api/marco-conceptual',          methods: ['GET'] },
 ];
 
 // ── Rutas que SIEMPRE requieren auth (todos los métodos) ──────

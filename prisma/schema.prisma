@@ -76,7 +76,6 @@ model Mencion {
   fechaPublicacion  DateTime?
   fechaCaptura      DateTime @default(now())
   tipoMencion       String   @default("mencion_pasiva")
-  sentimiento       String   @default("no_clasificado")
   temas             String   @default("")
   reach             Int      @default(0)
   verificado        Boolean  @default(false)
@@ -86,6 +85,22 @@ model Mencion {
   textoCompleto     String   @default("")
   comentariosCount  Int      @default(0)
   comentariosResumen String  @default("")
+
+  /// @deprecated — mantener por compatibilidad. Reemplazado por tratamientoPeriodistico.
+  sentimiento         String   @default("no_clasificado")
+  /// Reemplaza a sentimiento. Valores: tratamiento_informativo, tratamiento_analitico, tratamiento_critico,
+  /// tratamiento_editorial, tratamiento_agresivo, tratamiento_elogioso, tratamiento_ambiguo, sin_tratamiento
+  tratamientoPeriodistico String?
+  /// Nivel de confianza de la clasificación: "alta", "media", "baja"
+  confianzaClasificacion String?
+  /// Respuestas a las 8 preguntas periodísticas fundamentales (JSON)
+  preguntasFundamentales Json?
+  /// Si es duplicado de otra mención
+  esDuplicado         Boolean  @default(false)
+  /// Si es duplicado, referencia a la mención original
+  mencionOriginalId   String?
+  /// JSON array con IDs de medios adicionales donde aparece la misma noticia
+  mediosRelacionados  String?
 
   persona       Persona?          @relation(fields: [personaId], references: [id])
   medio         Medio            @relation(fields: [medioId], references: [id])
@@ -433,4 +448,53 @@ model SuscriptorGratuito {
   fechaSuscripcion DateTime @default(now())
 
   @@index([email])
+}
+
+// ─── MARCO CONCEPTUAL DEL SISTEMA DE IA ────────────────────────
+
+model MarcoConceptual {
+  id           Int      @id @default(autoincrement())
+  version      Int      @default(1)
+  activa       Boolean  @default(true)
+
+  /// Capa 1: INMUTABLE — Los 9 principios fundantes
+  principios   Json
+
+  /// Capa 2: EDITABLE — Directrices operativas
+  contextoInstitucional Json
+  lineasEditoriales     Json
+  ejesInstitucionales    Json
+  escalaTratamiento     Json
+  reglasDesambiguacion  Json
+  criteriosRelevancia   Json
+  exclusionesEtica      Json
+  terminologiaPermitida Json
+  terminologiaProhibida Json
+  preguntasFundamentales Json
+
+  /// Capa 3: PARÁMETROS TÉCNICOS
+  parametros   Json
+
+  creadoPor    String   @default("sistema")
+  creadoEn     DateTime @default(now())
+  editadoPor   String?
+  editadoEn    DateTime?
+
+  cambios      CambioMarcoConceptual[]
+
+  @@map("marco_conceptual")
+}
+
+model CambioMarcoConceptual {
+  id             Int             @id @default(autoincrement())
+  marcoId        Int
+  marco          MarcoConceptual @relation(fields: [marcoId], references: [id], onDelete: Cascade)
+  campo          String
+  valorAnterior  Json?
+  valorNuevo     Json?
+  razon          String?
+  creadoPor      String?
+  creadoEn       DateTime        @default(now())
+
+  @@map("cambio_marco_conceptual")
 }
