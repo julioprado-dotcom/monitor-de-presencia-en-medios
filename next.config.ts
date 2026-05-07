@@ -4,6 +4,13 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // output: 'standalone', // Disabled: use next start directly
 
+  // Permitir preview en iframe cross-origin (Z.ai)
+  allowedDevOrigins: [
+    'preview-chat-8529d95c-eec4-472f-b7ed-fe76a883c56b.space-z.ai',
+    '*.space-z.ai',
+    '*.space.chatglm.site',
+  ],
+
   images: {
     formats: ['image/avif', 'image/webp'],
   },
