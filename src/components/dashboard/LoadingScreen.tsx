@@ -19,7 +19,7 @@ import { BinaryRainCanvas } from './BinaryRainCanvas';
  *   Etapa 4 → Branding "DECODEX BOLIVIA"
  */
 
-const STAGE_DURATIONS = [400, 600, 800, 700, 700];
+const STAGE_DURATIONS = [500, 800, 1000, 900, 800]; // ~4s total
 const TOTAL_DURATION = STAGE_DURATIONS.reduce((a, b) => a + b, 0);
 
 interface LoadingScreenProps {
