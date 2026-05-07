@@ -4,6 +4,7 @@
 
 import db from '@/lib/db'
 import { CHECK_FIRST_CONFIG } from '../constants'
+import { getRandomUserAgent, domainRateLimiter } from '../anti-ban'
 import { registrarCambio } from '../histogram/tracker'
 import { evaluarFrecuencia } from '../frequency/adapter'
 import type { JobPayload, RunnerResult } from '../types'
@@ -44,10 +45,19 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), CHECK_FIRST_CONFIG.timeoutMs)
 
+        // Rate limiting por dominio anti-ban
+        await domainRateLimiter.waitIfNecessary(url)
+
         const response = await fetch(url, {
-          headers: { 'User-Agent': CHECK_FIRST_CONFIG.userAgent },
+          headers: {
+            'User-Agent': getRandomUserAgent(),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'es-BO,es;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate',
+          },
           signal: controller.signal,
         })
+        domainRateLimiter.recordRequest(url)
         clearTimeout(timeoutId)
 
         if (!response.ok) {

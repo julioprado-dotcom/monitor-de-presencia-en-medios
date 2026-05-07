@@ -3,6 +3,7 @@
 
 import { dequeue, complete, fail } from './queue'
 import { WORKER_CONFIG } from './constants'
+import { domainRateLimiter } from './anti-ban'
 import type { JobPayload, JobTipo, RunnerResult, RunnerFn } from './types'
 import { run as runCheckFuente } from './runners/check-fuente'
 import { run as runCheckIndicador } from './runners/check-indicador'
@@ -129,8 +130,9 @@ async function workerLoop(): Promise<void> {
         console.error(`[Worker] Job ${jobId} exception: ${msg}`)
       }
 
-      // Backpressure: esperar entre jobs
-      await sleep(WORKER_CONFIG.delayMs)
+      // Backpressure: esperar entre jobs con jitter anti-ban
+      const jitter = Math.floor(WORKER_CONFIG.delayMs * 0.3 * Math.random())
+      await sleep(WORKER_CONFIG.delayMs + jitter)
     } catch (error: unknown) {
       // Error del sistema (no del job)
       const msg = error instanceof Error ? error.message : String(error)
@@ -163,4 +165,13 @@ export function registerDefaultRunners(): void {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// Extraer dominio de una URL para rate limiting por dominio
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return 'unknown'
+  }
 }

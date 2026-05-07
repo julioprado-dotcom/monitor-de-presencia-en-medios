@@ -177,6 +177,30 @@
     "plataformas": "web,facebook"
   },
   {
+    "nivel": 2,
+    "nombre": "La Voz de Tarija",
+    "url": "https://lavozdetarija.com",
+    "tipo": "Digital",
+    "departamento": "Tarija",
+    "plataformas": "web,facebook"
+  },
+  {
+    "nivel": 2,
+    "nombre": "Leo.bo",
+    "url": "https://leo.bo",
+    "tipo": "Digital",
+    "departamento": "Santa Cruz",
+    "plataformas": "web,facebook"
+  },
+  {
+    "nivel": 2,
+    "nombre": "Sol de Pando",
+    "url": "https://sdepando.com",
+    "tipo": "Digital",
+    "departamento": "Pando",
+    "plataformas": "web,facebook"
+  },
+  {
     "nivel": 3,
     "nombre": "Abya Yala TV",
     "url": "https://abyayalatv.com",

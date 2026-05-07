@@ -22,9 +22,11 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
     if (result.cambiado) {
       // Encolar scrape_fuente automaticamente al detectar cambio
       if (medioId) {
+        const urls = (result.datosNuevos as Array<{link?: string}> | undefined)
+          ?.map(d => d.link).filter(Boolean)
         await enqueue({
           tipo: 'scrape_fuente',
-          payload: { fuenteId, medioId },
+          payload: { fuenteId, medioId, ...(urls?.length ? { urls } : {}) },
           prioridad: 1, // alta prioridad para scrape tras cambio detectado
         }).catch(err => {
           console.warn(`[check-fuente] Error encolando scrape para fuente ${fuenteId}:`, err)

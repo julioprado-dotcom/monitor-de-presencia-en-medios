@@ -2,6 +2,7 @@
 // Detecta entries nuevas comparando IDs contra cache
 
 import { CHECK_FIRST_CONFIG } from '../constants'
+import { getRandomUserAgent } from '../anti-ban'
 import type { CheckResult } from '../types'
 
 interface RSSEntry {
@@ -90,9 +91,11 @@ export async function checkRSS(
   const startTime = Date.now()
 
   try {
-    // Construir headers condicionales
+    // Construir headers condicionales con UA rotativo anti-ban
     const headers: Record<string, string> = {
-      'User-Agent': CHECK_FIRST_CONFIG.userAgent,
+      'User-Agent': getRandomUserAgent(),
+      'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, */*;q=0.9',
+      'Accept-Language': 'es-BO,es;q=0.9,en;q=0.8',
     }
     if (cachedETag) {
       headers['If-None-Match'] = cachedETag
