@@ -75,6 +75,7 @@ export class GeneratorScheduler {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private lastExecutions: Map<TipoBoletin, LastExecution> = new Map();
+  private lastSectorialSlot: string | null = null;
   private baseUrl: string;
 
   constructor(baseUrl?: string) {
@@ -160,6 +161,9 @@ export class GeneratorScheduler {
         console.error(`[scheduler] Fallido: ${tipo}`, error);
       }
     }
+
+    // ── Reporte Sectorial Minero: Lunes 10:00 AM ──
+    await this.checkReporteSectorial(now, currentSlot);
   }
 
   /**
@@ -268,6 +272,45 @@ export class GeneratorScheduler {
     const dia = fecha.getDate().toString().padStart(2, '0');
     const mes = (fecha.getMonth() + 1).toString().padStart(2, '0');
     return `${fecha.getFullYear()}-${mes}-${dia}_${hora}:${minuto}`;
+  }
+
+  /**
+   * Verifica si corresponde generar el Reporte Sectorial Minero.
+   * Schedule: Lunes 10:00 AM (America/La_Paz), tolerancia +/- 5 min.
+   */
+  private async checkReporteSectorial(now: Date, currentSlot: string): Promise<void> {
+    // Solo lunes (getDay() === 1)
+    if (now.getDay() !== 1) return;
+
+    // Ya se ejecuto en este slot
+    if (this.lastSectorialSlot === currentSlot) return;
+
+    // Horario: 10:00 AM +/- 5 min
+    const horaActual = now.getHours();
+    const minutoActual = now.getMinutes();
+    const diffMinutos = Math.abs((horaActual * 60 + minutoActual) - (10 * 60));
+
+    if (diffMinutos > 5) return;
+
+    console.log('[scheduler] Generando: Reporte Sectorial Minero (lunes 10:00)');
+    try {
+      const response = await fetch(`${this.baseUrl}/api/reportes/sectorial/minero/generar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+        signal: AbortSignal.timeout(300_000), // 5 min timeout para generación completa
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(`HTTP ${response.status}: ${errorData.error}`);
+      }
+
+      this.lastSectorialSlot = currentSlot;
+      console.log('[scheduler] Completado: Reporte Sectorial Minero');
+    } catch (error) {
+      console.error('[scheduler] Fallido: Reporte Sectorial Minero', error);
+    }
   }
 }
 
