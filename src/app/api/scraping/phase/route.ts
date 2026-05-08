@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { enqueue } from '@/lib/jobs/queue'
+import { ensureWorkerRunning } from '@/lib/jobs'
 
 // ── Configuración de fases ─────────────────────────────────────────
 
@@ -245,6 +246,9 @@ export async function POST(request: NextRequest) {
 
       // ── Ejecutar scrape secuencial (un medio a la vez) ──
       case 'ejecutar': {
+        // Asegurar que el worker esté corriendo antes de encolar
+        ensureWorkerRunning()
+
         if (scrapeEnProgreso) {
           return NextResponse.json(
             { error: 'Ya hay un scrape en progreso' },

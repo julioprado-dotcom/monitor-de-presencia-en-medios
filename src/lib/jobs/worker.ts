@@ -1,5 +1,6 @@
 // Worker - loop de ejecucion con backpressure - DECODEX Bolivia
 // Un solo worker que procesa jobs de uno en uno
+// Estado compartido via globalThis para persistir entre contextos de Next.js
 
 import { dequeue, complete, fail } from './queue'
 import { WORKER_CONFIG } from './constants'
@@ -27,63 +28,91 @@ export function getRunner(tipo: JobTipo): RunnerFn | undefined {
   return runners.get(tipo)
 }
 
-// Estado del worker
-let running = false
-let startTime: Date | null = null
-let jobsCompleted = 0
-let jobsFailed = 0
-let lastJobTime: Date | null = null
+// ─── Estado compartido via globalThis ─────────────────────────
+// Next.js Turbopack ejecuta instrumentation.ts y API routes en
+// contextos de módulo diferentes. Usar globalThis garantiza que
+// el estado del worker persista entre contextos.
+
+interface WorkerState {
+  running: boolean
+  startTime: Date | null
+  jobsCompleted: number
+  jobsFailed: number
+  lastJobTime: Date | null
+  runnersRegistered: boolean
+}
+
+const _g = globalThis as unknown as { __decodex_worker__: WorkerState | undefined }
+
+function getWorkerState(): WorkerState {
+  if (!_g.__decodex_worker__) {
+    _g.__decodex_worker__ = {
+      running: false,
+      startTime: null,
+      jobsCompleted: 0,
+      jobsFailed: 0,
+      lastJobTime: null,
+      runnersRegistered: false,
+    }
+  }
+  return _g.__decodex_worker__
+}
 
 // Estadisticas del worker
 export function getWorkerStats() {
-  const uptime = startTime
-    ? Math.floor((Date.now() - startTime.getTime()) / 1000)
+  const ws = getWorkerState()
+  const uptime = ws.startTime
+    ? Math.floor((Date.now() - ws.startTime.getTime()) / 1000)
     : 0
   const hours = Math.floor(uptime / 3600)
   const minutes = Math.floor((uptime % 3600) / 60)
   const seconds = uptime % 60
 
   const jobsPerHour = uptime > 0
-    ? Math.round(((jobsCompleted + jobsFailed) / uptime) * 3600)
+    ? Math.round(((ws.jobsCompleted + ws.jobsFailed) / uptime) * 3600)
     : 0
 
   return {
-    running,
+    running: ws.running,
     uptime: uptime > 0 ? `${hours}h ${minutes}m ${seconds}s` : '0s',
-    jobsCompleted,
-    jobsFailed,
+    jobsCompleted: ws.jobsCompleted,
+    jobsFailed: ws.jobsFailed,
     jobsPerHour,
-    startTime,
-    lastJobTime,
+    startTime: ws.startTime,
+    lastJobTime: ws.lastJobTime,
   }
 }
 
 // Iniciar el worker (background, no bloquea el hilo principal)
 export function startWorker(): void {
-  if (running) {
+  const ws = getWorkerState()
+  if (ws.running) {
     console.log('[Worker] Ya esta corriendo')
     return
   }
-  running = true
-  startTime = new Date()
-  console.log('[Worker] Iniciado')
+  ws.running = true
+  ws.startTime = new Date()
+  console.log('[Worker] Iniciado (globalThis shared state)')
 
   // Ejecutar en background
   workerLoop().catch(err => {
     console.error('[Worker] Error fatal:', err)
-    running = false
+    ws.running = false
   })
 }
 
 // Detener el worker
 export function stopWorker(): void {
-  running = false
+  const ws = getWorkerState()
+  ws.running = false
   console.log('[Worker] Detenido')
 }
 
 // Loop principal
 async function workerLoop(): Promise<void> {
-  while (running) {
+  const ws = getWorkerState()
+
+  while (ws.running) {
     try {
       const job = await dequeue()
 
@@ -103,7 +132,7 @@ async function workerLoop(): Promise<void> {
       const runner = getRunner(tipo)
       if (!runner) {
         await fail(jobId, `No existe runner para tipo: ${tipo}`)
-        jobsFailed++
+        ws.jobsFailed++
         console.warn(`[Worker] Sin runner para ${tipo}`)
         await sleep(WORKER_CONFIG.delayMs)
         continue
@@ -115,18 +144,18 @@ async function workerLoop(): Promise<void> {
 
         if (result.success) {
           await complete(jobId, result.data ?? {})
-          jobsCompleted++
-          lastJobTime = new Date()
+          ws.jobsCompleted++
+          ws.lastJobTime = new Date()
           console.log(`[Worker] Job ${jobId} completado`)
         } else {
           await fail(jobId, result.error ?? 'Error desconocido')
-          jobsFailed++
+          ws.jobsFailed++
           console.error(`[Worker] Job ${jobId} fallido: ${result.error}`)
         }
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error)
         await fail(jobId, msg)
-        jobsFailed++
+        ws.jobsFailed++
         console.error(`[Worker] Job ${jobId} exception: ${msg}`)
       }
 
@@ -146,6 +175,10 @@ async function workerLoop(): Promise<void> {
 
 // Registrar todos los runners del sistema
 export function registerDefaultRunners(): void {
+  const ws = getWorkerState()
+  if (ws.runnersRegistered) return
+  ws.runnersRegistered = true
+
   // Check-First runners (Capa 2)
   registerRunner('check_fuente', runCheckFuente)
   registerRunner('check_indicador', runCheckIndicador)
@@ -161,6 +194,8 @@ export function registerDefaultRunners(): void {
   // Verificacion y mantenimiento
   registerRunner('verificar_enlaces', runVerificarEnlaces)
   registerRunner('mantenimiento', runMantenimiento)
+
+  console.log('[Worker] Runners registrados (8 tipos)')
 }
 
 function sleep(ms: number): Promise<void> {
