@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, Component, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +14,45 @@ import type { AiHealthData } from './sections/SystemStatusOrbs';
 import type { EntregasHoyData } from './sections/EntregasHoy';
 
 // ─── Types ────────────────────────────────────────────────────
+
+// ─── ErrorBoundary para capturar ChunkLoadError sin romper el dashboard ─
+
+interface ErrorBoundaryProps { children: ReactNode; fallback?: ReactNode }
+interface ErrorBoundaryState { hasError: boolean; error?: Error }
+
+class ChunkErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error) {
+    // Solo log ChunkLoadError, no spam la consola con otros errores
+    if (error?.message?.includes('ChunkLoadError') || error?.message?.includes('Failed to load chunk')) {
+      console.warn('[Dashboard] ChunkLoadError capturado — la sección se mostrará como fallback');
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <Card className="border border-dashed border-muted-foreground/30">
+          <CardContent className="p-4 text-center text-muted-foreground text-xs">
+            <p>Sección temporalmente no disponible</p>
+            <button
+              className="mt-1 underline text-xs opacity-70 hover:opacity-100"
+              onClick={() => this.setState({ hasError: false, error: undefined })}
+            >
+              Reintentar
+            </button>
+          </CardContent>
+        </Card>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface AlertasComercialesData {
   topVariaciones: {
@@ -50,20 +89,33 @@ const QuickActions = dynamic(
 
 // ─── Already-dynamic heavy sub-components ─────────────────────
 
+// Dynamic imports con cache-bust para evitar ChunkLoadError por HMR stale refs
+// Turbopack regenera chunk IDs al cambiar el loader, limpiando cache del navegador
 const PipelineMonitor = dynamic(
-  () => import('@/components/dashboard/PipelineMonitor').then(m => ({ default: m.PipelineMonitor })),
-  { ssr: false, loading: () => <Card className="border"><CardContent className="p-4 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card> }
+  () => import(/* webpackChunkName: "pipeline-monitor" */'@/components/dashboard/PipelineMonitor').then(m => ({ default: m.PipelineMonitor })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
 );
 const ScrapingPhaseControl = dynamic(
-  () => import('@/components/dashboard/ScrapingPhaseControl').then(m => ({ default: m.ScrapingPhaseControl })),
-  { ssr: false, loading: () => <Card className="border"><CardContent className="p-4 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card> }
+  () => import(/* webpackChunkName: "scraping-phases" */'@/components/dashboard/ScrapingPhaseControl').then(m => ({ default: m.ScrapingPhaseControl })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
 );
 const AlarmasComerciales = dynamic(
-  () => import('@/components/dashboard/AlarmasComerciales').then(m => ({ default: m.AlarmasComerciales })),
-  { ssr: false, loading: () => <Card className="border"><CardContent className="p-4 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card> }
+  () => import(/* webpackChunkName: "alarmas-comerciales" */'@/components/dashboard/AlarmasComerciales').then(m => ({ default: m.AlarmasComerciales })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
 );
 
 // ─── Animation variants ──────────────────────────────────────
+
+/** Skeleton reutilizable para secciones lazy-loaded */
+function SectionSkeleton() {
+  return (
+    <Card className="border">
+      <CardContent className="p-4 flex items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </CardContent>
+    </Card>
+  );
+}
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 12 },
@@ -181,10 +233,14 @@ export function DashboardCommandCenter() {
           <EntregasHoy entregasHoy={entregasHoy} setActiveView={setActiveView} />
         </motion.div>
         <motion.div custom={2} variants={fadeInUp}>
-          <PipelineMonitor data={pipelineData} onRefresh={fetchPipelineStats} />
+          <ChunkErrorBoundary>
+            <PipelineMonitor data={pipelineData} onRefresh={fetchPipelineStats} />
+          </ChunkErrorBoundary>
         </motion.div>
         <motion.div custom={3} variants={fadeInUp}>
-          <ScrapingPhaseControl />
+          <ChunkErrorBoundary>
+            <ScrapingPhaseControl />
+          </ChunkErrorBoundary>
         </motion.div>
       </motion.div>
 
@@ -212,12 +268,14 @@ export function DashboardCommandCenter() {
         </motion.div>
         <motion.div variants={fadeInUp} initial="hidden" animate="visible" custom={9}>
           {alertasCom ? (
-            <AlarmasComerciales
-              contratosPorVencer={alertasCom.contratosPorVencer}
-              solicitudesPendientes={alertasCom.solicitudesPendientes}
-              entregasPendientes={alertasCom.entregasPendientes}
-              onNavigate={setActiveView}
-            />
+            <ChunkErrorBoundary>
+              <AlarmasComerciales
+                contratosPorVencer={alertasCom.contratosPorVencer}
+                solicitudesPendientes={alertasCom.solicitudesPendientes}
+                entregasPendientes={alertasCom.entregasPendientes}
+                onNavigate={setActiveView}
+              />
+            </ChunkErrorBoundary>
           ) : (
             <Card className="hover:shadow-md transition-all">
               <CardContent className="py-10 text-center">
