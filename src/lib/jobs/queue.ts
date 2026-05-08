@@ -234,3 +234,47 @@ export async function purgeFailed(days: number = 7): Promise<number> {
   })
   return result.count
 }
+
+// Recuperar jobs huerfanos atascados en en_progreso
+// Un job es huerfano si lleva > timeoutMs en en_progreso sin completar.
+// Se resetea a pendiente para que el worker lo reintente.
+export async function reclaimOrphanJobs(timeoutMs: number = 10 * 60 * 1000): Promise<number> {
+  const cutoff = new Date(Date.now() - timeoutMs)
+
+  // Buscar jobs en_progreso cuyo fechaInicio es anterior al cutoff
+  const huerfanos = await db.job.findMany({
+    where: {
+      estado: 'en_progreso',
+      fechaInicio: { lt: cutoff },
+    },
+    select: { id: true, tipo: true, fechaInicio: true },
+  })
+
+  if (huerfanos.length === 0) return 0
+
+  // Resetear a pendiente (no incrementar intentos — no falló, se perdió el worker)
+  const ids = huerfanos.map(j => j.id)
+  const result = await db.job.updateMany({
+    where: { id: { in: ids } },
+    data: {
+      estado: 'pendiente',
+      fechaInicio: null,
+      proximaEjecucion: new Date(), // re-encolar inmediatamente
+    },
+  })
+
+  if (result.count > 0) {
+    console.log(
+      `[Queue] Reclaim: ${result.count} jobs huerfanos recuperados ` +
+      `(timeout: ${Math.round(timeoutMs / 60000)}min)`
+    )
+    for (const j of huerfanos.slice(0, 10)) {
+      console.log(`  - job ${j.id} (${j.tipo}) desde ${j.fechaInicio?.toISOString() ?? '?'}`)
+    }
+    if (huerfanos.length > 10) {
+      console.log(`  ... y ${huerfanos.length - 10} mas`)
+    }
+  }
+
+  return result.count
+}

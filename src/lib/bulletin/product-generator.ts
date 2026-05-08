@@ -80,8 +80,6 @@ export async function getMencionesForBulletin(
     tratamientoPeriodistico: m.tratamientoPeriodistico,
     intencionMedio: m.intencionMedio,
     confianzaClasificacion: m.confianzaClasificacion,
-    tipoActor: m.tipoActor,
-    tipoAccion: m.tipoAccion,
     temas: m.ejesTematicos.map((et) => et.ejeTematico.nombre),
     temasSlugs: m.ejesTematicos.map((et) => et.ejeTematico.slug),
     temasColores: m.ejesTematicos.map((et) => et.ejeTematico.color),

@@ -268,7 +268,7 @@ export const PRODUCTOS: Record<TipoBoletin, ProductoConfig> = {
     periodoDefault: 1,
     palabrasObjetivo: 1800,
     temperatura: 0.5,
-    activo: false,
+    activo: true,
     generador: {
       tipo: 'generico',
       ventana: 'estandar',

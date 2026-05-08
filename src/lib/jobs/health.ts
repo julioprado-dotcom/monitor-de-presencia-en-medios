@@ -3,6 +3,7 @@
 import db from '@/lib/db'
 import { HEALTH_CONFIG } from './constants'
 import { getWorkerStats } from './worker'
+import { reclaimOrphanJobs } from './queue'
 import type { QueueStats, CheckFirstStats, FuentesStats } from './types'
 
 let intervalId: ReturnType<typeof setInterval> | null = null
@@ -66,6 +67,17 @@ async function checkHealth(): Promise<void> {
     if (heapMb > HEALTH_CONFIG.warnMemoryMb) {
       console.warn(`[Health] Heap: ${heapMb}MB (limite: ${HEALTH_CONFIG.warnMemoryMb}MB)`)
     }
+  }
+
+  // Reclaim jobs huerfanos (en_progreso > 10 min)
+  try {
+    const reclaimed = await reclaimOrphanJobs(10 * 60 * 1000)
+    if (reclaimed > 0) {
+      console.warn(`[Health] Reclaim: ${reclaimed} jobs huerfanos recuperados`)
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error(`[Health] Error en reclaim: ${msg}`)
   }
 }
 
