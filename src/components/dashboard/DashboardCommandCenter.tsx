@@ -20,6 +20,7 @@ import { MiniGauge } from '@/components/dashboard/gauges/MiniGauge';
 import { TopVariations } from '@/components/dashboard/TopVariations';
 import { AlarmasComerciales } from '@/components/dashboard/AlarmasComerciales';
 import { PipelineMonitor } from '@/components/dashboard/PipelineMonitor';
+import { ScrapingPhaseControl } from '@/components/dashboard/ScrapingPhaseControl';
 import { SENTIMIENTO_STYLES, TIPO_MENCION_LABELS } from '@/constants/ui';
 import { ALL_PRODUCTS } from '@/constants/nav';
 import { fetchWithTimeout } from '@/lib/fetch-utils';
@@ -827,6 +828,11 @@ export function DashboardCommandCenter() {
             data={pipelineData}
             onRefresh={fetchPipelineStats}
           />
+        </motion.div>
+
+        {/* FILA 4: Control de Scraping por Fases */}
+        <motion.div custom={3} variants={fadeInUp}>
+          <ScrapingPhaseControl />
         </motion.div>
       </motion.div>
 
