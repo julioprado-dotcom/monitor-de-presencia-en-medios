@@ -4,7 +4,9 @@
 
 cd /home/z/my-project/connect
 
-export DATABASE_URL="file:/home/z/my-project/db/custom.db"
+# Leer DB path del archivo centralizado
+source "$(dirname "$0")/decodeX-bolivia/scripts/_db-path.sh"
+export DATABASE_URL="file:${DECODEX_DB_PATH}"
 export AUTH_TRUST_HOST=true
 export AUTH_SECRET="decodex-dev-secret-key-2025-test"
 export NEXTAUTH_URL="http://localhost:3000"

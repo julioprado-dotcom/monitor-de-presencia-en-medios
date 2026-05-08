@@ -17,11 +17,11 @@
 
 set -euo pipefail
 
-# ─── Config ──────────────────────────────────────────────────
+# ─── Config (fuente unica de verdad) ─────────────────────────
 REPO_DIR="/home/z/my-project"
-BACKUP_DIR="${REPO_DIR}/backups"
-# DB real del proyecto
-DB_PATH="/home/z/my-project/db/custom.db"
+source "${REPO_DIR}/decodeX-bolivia/scripts/_db-path.sh"
+BACKUP_DIR="${DECODEX_BACKUP_DIR}"
+DB_PATH="${DECODEX_DB_PATH}"
 
 # Tiempo maximo de backups locales (dias)
 MAX_BACKUP_AGE_DAYS=7

@@ -1,6 +1,7 @@
 // Instrumentacion del servidor — DECODEX Bolivia
 // Se ejecuta UNA VEZ al arrancar Next.js
 // Inicia: Job System (worker, scheduler, health) + GeneratorScheduler + reclaim huérfanos
+// + Verificación de integridad de DB
 
 let setupDone = false
 
@@ -8,6 +9,25 @@ export async function register() {
   if (setupDone) return
 
   try {
+    // 0. Verificar DB — health check antes de iniciar sistemas
+    const { db } = await import('@/lib/db')
+    const [personas, medios, ejes] = await Promise.all([
+      db.persona.count(),
+      db.medio.count(),
+      db.ejeTematico.count(),
+    ])
+    const dbPath = (process.env.DATABASE_URL || '').replace(/^file:/, '')
+    console.log(
+      `[Instrumentation] DB check: "${dbPath}" — ` +
+      `${personas} personas, ${medios} medios, ${ejes} ejes`
+    )
+    if (personas === 0 && medios === 0) {
+      console.error(
+        `[Instrumentation] ⚠️  DB VACÍA detectada en "${dbPath}". ` +
+        `Posible DATABASE_URL incorrecto. Verificar .env vs scripts/_db-path.sh`
+      )
+    }
+
     // 1. Iniciar Job System (worker, scheduler, health monitor)
     const { initJobSystem } = await import('@/lib/jobs')
     await initJobSystem()

@@ -7,7 +7,8 @@ cd "$(dirname "$0")"
 
 MODE="${1:---dev}"
 PROJECT_DIR="/home/z/my-project"
-DB_PATH="$PROJECT_DIR/db/custom.db"
+source "${PROJECT_DIR}/decodeX-bolivia/scripts/_db-path.sh"
+DB_PATH="$DECODEX_DB_PATH"
 LOG="/tmp/decodex-server.log"
 
 echo "╔══════════════════════════════════════════════════╗"
