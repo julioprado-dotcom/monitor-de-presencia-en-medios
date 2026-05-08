@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { safeError } from '@/lib/rate-guard';
+import { safeError } from '@/lib/safe-error';
 import ZAI from 'z-ai-web-dev-sdk';
 import { analyzeMencion, applyAnalysisToMencion } from '@/lib/analyze';
 import { deduplicarMencion, actualizarCoberturaDuplicado } from '@/lib/deduplicacion';
@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
       detalles,
     });
   } catch (error: unknown) {
-    return NextResponse.json({ error: safeError(error, 'capture') }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 }
 
@@ -315,6 +315,6 @@ export async function GET() {
 
     return NextResponse.json(lastLog);
   } catch (error: unknown) {
-    return NextResponse.json({ error: safeError(error, 'capture') }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 }

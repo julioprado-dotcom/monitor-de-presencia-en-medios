@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
-import { safeError } from '@/lib/rate-guard'
+import { safeError } from '@/lib/safe-error'
 
 export async function GET(
   request: NextRequest,
@@ -24,7 +24,7 @@ export async function GET(
     return NextResponse.json({ fuente })
   } catch (error: unknown) {
     console.error('[API /jobs/fuentes/[id] GET]', error)
-    return NextResponse.json({ error: safeError(error, 'jobs/fuentes/[id]') }, { status: 500 })
+    return NextResponse.json({ error: safeError(error) }, { status: 500 })
   }
 }
 
@@ -42,7 +42,7 @@ export async function PUT(
 
     // Build update data with only provided fields
     const data: Record<string, unknown> = {}
-    if (frecuenciaOverride !== undefined) data.frecuenciaBase = frecuenciaOverride
+    if (frecuenciaOverride !== undefined) data.frecuenciaOverride = frecuenciaOverride
     if (activo !== undefined) data.activo = activo
 
     if (Object.keys(data).length === 0) {
@@ -61,6 +61,6 @@ export async function PUT(
     return NextResponse.json({ exito: true, fuente })
   } catch (error: unknown) {
     console.error('[API /jobs/fuentes/[id] PUT]', error)
-    return NextResponse.json({ error: safeError(error, 'jobs/fuentes/[id]') }, { status: 500 })
+    return NextResponse.json({ error: safeError(error) }, { status: 500 })
   }
 }
