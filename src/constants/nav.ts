@@ -51,8 +51,8 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'suscriptores', label: 'Suscriptores', icon: Users },
 
   // ── CONFIGURACION ─────────────────────────────────────────
-  { id: 'medios', label: 'Gestion de Medios', icon: RadioTower },
-  { id: 'clasificadores', label: 'Ejes Tematicos', icon: Tag },
+  { id: 'medios', label: 'Fuentes (Medios)', icon: RadioTower },
+  { id: 'clasificadores', label: 'Ejes y Temas', icon: Tag },
   { id: 'generadores', label: 'Generadores', icon: Zap },
   { id: 'captura', label: 'Captura', icon: Database },
   { id: 'jobs', label: 'Sistema de Jobs', icon: Activity },
