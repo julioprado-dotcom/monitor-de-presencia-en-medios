@@ -16,6 +16,7 @@ export interface StatusOrbProps {
   detail?: string;
   size?: 'sm' | 'md' | 'lg';
   horizontal?: boolean;
+  onClick?: () => void;
 }
 
 // ─── Color maps ─────────────────────────────────────────────
@@ -97,15 +98,23 @@ const criticalPulse = {
 // StatusOrb — Pulsating sphere with halo
 // ═══════════════════════════════════════════════════════════
 
-export function StatusOrb({ level, icon, label, value, detail, size = 'md', horizontal }: StatusOrbProps) {
+export function StatusOrb({ level, icon, label, value, detail, size = 'md', horizontal, onClick }: StatusOrbProps) {
   const colors = LEVEL_COLORS[level];
   const dim = SIZE_MAP[size];
 
   return (
-    <div className={cn(
-      'flex items-center gap-2 min-w-0',
-      horizontal ? 'flex-row' : 'flex-col',
-    )}>
+    <div
+      className={cn(
+        'flex items-center gap-2 min-w-0',
+        horizontal ? 'flex-row' : 'flex-col',
+        onClick ? 'cursor-pointer rounded-lg px-1.5 py-1 -mx-1.5 -my-1 hover:bg-muted/60 transition-colors' : '',
+      )}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
+      title={onClick ? `Ver ${label}` : undefined}
+    >
       {/* Orb container */}
       <div className="relative flex items-center justify-center" style={{ width: dim.orb, height: dim.orb }}>
         {/* Outer halo (pulsating) */}

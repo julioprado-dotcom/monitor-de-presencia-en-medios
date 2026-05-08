@@ -238,6 +238,39 @@ function CategoryCard({
 // Main Component
 // ═══════════════════════════════════════════════════════════
 
+// ─── Hook: polling con debounce onFocus ─────────────────────
+// Pausa polling cuando el tab no es visible, reanuda al volver.
+// Intervalo minimo 30s. Fetch inmediato al recuperar foco.
+
+function usePolling(fetchFn: () => void | Promise<void>, intervalMs: number = 30_000) {
+  useEffect(() => {
+    fetchFn();
+    const interval = setInterval(fetchFn, intervalMs);
+    let onFocusFn: (() => void) | null = null;
+
+    const onBlur = () => clearInterval(interval);
+    const onFocus = () => {
+      fetchFn();
+      // Reanudar polling
+      const reanudar = setInterval(fetchFn, intervalMs);
+      onFocusFn = () => clearInterval(reanudar);
+    };
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        onBlur();
+      } else {
+        onFocus();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      onFocusFn?.();
+    };
+  }, [fetchFn, intervalMs]);
+}
+
 export function DashboardCommandCenter() {
   const data = useDashboardStore((s) => s.data);
   const mediosHealth = useDashboardStore((s) => s.mediosHealth);
@@ -263,95 +296,48 @@ export function DashboardCommandCenter() {
     vacios: string[];
   } | null>(null);
 
-  // Fetch entregas hoy
-  const fetchEntregasHoy = useCallback(async () => {
-    try {
-      const res = await fetchWithTimeout('/api/dashboard/entregas-hoy', { timeoutMs: 12_000 });
-      if (res.ok) {
-        const json = await res.json();
-        setEntregasHoy(json);
-      }
-    } catch {
-      // silent
-    }
-  }, []);
-
-  // Fetch AI health
-  const fetchAiHealth = useCallback(async () => {
-    try {
-      const res = await fetchWithTimeout('/api/dashboard/ai-health', { timeoutMs: 12_000 });
-      if (res.ok) {
-        const json = await res.json();
-        setAiHealth(json);
-      }
-    } catch {
-      // silent — no bloquear el render
-    }
-  }, []);
-
-  // Fetch alertas comerciales
-  const fetchAlertasComerciales = useCallback(async () => {
-    try {
-      const res = await fetchWithTimeout('/api/dashboard/alertas-comerciales', { timeoutMs: 12_000 });
-      if (res.ok) {
-        const json = await res.json();
-        setAlertasCom(json);
-      }
-    } catch {
-      // silent
-    }
-  }, []);
-
-  // Fetch system metrics
+  // Fetch functions estables
   const fetchSystemMetrics = useCallback(async () => {
     try {
       const res = await fetchWithTimeout('/api/dashboard/system', { timeoutMs: 12_000 });
-      if (res.ok) {
-        const json = await res.json();
-        setSysMetrics(json);
-      }
-    } catch {
-      // silent
-    }
+      if (res.ok) setSysMetrics(await res.json());
+    } catch { /* silent */ }
   }, []);
 
-  useEffect(() => {
-    fetchSystemMetrics();
-    const interval = setInterval(fetchSystemMetrics, 10000);
-    return () => clearInterval(interval);
-  }, [fetchSystemMetrics]);
-
-  useEffect(() => {
-    fetchAlertasComerciales();
-    const interval = setInterval(fetchAlertasComerciales, 30000); // refresh cada 30s
-    return () => clearInterval(interval);
-  }, [fetchAlertasComerciales]);
-
-  useEffect(() => {
-    fetchEntregasHoy();
-    const interval = setInterval(fetchEntregasHoy, 15000); // refresh cada 15s
-    return () => clearInterval(interval);
-  }, [fetchEntregasHoy]);
-
-  useEffect(() => {
-    fetchAiHealth();
-    const interval = setInterval(fetchAiHealth, 20000); // refresh cada 20s
-    return () => clearInterval(interval);
-  }, [fetchAiHealth]);
-
-  // Fetch Marco Conceptual resumen
-  useEffect(() => {
-    const fetchMC = async () => {
-      try {
-        const res = await fetchWithTimeout('/api/marco-conceptual/resumen', { timeoutMs: 12_000 });
-        const data = await res.json();
-        setMcResumen(data);
-      } catch { /* silent */ }
-    };
-    fetchMC();
-    const interval = setInterval(fetchMC, 60000);
-    return () => clearInterval(interval);
+  const fetchAlertasComerciales = useCallback(async () => {
+    try {
+      const res = await fetchWithTimeout('/api/dashboard/alertas-comerciales', { timeoutMs: 12_000 });
+      if (res.ok) setAlertasCom(await res.json());
+    } catch { /* silent */ }
   }, []);
+
+  const fetchEntregasHoy = useCallback(async () => {
+    try {
+      const res = await fetchWithTimeout('/api/dashboard/entregas-hoy', { timeoutMs: 12_000 });
+      if (res.ok) setEntregasHoy(await res.json());
+    } catch { /* silent */ }
+  }, []);
+
+  const fetchAiHealth = useCallback(async () => {
+    try {
+      const res = await fetchWithTimeout('/api/dashboard/ai-health', { timeoutMs: 12_000 });
+      if (res.ok) setAiHealth(await res.json());
+    } catch { /* silent */ }
+  }, []);
+
+  const fetchMC = useCallback(async () => {
+    try {
+      const res = await fetchWithTimeout('/api/marco-conceptual/resumen', { timeoutMs: 12_000 });
+      if (res.ok) setMcResumen(await res.json());
+    } catch { /* silent */ }
+  }, []);
+
+  // Polling con debounce onFocus — intervalo minimo 30s
+  usePolling(fetchSystemMetrics, 30_000);
+  usePolling(fetchAlertasComerciales, 30_000);
+  usePolling(fetchEntregasHoy, 30_000);
+  usePolling(fetchAiHealth, 30_000);
+  usePolling(fetchMC, 60_000);
 
   // ─── Computed values ────────────────────────────────────
 
@@ -547,6 +533,7 @@ export function DashboardCommandCenter() {
                       value={healthScore !== null ? `${healthScore}%` : '--'}
                       size="md"
                       horizontal={true}
+                      onClick={() => setActiveView('jobs')}
                     />
                     {scoreReason && (
                       <span className="text-[8px] text-muted-foreground max-w-[120px] truncate hidden lg:inline-block lg:col-span-1" title={scoreReason}>
@@ -560,6 +547,7 @@ export function DashboardCommandCenter() {
                       value={memoryPct}
                       size="md"
                       horizontal={true}
+                      onClick={() => setActiveView('jobs')}
                     />
                     <StatusOrb
                       level={dbLevel}
@@ -568,6 +556,7 @@ export function DashboardCommandCenter() {
                       value={dbSizeStr}
                       size="md"
                       horizontal={true}
+                      onClick={() => setActiveView('captura')}
                     />
                     <StatusOrb
                       level={uptimeLevel}
@@ -576,6 +565,7 @@ export function DashboardCommandCenter() {
                       value={uptimeStr}
                       size="md"
                       horizontal={true}
+                      onClick={() => setActiveView('jobs')}
                     />
                     <StatusOrb
                       level={entregasLevel}
@@ -584,6 +574,7 @@ export function DashboardCommandCenter() {
                       value={entregasHoy ? `${entregasHoy.enviadas}/${entregasHoy.total}` : '--'}
                       size="md"
                       horizontal={true}
+                      onClick={() => setActiveView('boletines')}
                     />
                     <StatusOrb
                       level={aiHealth?.statusLevel || 'ok'}
@@ -593,6 +584,7 @@ export function DashboardCommandCenter() {
                       detail={`$${(aiHealth?.costoEstimadoHoy ?? 0).toFixed(2)}`}
                       size="sm"
                       horizontal={true}
+                      onClick={() => setActiveView('generadores')}
                     />
                     {/* Indicador Marco Conceptual */}
                     {mcResumen && (
