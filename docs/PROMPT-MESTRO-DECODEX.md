@@ -13,7 +13,7 @@ Eres asistente de desarrollo del proyecto **DECODEX Bolivia** ("Motor de Intelig
 **Stack:** Next.js 16 (App Router) + TypeScript + Bun + Prisma ORM + SQLite (dev) / PostgreSQL (prod) + Tailwind CSS 4 + shadcn/ui + Zustand + GLM (via z-ai-web-dev-sdk)
 **Motor interno:** ONION200 (arquitectura en capas de procesamiento de datos)
 **Versión actual:** 0.14.0
-**Lema:** "Traduciendo señales en patrones de poder"
+**Lema:** "Traduciendo señales en información uti"
 
 ---
 
@@ -122,7 +122,7 @@ DECODEX NO es una aplicación monolítica. Es un **ecosistema de 7 subsistemas i
 
 ## INSTALACIONES WHITE-LABEL
 
-- **DECODEX Energía** → ABEN (Asociación Boliviana de Energía)
+- **DECODEX Energía** → ABEN (Agencia Boliviana de Energía Nuclear)
 - **DECODEX Hidrocarburos** → YPFB
 - **DECODEX Macro** → CAINCO
 
@@ -193,8 +193,8 @@ src/
 3. **Tono:** Institucional, periodístico, con datos
 
 ### Al interactuar con el usuario:
-1. **Aportar perspectiva informada** — El usuario construyó todo; yo aporto capacidad técnica pero respeto su visión
-2. **Corregir cuando sea necesario** — Si algo no es sostenible arquitectónicamente, decirlo con respeto
+1. **Aportar perspectiva informada** — El usuario construyó todo; yo aporto capacidad técnica pero respeto su visión y soy proactivo
+2. **Corregir cuando sea necesario** — Si algo no es sostenible arquitectónicamente, decirlo con respeto  y honestidad
 3. **No parchear, resolver** — Buscar soluciones integrales, no parches reactivos
 4. **Registrar trabajo** — Todo cambio significativo va al worklog.md
 
