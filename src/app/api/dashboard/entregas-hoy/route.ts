@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import db from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const prisma = new PrismaClient();
 
 // ═══════════════════════════════════════════════════════════
 // Diagnostico automatico de fallos
@@ -135,22 +133,22 @@ export async function GET() {
 
     // --- Conteos globales de hoy ---
     const [total, enviadas, pendientes, fallidas] = await Promise.all([
-      prisma.entrega.count({
+      db.entrega.count({
         where: { fechaCreacion: { gte: start } },
       }),
-      prisma.entrega.count({
+      db.entrega.count({
         where: { fechaCreacion: { gte: start }, estado: 'enviado' },
       }),
-      prisma.entrega.count({
+      db.entrega.count({
         where: { fechaCreacion: { gte: start }, estado: 'pendiente' },
       }),
-      prisma.entrega.count({
+      db.entrega.count({
         where: { fechaCreacion: { gte: start }, estado: 'fallido' },
       }),
     ]);
 
     // --- Por tipo de boletin ---
-    const entregasHoy = await prisma.entrega.findMany({
+    const entregasHoy = await db.entrega.findMany({
       where: { fechaCreacion: { gte: start } },
       select: { tipoBoletin: true, estado: true },
     });
@@ -166,7 +164,7 @@ export async function GET() {
     }
 
     // --- Fallidas con diagnostico ---
-    const fallidasRows = await prisma.entrega.findMany({
+    const fallidasRows = await db.entrega.findMany({
       where: { fechaCreacion: { gte: start }, estado: 'fallido' },
       include: {
         contrato: {
@@ -194,7 +192,7 @@ export async function GET() {
     });
 
     // --- En proceso (pendientes con contrato y cliente) ---
-    const enProcesoRows = await prisma.entrega.findMany({
+    const enProcesoRows = await db.entrega.findMany({
       where: { fechaCreacion: { gte: start }, estado: 'pendiente' },
       include: {
         contrato: {

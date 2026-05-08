@@ -21,6 +21,7 @@ import { TopVariations } from '@/components/dashboard/TopVariations';
 import { AlarmasComerciales } from '@/components/dashboard/AlarmasComerciales';
 import { SENTIMIENTO_STYLES, TIPO_MENCION_LABELS } from '@/constants/ui';
 import { ALL_PRODUCTS } from '@/constants/nav';
+import { fetchWithTimeout } from '@/lib/fetch-utils';
 import type { SystemMetrics } from '@/types/dashboard';
 import { StatusOrb, StatusPill, StatusBar } from '@/components/dashboard/gauges/StatusOrb';
 import type { StatusLevel } from '@/components/dashboard/gauges/StatusOrb';
@@ -265,7 +266,7 @@ export function DashboardCommandCenter() {
   // Fetch entregas hoy
   const fetchEntregasHoy = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/entregas-hoy');
+      const res = await fetchWithTimeout('/api/dashboard/entregas-hoy', { timeoutMs: 12_000 });
       if (res.ok) {
         const json = await res.json();
         setEntregasHoy(json);
@@ -278,7 +279,7 @@ export function DashboardCommandCenter() {
   // Fetch AI health
   const fetchAiHealth = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/ai-health');
+      const res = await fetchWithTimeout('/api/dashboard/ai-health', { timeoutMs: 12_000 });
       if (res.ok) {
         const json = await res.json();
         setAiHealth(json);
@@ -291,7 +292,7 @@ export function DashboardCommandCenter() {
   // Fetch alertas comerciales
   const fetchAlertasComerciales = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/alertas-comerciales');
+      const res = await fetchWithTimeout('/api/dashboard/alertas-comerciales', { timeoutMs: 12_000 });
       if (res.ok) {
         const json = await res.json();
         setAlertasCom(json);
@@ -304,7 +305,7 @@ export function DashboardCommandCenter() {
   // Fetch system metrics
   const fetchSystemMetrics = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/system');
+      const res = await fetchWithTimeout('/api/dashboard/system', { timeoutMs: 12_000 });
       if (res.ok) {
         const json = await res.json();
         setSysMetrics(json);
@@ -342,7 +343,7 @@ export function DashboardCommandCenter() {
   useEffect(() => {
     const fetchMC = async () => {
       try {
-        const res = await fetch('/api/marco-conceptual/resumen');
+        const res = await fetchWithTimeout('/api/marco-conceptual/resumen', { timeoutMs: 12_000 });
         const data = await res.json();
         setMcResumen(data);
       } catch { /* silent */ }

@@ -165,16 +165,27 @@ export async function GET() {
       };
     }).filter(Boolean);
 
-    // ─── Menciones por partido (1 query con include) ───
-    const mencionesPorPartidoRaw = await db.mencion.findMany({
-      where: { fechaCaptura: { gte: inicioSemana } },
-      include: { persona: { select: { partidoSigla: true } } },
+    // ─── Menciones por partido (groupBy personaId → 1 query compacta) ───
+    const mppGrouped = await db.mencion.groupBy({
+      by: ['personaId'],
+      where: { fechaCaptura: { gte: inicioSemana }, personaId: { not: null } },
+      _count: { id: true },
     });
 
+    const mppPersonaIds = mppGrouped.map(g => g.personaId).filter((id): id is string => id !== null);
+    const mppPersonas = mppPersonaIds.length > 0
+      ? await db.persona.findMany({
+          where: { id: { in: mppPersonaIds } },
+          select: { id: true, partidoSigla: true },
+        })
+      : [];
+    const mppPersonaMap = new Map(mppPersonas.map(p => [p.id, p.partidoSigla]));
+
     const partidoCount: Record<string, number> = {};
-    for (const m of mencionesPorPartidoRaw) {
-      const sigla = m.persona?.partidoSigla || 'Sin partido';
-      partidoCount[sigla] = (partidoCount[sigla] || 0) + 1;
+    for (const g of mppGrouped) {
+      if (!g.personaId) continue;
+      const sigla = mppPersonaMap.get(g.personaId) || 'Sin partido';
+      partidoCount[sigla] = (partidoCount[sigla] || 0) + g._count.id;
     }
     const mencionesPorPartido = Object.entries(partidoCount)
       .map(([partido, count]) => ({ partido, count }))

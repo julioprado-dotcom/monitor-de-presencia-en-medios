@@ -2,6 +2,7 @@
 // DECODEX Bolivia
 // Delega la config de productos a constants/products.ts
 
+import db from '@/lib/db'
 import type { TipoBoletin, ProductoConfig } from '@/types/bulletin'
 import { PRODUCTOS } from '@/constants/products'
 
@@ -20,19 +21,79 @@ export async function getMencionesForBulletin(
   fechaFin: Date
   totalMenciones: number
 }> {
-  const now = new Date()
-  const config = getProductConfig(tipo)
-  const dias = config?.periodoDefault || 1
+  const { fechaInicio, fechaFin } = getDateRange(tipo)
 
-  const fechaFin = new Date(now)
-  const fechaInicio = new Date(now)
-  fechaInicio.setDate(fechaInicio.getDate() - dias)
+  // Construir filtros base
+  const where: Record<string, unknown> = {
+    fechaCaptura: { gte: fechaInicio, lt: fechaFin },
+    esDuplicado: false,
+  }
+
+  if (options.personaId) {
+    where.personaId = options.personaId
+  }
+
+  // Si se piden ejes tematicos, filtrar menciones que tengan esos ejes
+  if (options.ejesTematicos && options.ejesTematicos.length > 0) {
+    where.ejesTematicos = {
+      some: {
+        ejeTematicoId: { in: options.ejesTematicos },
+      },
+    }
+  }
+
+  const menciones = await db.mencion.findMany({
+    where,
+    include: {
+      persona: {
+        select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true },
+      },
+      medio: {
+        select: { id: true, nombre: true, tipo: true },
+      },
+      ejesTematicos: {
+        select: {
+          ejeTematico: { select: { id: true, nombre: true, slug: true, color: true } },
+        },
+      },
+    },
+    orderBy: { fechaCaptura: 'desc' },
+  })
+
+  // Formatear para consumo del generador
+  const mencionesFormateadas = menciones.map((m) => ({
+    id: m.id,
+    titulo: m.titulo,
+    texto: m.texto,
+    textoCompleto: m.textoCompleto,
+    url: m.url,
+    fechaPublicacion: m.fechaPublicacion,
+    fechaCaptura: m.fechaCaptura,
+    tipoMencion: m.tipoMencion,
+    persona: m.persona?.nombre ?? null,
+    personaId: m.personaId,
+    partidoSigla: m.persona?.partidoSigla ?? null,
+    camara: m.persona?.camara ?? null,
+    medio: m.medio?.nombre ?? 'Desconocido',
+    medioTipo: m.medio?.tipo ?? null,
+    sentimiento: m.tratamientoPeriodistico || m.sentimiento,
+    tratamientoPeriodistico: m.tratamientoPeriodistico,
+    intencionMedio: m.intencionMedio,
+    confianzaClasificacion: m.confianzaClasificacion,
+    tipoActor: m.tipoActor,
+    tipoAccion: m.tipoAccion,
+    temas: m.ejesTematicos.map((et) => et.ejeTematico.nombre),
+    temasSlugs: m.ejesTematicos.map((et) => et.ejeTematico.slug),
+    temasColores: m.ejesTematicos.map((et) => et.ejeTematico.color),
+    reach: m.reach,
+    verificado: m.verificado,
+  }))
 
   return {
-    menciones: [],
+    menciones: mencionesFormateadas as Record<string, unknown>[],
     fechaInicio,
     fechaFin,
-    totalMenciones: 0,
+    totalMenciones: menciones.length,
   }
 }
 
