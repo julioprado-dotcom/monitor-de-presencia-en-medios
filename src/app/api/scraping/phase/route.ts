@@ -18,6 +18,7 @@ interface FaseConfig {
   descripcion: string
   maxFuentes: number // 0 = todas
   filtros: { nivel?: string[]; activo?: boolean }
+  fuentesEspecificas?: string[] // nombres de medios exactos (anula filtros si está presente)
   criterioExito: string
 }
 
@@ -28,6 +29,7 @@ const FASES: FaseConfig[] = [
     descripcion: '4 fuentes principales — verificación de scraping',
     maxFuentes: 4,
     filtros: { nivel: ['1'] },
+    fuentesEspecificas: ['ABI', 'ATB', 'El Deber', 'RTP'],
     criterioExito: 'Scrape responde + IA extrae menciones con sentido',
   },
   {
@@ -96,24 +98,42 @@ export async function GET() {
 
     if (scrapingState.faseActual > 0) {
       const faseConfig = FASES[scrapingState.faseActual - 1]
-      const whereClause: Record<string, unknown> = {}
-      if (faseConfig.filtros.nivel?.length) {
-        whereClause.medio = { nivel: { in: faseConfig.filtros.nivel } }
-      }
 
-      const fuentesRaw = await db.fuenteEstado.findMany({
-        where: whereClause,
-        orderBy: { medio: { nombre: 'asc' } },
-        take: faseConfig.maxFuentes || 999,
-        select: {
-          id: true,
-          activo: true,
-          medio: { select: { nombre: true, nivel: true } },
-          tipoCheck: true,
-          ultimoCheck: true,
-          totalCambios: true,
-        },
-      })
+      let fuentesRaw
+      if (faseConfig.fuentesEspecificas && faseConfig.fuentesEspecificas.length > 0) {
+        fuentesRaw = await db.fuenteEstado.findMany({
+          where: {
+            medio: { nombre: { in: faseConfig.fuentesEspecificas } }
+          },
+          orderBy: { medio: { nombre: 'asc' } },
+          select: {
+            id: true,
+            activo: true,
+            medio: { select: { nombre: true, nivel: true } },
+            tipoCheck: true,
+            ultimoCheck: true,
+            totalCambios: true,
+          },
+        })
+      } else {
+        const whereClause: Record<string, unknown> = {}
+        if (faseConfig.filtros.nivel?.length) {
+          whereClause.medio = { nivel: { in: faseConfig.filtros.nivel } }
+        }
+        fuentesRaw = await db.fuenteEstado.findMany({
+          where: whereClause,
+          orderBy: { medio: { nombre: 'asc' } },
+          take: faseConfig.maxFuentes || 999,
+          select: {
+            id: true,
+            activo: true,
+            medio: { select: { nombre: true, nivel: true } },
+            tipoCheck: true,
+            ultimoCheck: true,
+            totalCambios: true,
+          },
+        })
+      }
 
       fuentesIncluidas = fuentesRaw.map(f => ({
         id: f.id,
@@ -184,17 +204,29 @@ export async function POST(request: NextRequest) {
         })
 
         // Activar solo las fuentes de esta fase
-        const whereClause: Record<string, unknown> = {}
-        if (faseConfig.filtros.nivel?.length) {
-          whereClause.medio = { nivel: { in: faseConfig.filtros.nivel } }
+        let fuentes
+        if (faseConfig.fuentesEspecificas && faseConfig.fuentesEspecificas.length > 0) {
+          // Modo explícito: seleccionar medios por nombre exacto
+          fuentes = await db.fuenteEstado.findMany({
+            where: {
+              medio: { nombre: { in: faseConfig.fuentesEspecificas } }
+            },
+            include: { medio: { select: { nombre: true, nivel: true } } },
+            orderBy: { medio: { nombre: 'asc' } },
+          })
+        } else {
+          // Modo filtro: seleccionar por nivel y tomar maxFuentes
+          const whereClause: Record<string, unknown> = {}
+          if (faseConfig.filtros.nivel?.length) {
+            whereClause.medio = { nivel: { in: faseConfig.filtros.nivel } }
+          }
+          fuentes = await db.fuenteEstado.findMany({
+            where: whereClause,
+            include: { medio: { select: { nombre: true, nivel: true } } },
+            orderBy: { medio: { nombre: 'asc' } },
+            take: faseConfig.maxFuentes || 999,
+          })
         }
-
-        const fuentes = await db.fuenteEstado.findMany({
-          where: whereClause,
-          include: { medio: { select: { nombre: true, nivel: true } } },
-          orderBy: { medio: { nombre: 'asc' } },
-          take: faseConfig.maxFuentes || 999,
-        })
 
         if (fuentes.length === 0) {
           return NextResponse.json(
