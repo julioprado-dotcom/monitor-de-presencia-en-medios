@@ -45,11 +45,13 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
           responseTime: result.responseTime,
           tipoCheckUsado: result.tipoCheckUsado,
           scrapeEncolado: !!medioId,
+          ...(result.error ? { error: result.error } : {}),
+          ...(result.estrategiasProbadas ? { estrategiasProbadas: result.estrategiasProbadas } : {}),
         },
       }
     }
 
-    // Sin cambio
+    // Sin cambio — propagar error si existe (estrategias fallaron pero no lanzaron excepción)
     return {
       success: true,
       data: {
@@ -60,6 +62,8 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
         detalle: result.detalle,
         responseTime: result.responseTime,
         tipoCheckUsado: result.tipoCheckUsado,
+        ...(result.error ? { error: result.error } : {}),
+        ...(result.estrategiasProbadas ? { estrategiasProbadas: result.estrategiasProbadas } : {}),
       },
     }
   } catch (error: unknown) {

@@ -435,7 +435,7 @@ export function PipelineMonitor({ data, onRefresh }: PipelineMonitorProps) {
               </div>
             </div>
 
-            {/* Quick actions */}
+            {/* Quick actions — controles siempre visibles */}
             <div className="flex flex-wrap gap-1.5">
               <Button variant="outline" size="sm" className="text-[10px] gap-1 h-7 px-2"
                 disabled={actionLoading === 'worker'} onClick={toggleWorker}>
@@ -444,18 +444,90 @@ export function PipelineMonitor({ data, onRefresh }: PipelineMonitorProps) {
                 {workerRunning ? 'Pausar' : 'Reanudar'}
               </Button>
               <Button variant="outline" size="sm" className="text-[10px] gap-1 h-7 px-2"
+                disabled={actionLoading === 'force_check'} onClick={forceCheckAll}>
+                {actionLoading === 'force_check' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+                Forzar Check
+              </Button>
+              <Button variant="outline" size="sm" className="text-[10px] gap-1 h-7 px-2"
+                disabled={actionLoading === 'reschedule'} onClick={rescheduleTasks}>
+                {actionLoading === 'reschedule' ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                Reprogramar
+              </Button>
+              <Button variant="outline" size="sm" className="text-[10px] gap-1 h-7 px-2"
                 disabled={actionLoading === 'reclaim'} onClick={reclaimOrphans}>
-                <Wrench className="h-3 w-3" /> Recuperar Huerfanos
+                <Wrench className="h-3 w-3" /> Huerfanos
               </Button>
               <Button variant="outline" size="sm" className="text-[10px] gap-1 h-7 px-2"
                 disabled={actionLoading === 'purge_c'} onClick={purgeCompleted}>
-                <Trash2 className="h-3 w-3" /> Limpiar Completados
-              </Button>
-              <Button variant="outline" size="sm" className="text-[10px] gap-1 h-7 px-2 text-red-600 dark:text-red-400"
-                disabled={actionLoading === 'purge_f'} onClick={purgeFailed}>
-                <Trash2 className="h-3 w-3" /> Limpiar Fallidos
+                <Trash2 className="h-3 w-3" /> Limpiar
               </Button>
             </div>
+
+            {/* Mini historial — siempre visible en compact view */}
+            {pasado.completados.length > 0 || pasado.fallidos.length > 0 ? (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+                    <Timer className="h-2.5 w-2.5 inline mr-1" />Actividad Reciente
+                  </p>
+                  <button onClick={() => { setExpanded(true); setSection('pasado'); }}
+                    className="text-[9px] text-sky-600 dark:text-sky-400 hover:underline">
+                    Ver todo
+                  </button>
+                </div>
+                {(() => {
+                  type MiniJobRow = Record<string, unknown> & {
+                    id: string; tipo: string; hace: string;
+                    _hasError: boolean; _errorText: string | null;
+                    _cambiado: boolean | undefined; _kind: string;
+                  }
+                  const recentJobs: MiniJobRow[] = [
+                    ...pasado.completados.slice(0, 5).map(j => {
+                      const r = j.resultado || {}
+                      const detalle = String(r.detalle ?? '')
+                      const hasError = !!(r.error || (detalle && /HTTP \d{3}|fetch failed|timeout|forbidden|vacío|vacio|no parseable|Error:/i.test(detalle)))
+                      return {
+                        id: j.id, tipo: j.tipo, hace: j.hace,
+                        _kind: 'completado', _hasError: hasError,
+                        _errorText: r.error ? String(r.error) : (hasError ? detalle : null),
+                        _cambiado: r.cambiado as boolean | undefined,
+                      }
+                    }),
+                    ...pasado.fallidos.slice(0, 3).map(j => ({
+                      id: j.id, tipo: j.tipo, hace: j.hace,
+                      _kind: 'fallido', _hasError: true, _errorText: j.error || null, _cambiado: false,
+                    })),
+                  ].sort((a, b) => a.hace.localeCompare(b.hace))
+
+                  return (
+                    <div className="space-y-0.5">
+                      {recentJobs.map(j => (
+                        <div key={j.id} className="flex items-center gap-1.5 text-[10px] px-1.5 py-1 rounded bg-muted/20">
+                          {j._kind === 'fallido' ? (
+                            <XCircle className="h-2.5 w-2.5 text-red-500 shrink-0" />
+                          ) : j._hasError ? (
+                            <AlertTriangle className="h-2.5 w-2.5 text-amber-500 shrink-0" />
+                          ) : j._cambiado ? (
+                            <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
+                          ) : (
+                            <CheckCircle2 className="h-2.5 w-2.5 text-muted-foreground/40 shrink-0" />
+                          )}
+                          <span className={`truncate ${JOB_TYPE_COLORS[j.tipo] || 'text-foreground'}`}>
+                            {JOB_TYPE_LABELS[j.tipo] || j.tipo}
+                          </span>
+                          {j._hasError && j._errorText && (
+                            <span className="text-[9px] text-red-600 dark:text-red-400 truncate flex-1">{j._errorText}</span>
+                          )}
+                          <span className="text-[9px] text-muted-foreground shrink-0 ml-auto">{j.hace}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">Sin actividad en las últimas 24h</p>
+            )}
           </div>
         )}
 

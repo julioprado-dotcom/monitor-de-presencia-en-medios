@@ -742,15 +742,20 @@ async function ejecutarScrapeSecuencial(reanudando: boolean = false): Promise<vo
                 | Array<{ estrategia: string; exito: boolean; detalle: string }>
                 | undefined
 
+              // Patrones de error en detalle como respaldo
+              const ERROR_PATTERNS_DETALLE = /HTTP \d{3}|fetch failed|timeout|forbidden|vac[ií]o|no parseable|Error:|ECONNREFUSED|ENOTFOUND|socket hang up/i
+              const detalleTieneError = detalle ? ERROR_PATTERNS_DETALLE.test(detalle) : false
+
               // Si el resultado indica error interno (estrategias fallaron), marcar como error
-              if (resultadoError) {
+              if (resultadoError || detalleTieneError) {
                 scrapeResultados[resultIdx].estado = 'error'
+                const errorMsg = resultadoError || (detalleTieneError ? detalle : '')
                 const rotacionInfo = estrategiasProbadas
                   ? estrategiasProbadas.map(e => `${e.estrategia}:${e.exito ? 'OK' : 'FAIL'}`).join(' → ')
                   : ''
                 scrapeResultados[resultIdx].error = rotacionInfo
-                  ? `[${rotacionInfo}] ${resultadoError}`
-                  : resultadoError
+                  ? `[${rotacionInfo}] ${errorMsg}`
+                  : errorMsg
                 scrapeResultados[resultIdx].detalle = detalle
               } else if (cambiado) {
                 // Cambio detectado — éxito real
