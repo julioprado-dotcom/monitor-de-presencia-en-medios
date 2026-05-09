@@ -1,5 +1,5 @@
-// GET  /api/admin/cache — Métricas de cache y contenedor
-// POST /api/admin/cache — Acciones: purge_next, purge_turbopack, purge_backups, purge_all
+// GET  /api/admin/cache — Métricas de cache, contenedor y estado del Guardian
+// POST /api/admin/cache — Acciones: purge_next, purge_turbopack, purge_backups, purge_all, drop_cache
 
 import { NextRequest, NextResponse } from 'next/server'
 import {
@@ -11,11 +11,12 @@ import {
   purgeOldBackups,
   formatMB,
 } from '@/lib/browser-runtime'
+import { getGuardianStatus, manualDropPageCache } from '@/lib/jobs/container-guardian'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// ── GET: Métricas ─────────────────────────────────────────────────────
+// ── GET: Métricas + Guardian ──────────────────────────────────────────
 
 export async function GET() {
   try {
@@ -23,10 +24,11 @@ export async function GET() {
     const container = getContainerMetrics()
     const cache = getCacheMetrics()
     const uptime = process.uptime()
+    const guardian = getGuardianStatus()
 
-    // Nivel de presión (0-100)
+    // Nivel de presión (0-100) — ahora pesa más el cgroup que el heap
     const pressureScore = Math.round(
-      (memory.heapPct * 0.4) + (container.pct * 0.4) +
+      (memory.heapPct * 0.25) + (container.pct * 0.55) +
       Math.min(100, (cache.nextCacheSizeMB / 500) * 100) * 0.2
     )
 
@@ -42,6 +44,22 @@ export async function GET() {
       container,
       cache,
       pressure: { score: pressureScore, label: pressureLabel },
+      guardian: {
+        active: guardian.active,
+        level: guardian.level,
+        currentPct: guardian.currentPct,
+        trendMB: guardian.trendMB,
+        trendPctPerHour: guardian.trendPctPerHour,
+        lastAction: guardian.lastAction,
+        lastActionTime: guardian.lastActionTime,
+        lastActionMessage: guardian.lastActionMessage,
+        actionsExecuted: guardian.actionsExecuted,
+        emergencyCount: guardian.emergencyCount,
+        workerPaused: guardian.workerPaused,
+        schedulerPaused: guardian.schedulerPaused,
+        // Últimas 20 snapshots para gráfica de tendencia
+        snapshots: guardian.snapshots,
+      },
       uptime: {
         seconds: Math.round(uptime),
         formatted: formatUptime(uptime),
@@ -65,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     if (!accion) {
       return NextResponse.json(
-        { error: 'Campo "accion" requerido. Opciones: purge_next, purge_turbopack, purge_backups, purge_all' },
+        { error: 'Campo "accion" requerido. Opciones: purge_next, purge_turbopack, purge_backups, purge_all, drop_cache', accionesValidas: ['purge_next', 'purge_turbopack', 'purge_backups', 'purge_all', 'drop_cache'] },
         { status: 400 }
       )
     }
@@ -73,6 +91,16 @@ export async function POST(request: NextRequest) {
     const resultados: Array<{ target: string; success: boolean; freedMB: number; error?: string }> = []
 
     switch (accion) {
+      case 'drop_cache': {
+        // Liberar page cache del SO sin reiniciar
+        const success = manualDropPageCache()
+        resultados.push({
+          target: 'page_cache (SO)',
+          success,
+          freedMB: 0, // drop_caches no reporta cuánto liberó — se refleja en siguiente lectura
+        })
+        break
+      }
       case 'purge_next': {
         const r = purgeNextCache()
         resultados.push(r)
@@ -96,7 +124,7 @@ export async function POST(request: NextRequest) {
       }
       default:
         return NextResponse.json(
-          { error: `Acción no reconocida: ${accion}`, accionesValidas: ['purge_next', 'purge_turbopack', 'purge_backups', 'purge_all'] },
+          { error: `Acción no reconocida: ${accion}`, accionesValidas: ['purge_next', 'purge_turbopack', 'purge_backups', 'purge_all', 'drop_cache'] },
           { status: 400 }
         )
     }
@@ -110,10 +138,13 @@ export async function POST(request: NextRequest) {
       resultados: resultados.map(r => ({
         target: r.target,
         exito: r.success,
-        liberado: `${formatMB(r.freedMB)}`,
+        liberado: r.success ? `${formatMB(r.freedMB)}` : 'N/A',
         error: r.error,
       })),
       totalLiberado: `${formatMB(totalFreed)}`,
+      nota: accion === 'drop_cache'
+        ? 'Page cache liberada. El efecto se refleja en la siguiente lectura del contenedor (30s).'
+        : undefined,
     })
   } catch (error) {
     return NextResponse.json(

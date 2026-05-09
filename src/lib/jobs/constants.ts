@@ -123,6 +123,19 @@ export const WORKER_CONFIG = {
   errorBackoffMs: 10000,    // espera si hay error del sistema
 }
 
+// ── Configuracion del Container Guardian ──────────────────────────────
+
+export const GUARDIAN_CONFIG = {
+  intervalMs: 30000,          // cada 30 segundos (más agresivo que health 60s)
+  watchPct: 60,               // 60% → INFO log periódico
+  warnPct: 70,                // 70% → drop_caches + purge .next/dev
+  criticalPct: 80,            // 80% → detener scheduler + purge agresivo
+  emergencyPct: 85,           // 85% → detener worker + todo
+  recoveryPct: 65,            // <65% → reiniciar scheduler + worker
+  maxSnapshots: 20,           // historial de lecturas
+  trendWindowMinutes: 5,      // ventana para calcular tendencia
+}
+
 // ── Configuracion de Health Monitor ────────────────────────────────────
 
 export const HEALTH_CONFIG = {

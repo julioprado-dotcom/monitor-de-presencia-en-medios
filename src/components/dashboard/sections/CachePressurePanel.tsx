@@ -1,12 +1,13 @@
 'use client'
 
 // CachePressurePanel — Panel "Contenedor & Cache" del dashboard
-// Muestra gauges de presión de memoria, contenedor y cache con acciones de purga
+// Muestra gauges de presión, estado del Container Guardian, mini gráfica
+// de tendencia cgroup y acciones de purga incluyendo drop_caches del SO
 
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { HardDrive, Trash2, Database, Cpu, Gauge, RefreshCw } from 'lucide-react'
+import { HardDrive, Trash2, Database, Cpu, Gauge, RefreshCw, Shield, Zap } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -34,6 +35,26 @@ interface CacheData {
     score: number
     label: string
   }
+  guardian: {
+    active: boolean
+    level: string
+    currentPct: number
+    trendMB: number
+    trendPctPerHour: number
+    lastAction: string
+    lastActionTime: string | null
+    lastActionMessage: string | null
+    actionsExecuted: number
+    emergencyCount: number
+    workerPaused: boolean
+    schedulerPaused: boolean
+    snapshots: Array<{
+      timestamp: string
+      cgroupPct: number
+      level: string
+      action: string
+    }>
+  }
   uptime: {
     seconds: number
     formatted: string
@@ -45,13 +66,14 @@ interface PurgeResult {
   exito: boolean
   totalLiberado: string
   resultados: Array<{ target: string; exito: boolean; liberado: string }>
+  nota?: string
 }
 
 // ── Gauge Component ───────────────────────────────────────────────────
 
 function PressureGauge({ value, label, color }: { value: number; label: string; color: string }) {
   const circumference = 2 * Math.PI * 40
-  const offset = circumference - (value / 100) * circumference
+  const offset = circumference - (Math.min(100, value) / 100) * circumference
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -69,7 +91,7 @@ function PressureGauge({ value, label, color }: { value: number; label: string; 
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-lg font-bold" style={{ color }}>{value}%</span>
+          <span className="text-lg font-bold" style={{ color }}>{Math.round(value)}%</span>
         </div>
       </div>
       <span className="text-[10px] text-muted-foreground text-center leading-tight">{label}</span>
@@ -84,17 +106,103 @@ function gaugeColor(value: number): string {
   return '#22c55e'
 }
 
+function guardianLevelColor(level: string): string {
+  switch (level) {
+    case 'emergency': return '#ef4444'
+    case 'critical': return '#f97316'
+    case 'warn': return '#f59e0b'
+    case 'watch': return '#3b82f6'
+    default: return '#22c55e'
+  }
+}
+
 // ── Metric Row ────────────────────────────────────────────────────────
 
-function MetricRow({ icon: Icon, label, value, unit }: { icon: React.ElementType; label: string; value: string | number; unit: string }) {
+function MetricRow({ icon: Icon, label, value, unit, warn }: { icon: React.ElementType; label: string; value: string | number; unit: string; warn?: boolean }) {
   return (
     <div className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
       <div className="flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="text-xs text-muted-foreground">{label}</span>
       </div>
-      <span className="text-xs font-medium font-mono">{value} {unit}</span>
+      <span className={`text-xs font-medium font-mono ${warn ? 'text-red-500' : ''}`}>{value} {unit}</span>
     </div>
+  )
+}
+
+// ── Mini Trend Sparkline ──────────────────────────────────────────────
+
+function TrendSparkline({ snapshots }: { snapshots: CacheData['guardian']['snapshots'] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || snapshots.length < 2) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const w = canvas.width
+    const h = canvas.height
+    const pcts = snapshots.map(s => s.cgroupPct)
+    const min = Math.max(0, Math.min(...pcts) - 5)
+    const max = Math.min(100, Math.max(...pcts) + 5)
+    const range = max - min || 1
+
+    ctx.clearRect(0, 0, w, h)
+
+    // Zona de peligro (70%+)
+    const dangerY = h - ((70 - min) / range) * h
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.08)'
+    ctx.fillRect(0, 0, w, dangerY)
+
+    // Línea de 70%
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.3)'
+    ctx.setLineDash([3, 3])
+    ctx.beginPath()
+    ctx.moveTo(0, dangerY)
+    ctx.lineTo(w, dangerY)
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    // Línea de tendencia
+    const gradient = ctx.createLinearGradient(0, 0, 0, h)
+    gradient.addColorStop(0, 'rgba(59, 130, 246, 0.6)')
+    gradient.addColorStop(1, 'rgba(34, 197, 94, 0.3)')
+
+    ctx.strokeStyle = gradient
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    pcts.forEach((pct, i) => {
+      const x = (i / (pcts.length - 1)) * w
+      const y = h - ((pct - min) / range) * h
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    })
+    ctx.stroke()
+
+    // Área bajo la línea
+    const lastIdx = pcts.length - 1
+    const lastX = w
+    const areaGradient = ctx.createLinearGradient(0, 0, 0, h)
+    areaGradient.addColorStop(0, 'rgba(59, 130, 246, 0.15)')
+    areaGradient.addColorStop(1, 'rgba(59, 130, 246, 0.02)')
+    ctx.fillStyle = areaGradient
+    ctx.lineTo(lastX, h)
+    ctx.lineTo(0, h)
+    ctx.closePath()
+    ctx.fill()
+  }, [snapshots])
+
+  if (snapshots.length < 2) return null
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={200}
+      height={40}
+      className="w-full h-10 rounded"
+    />
   )
 }
 
@@ -133,7 +241,7 @@ export function CachePressurePanel() {
         const result = await res.json()
         setPurgeResult(result)
         // Refresh metrics after purge
-        setTimeout(fetchMetrics, 1000)
+        setTimeout(fetchMetrics, 2000)
       }
     } catch { /* silent */ }
     setPurging(false)
@@ -158,6 +266,7 @@ export function CachePressurePanel() {
   }
 
   const mainPressureColor = gaugeColor(data.pressure.score)
+  const gColor = guardianLevelColor(data.guardian.level)
 
   return (
     <Card className="border hover:shadow-md transition-all">
@@ -174,33 +283,95 @@ export function CachePressurePanel() {
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-3 space-y-3">
-        {/* Gauges */}
+
+        {/* ── Guardian Status Bar ─────────────────────────────────── */}
+        <div className="flex items-center justify-between px-2 py-1.5 rounded-md text-[10px]"
+          style={{ backgroundColor: gColor + '10' }}>
+          <div className="flex items-center gap-1.5">
+            <Shield className="h-3 w-3" style={{ color: gColor }} />
+            <span className="font-medium" style={{ color: gColor }}>
+              GUARDIAN {data.guardian.level.toUpperCase()}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {data.guardian.workerPaused && (
+              <span className="text-red-500 font-medium">WORKER ⏸</span>
+            )}
+            {data.guardian.schedulerPaused && (
+              <span className="text-amber-500 font-medium">SCHED ⏸</span>
+            )}
+            <span className="text-muted-foreground">
+              {data.guardian.currentPct}%
+            </span>
+          </div>
+        </div>
+
+        {/* ── Gauges ─────────────────────────────────────────────── */}
         <div className="flex justify-around">
           <PressureGauge value={Math.round(data.memory.heapPct)} label="Heap" color={gaugeColor(data.memory.heapPct)} />
           <PressureGauge value={Math.round(data.container.pct)} label="Contenedor" color={gaugeColor(data.container.pct)} />
           <PressureGauge value={data.pressure.score} label="Presión" color={mainPressureColor} />
         </div>
 
-        {/* Metrics */}
+        {/* ── Trend Sparkline ────────────────────────────────────── */}
+        {data.guardian.snapshots.length >= 2 && (
+          <div>
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-[9px] text-muted-foreground">Tendencia cgroup (últimos ~10 min)</span>
+              <span className="text-[9px] font-mono text-muted-foreground">
+                {data.guardian.trendPctPerHour >= 0 ? '+' : ''}{data.guardian.trendPctPerHour}%/h
+              </span>
+            </div>
+            <TrendSparkline snapshots={data.guardian.snapshots} />
+          </div>
+        )}
+
+        {/* ── Metrics ────────────────────────────────────────────── */}
         <div className="space-y-0">
           <MetricRow icon={Cpu} label="RSS" value={data.memory.rss} unit="MB" />
           <MetricRow icon={HardDrive} label="Cache Next.js" value={data.cache.nextCacheSizeMB} unit="MB" />
           <MetricRow icon={HardDrive} label="Turbopack" value={data.cache.turbopackCacheSizeMB} unit="MB" />
           <MetricRow icon={Database} label="DB" value={data.cache.dbSizeMB} unit="MB" />
           <MetricRow icon={Database} label="Backups" value={`${data.cache.backupCount} (${data.cache.backupTotalMB})`} unit="MB" />
+          {data.guardian.actionsExecuted > 0 && (
+            <MetricRow icon={Shield} label="Acciones auto" value={data.guardian.actionsExecuted} unit="" warn={data.guardian.emergencyCount > 0} />
+          )}
         </div>
 
-        {/* Purge result toast */}
+        {/* ── Last Action ────────────────────────────────────────── */}
+        {data.guardian.lastActionMessage && (
+          <div className="text-[10px] px-2 py-1.5 rounded bg-muted/50 text-muted-foreground">
+            <span className="font-medium">Última auto-acción:</span>{' '}
+            {data.guardian.lastActionMessage}
+            {data.guardian.lastActionTime && (
+              <span className="ml-1 opacity-60">
+                ({new Date(data.guardian.lastActionTime).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })})
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── Purge result toast ─────────────────────────────────── */}
         {purgeResult && (
           <div className={`text-[10px] px-2 py-1.5 rounded ${purgeResult.exito ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
             {purgeResult.exito
-              ? `Liberado: ${purgeResult.totalLiberado}`
+              ? `Liberado: ${purgeResult.totalLiberado}${purgeResult.nota ? '. ' + purgeResult.nota : ''}`
               : 'Error en purga'}
           </div>
         )}
 
-        {/* Actions */}
+        {/* ── Actions ────────────────────────────────────────────── */}
         <div className="flex gap-1.5 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-[10px] px-2"
+            disabled={purging}
+            onClick={() => handlePurge('drop_cache')}
+          >
+            <Zap className="h-3 w-3 mr-1" />
+            Page Cache
+          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -243,9 +414,10 @@ export function CachePressurePanel() {
           </Button>
         </div>
 
-        {/* Uptime footer */}
-        <div className="text-[9px] text-muted-foreground text-right">
-          Uptime: {data.uptime.formatted}
+        {/* ── Uptime footer ──────────────────────────────────────── */}
+        <div className="text-[9px] text-muted-foreground text-right flex items-center justify-between">
+          <span>Guardian: {data.guardian.active ? 'ACTIVO' : 'INACTIVO'} · {data.guardian.currentPct}% cgroup</span>
+          <span>Uptime: {data.uptime.formatted}</span>
         </div>
       </CardContent>
     </Card>

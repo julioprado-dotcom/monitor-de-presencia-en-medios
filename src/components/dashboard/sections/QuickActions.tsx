@@ -1,12 +1,20 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
-  Eye, Bell, Database, FileBarChart, UserCircle, Activity, Zap,
+  Eye, Bell, Database, FileBarChart, UserCircle, Activity, Zap, Shield,
 } from 'lucide-react';
 import type { SystemMetrics } from '@/types/dashboard';
+
+// ─── Types ────────────────────────────────────────────────────
+
+interface GuardianInfo {
+  active: boolean
+  level: string
+  currentPct: number
+}
 
 // ─── Props ────────────────────────────────────────────────────
 
@@ -18,6 +26,36 @@ interface QuickActionsProps {
 // ─── Component ────────────────────────────────────────────────
 
 export function QuickActions({ sysMetrics, setActiveView }: QuickActionsProps) {
+  const [guardian, setGuardian] = useState<GuardianInfo | null>(null)
+
+  useEffect(() => {
+    // Poll guardian status cada 30s
+    const fetchGuardian = async () => {
+      try {
+        const res = await fetch('/api/admin/cache')
+        if (res.ok) {
+          const data = await res.json()
+          setGuardian(data.guardian ? {
+            active: data.guardian.active,
+            level: data.guardian.level,
+            currentPct: data.guardian.currentPct,
+          } : null)
+        }
+      } catch { /* silent */ }
+    }
+    fetchGuardian()
+    const interval = setInterval(fetchGuardian, 30_000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const guardianColor = guardian
+    ? guardian.level === 'emergency' ? 'text-red-500'
+      : guardian.level === 'critical' ? 'text-orange-500'
+      : guardian.level === 'warn' ? 'text-amber-500'
+      : guardian.level === 'watch' ? 'text-blue-500'
+      : 'text-green-500'
+    : 'text-muted-foreground'
+
   return (
     <>
       <Card>
@@ -89,7 +127,18 @@ export function QuickActions({ sysMetrics, setActiveView }: QuickActionsProps) {
       {sysMetrics && (
         <div className="flex items-center justify-between text-[10px] text-muted-foreground/60 px-1 pb-2">
           <span>Node {sysMetrics.nodeVersion} · {sysMetrics.environment}</span>
-          <span>Heap {sysMetrics.memoryUsage.heapUsed} MB · Contenedor {sysMetrics.memoryUsage.cgroupUsage}/{sysMetrics.memoryUsage.cgroupLimit} MB</span>
+          <span className="flex items-center gap-1.5">
+            {guardian && (
+              <>
+                <Shield className={`h-3 w-3 ${guardianColor}`} />
+                <span className={guardianColor}>
+                  Guardian {guardian.active ? 'ON' : 'OFF'} {guardian.currentPct}%
+                </span>
+                <span className="text-muted-foreground/40">|</span>
+              </>
+            )}
+            <span>Heap {sysMetrics.memoryUsage.heapUsed} MB · Contenedor {sysMetrics.memoryUsage.cgroupUsage}/{sysMetrics.memoryUsage.cgroupLimit} MB</span>
+          </span>
           <span>DB: {sysMetrics.dbSize} MB · {sysMetrics.uptimeFormatted}</span>
         </div>
       )}

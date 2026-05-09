@@ -1,6 +1,10 @@
 // browser-runtime.ts — Utilidades de runtime para métricas del sistema
 // Usado por CachePressurePanel y API de administración
 // No depende de APIs externas — solo lectura de procesos y filesystem
+//
+// NOTA: dropPageCache() fue movida a container-guardian.ts porque requiere
+// lógica de control (guardian decide cuándo ejecutarla). Esta capa expone
+// solo lectura de métricas y purga de directorios de cache.
 
 import fs from 'fs'
 import path from 'path'

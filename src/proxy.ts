@@ -40,12 +40,12 @@ const PUBLIC_ENDPOINTS: Array<{ path: string; methods: string[] }> = [
   { path: '/api/jobs',                      methods: ['GET', 'POST'] },
   { path: '/api/marco-conceptual',          methods: ['GET'] },
   { path: '/api/backup',                    methods: ['GET', 'POST', 'PATCH'] },
+  { path: '/api/seed',                      methods: ['GET', 'POST'] },
 ];
 
 // ── Rutas que SIEMPRE requieren auth (todos los métodos) ──────
 const ALWAYS_PROTECTED: string[] = [
   '/api/admin/',
-  '/api/seed',
   '/api/auth/setup',
 ];
 
