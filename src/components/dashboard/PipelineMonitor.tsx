@@ -254,6 +254,27 @@ export function PipelineMonitor({ data, onRefresh }: PipelineMonitorProps) {
     executeAction('reclaim', '/api/jobs/maintenance', { accion: 'reclaim_huerfanos' }, 'Huerfanos recuperados');
   }, [executeAction]);
 
+  const rescheduleTasks = useCallback(() => {
+    executeAction('reschedule', '/api/jobs/scheduler', { accion: 'recalcular' }, 'Tareas reprogramadas');
+  }, [executeAction]);
+
+  const forceCheckAll = useCallback(async () => {
+    setActionLoading('force_check');
+    try {
+      // Enqueue check_fuente for all active fuentes
+      const res = await fetchWithTimeout('/api/scraping/phase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'ejecutar_uno_all' }),
+        timeoutMs: 10_000,
+      });
+      const json = await res.json();
+      if (res.ok) { addFeedback('exito', json.mensaje || 'Check forzado para todas las fuentes'); setTimeout(onRefresh, 1000); }
+      else { addFeedback('error', json.error || 'Error forzando checks'); }
+    } catch (err) { addFeedback('error', `Error: ${err instanceof Error ? err.message : 'force_check'}`); }
+    finally { setActionLoading(null); }
+  }, [addFeedback, onRefresh]);
+
   const cancelJob = useCallback(async (jobId: string) => {
     try {
       const res = await fetchWithTimeout(`/api/jobs/${jobId}`, { method: 'DELETE', timeoutMs: 10_000 });
@@ -512,79 +533,117 @@ export function PipelineMonitor({ data, onRefresh }: PipelineMonitorProps) {
                   </div>
                 )}
 
-                {/* Jobs completados */}
-                {pasado.completados.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
-                      <CheckCircle2 className="h-3 w-3 inline mr-1 text-emerald-500" />Jobs completados
-                    </p>
-                    <div className="space-y-1">
-                      {pasado.completados.slice(0, 10).map(j => (
-                        <div key={j.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/20 border border-border/30">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`text-[10px] font-medium ${JOB_TYPE_COLORS[j.tipo] || 'text-foreground'}`}>
-                                {JOB_TYPE_LABELS[j.tipo] || j.tipo}
-                              </span>
-                              <span className="text-[9px] text-muted-foreground">{j.hace}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 text-[9px] text-muted-foreground shrink-0">
-                            {j.duracionSegundos !== null && (
-                              <span className="flex items-center gap-0.5">
-                                <Timer className="h-2.5 w-2.5" />{formatDuration(j.duracionSegundos)}
-                              </span>
-                            )}
-                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${PRIORIDAD_COLORS[j.prioridad] || 'bg-gray-400'}`} title={`P${j.prioridad}`} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Historial unificado de jobs */}
+                <div>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                    <Timer className="h-3 w-3 inline mr-1" />Historial de Jobs (24h)
+                  </p>
+                  {(() => {
+                    // Merge completados + fallidos into unified timeline sorted by date
+                    type JobRow = Record<string, unknown> & {
+                      id: string; tipo: string; prioridad: number; hace: string; fecha: string;
+                      _kind: string; _hasError: boolean; _errorText: string | null;
+                      _cambiado: boolean | undefined; _tipoCheck: string | null;
+                      _detalle: string | null; duracionSegundos: number | null;
+                    }
+                    const allJobs: JobRow[] = [
+                      ...pasado.completados.map(j => {
+                        const r = j.resultado || {}
+                        const detalle = String(r.detalle ?? '')
+                        const hasError = r.error || (detalle && /HTTP \d{3}|fetch failed|timeout|forbidden|vacío|no parseable/i.test(detalle))
+                        return {
+                          id: j.id, tipo: j.tipo, prioridad: j.prioridad,
+                          duracionSegundos: j.duracionSegundos, hace: j.hace, fecha: j.fecha,
+                          resultado: j.resultado, fuente: (j.resultado as Record<string, unknown>)?.fuente as string | undefined,
+                          _kind: 'completado', _hasError: !!hasError,
+                          _errorText: r.error ? String(r.error) : (hasError ? detalle : null),
+                          _cambiado: r.cambiado as boolean | undefined,
+                          _tipoCheck: (r.tipoCheckUsado as string) || null,
+                          _detalle: detalle || null,
+                        }
+                      }),
+                      ...pasado.fallidos.map(j => ({
+                        id: j.id, tipo: j.tipo, prioridad: j.prioridad,
+                        duracionSegundos: j.duracionSegundos, hace: j.hace, fecha: j.fecha,
+                        _kind: 'fallido', _hasError: true, _errorText: j.error || null,
+                        _cambiado: false, _tipoCheck: null, _detalle: null,
+                      })),
+                    ].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))
 
-                {/* Jobs fallidos */}
-                {pasado.fallidos.length > 0 ? (
-                  <div>
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
-                      <XCircle className="h-3 w-3 inline mr-1 text-red-500" />Jobs fallidos — diagnosticar y actuar
-                    </p>
-                    <div className="space-y-1.5">
-                      {pasado.fallidos.map(j => (
-                        <div key={j.id} className="p-2 rounded-lg bg-red-500/5 border border-red-500/20">
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className={`text-[10px] font-medium ${JOB_TYPE_COLORS[j.tipo] || 'text-red-600 dark:text-red-400'}`}>
-                                {JOB_TYPE_LABELS[j.tipo] || j.tipo}
-                              </span>
-                              {j.fuente && <span className="text-[9px] text-muted-foreground truncate max-w-[100px]">{j.fuente}</span>}
-                              {j.cliente && <span className="text-[9px] text-muted-foreground">→ {j.cliente}</span>}
-                              {j.canal && <Badge variant="outline" className="text-[8px] px-1 py-0 h-4">{j.canal}</Badge>}
+                    if (allJobs.length === 0) {
+                      return <p className="text-[10px] text-muted-foreground">Sin jobs en las últimas 24h</p>
+                    }
+
+                    return (
+                      <div className="space-y-1">
+                        {allJobs.slice(0, 20).map(j => (
+                          <div
+                            key={j.id}
+                            className={`p-2 rounded-lg border ${
+                              j._kind === 'fallido'
+                                ? 'bg-red-500/5 border-red-500/20'
+                                : j._hasError
+                                  ? 'bg-amber-500/5 border-amber-500/20'
+                                  : j._cambiado
+                                    ? 'bg-emerald-500/5 border-emerald-500/20'
+                                    : 'bg-muted/20 border-border/30'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {j._kind === 'fallido' ? (
+                                  <XCircle className="h-3 w-3 text-red-500 shrink-0" />
+                                ) : j._hasError ? (
+                                  <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                ) : j._cambiado ? (
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                                ) : (
+                                  <CheckCircle2 className="h-3 w-3 text-muted-foreground/40 shrink-0" />
+                                )}
+                                <span className={`text-[10px] font-medium ${JOB_TYPE_COLORS[j.tipo] || 'text-foreground'}`}>
+                                  {JOB_TYPE_LABELS[j.tipo] || j.tipo}
+                                </span>
+                                {(j as { fuente?: string }).fuente && <span className="text-[9px] text-foreground truncate max-w-[100px]">{(j as { fuente?: string }).fuente!}</span>}
+                                {j._tipoCheck && (
+                                  <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5">{j._tipoCheck}</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[9px] text-muted-foreground shrink-0">
+                                <span>{j.hace}</span>
+                                {j.duracionSegundos !== null && (
+                                  <span className="flex items-center gap-0.5">
+                                    <Timer className="h-2.5 w-2.5" />{formatDuration(j.duracionSegundos)}
+                                  </span>
+                                )}
+                                <span className={`inline-block h-1.5 w-1.5 rounded-full ${PRIORIDAD_COLORS[j.prioridad] || 'bg-gray-400'}`} title={`P${j.prioridad}`} />
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-[9px] text-muted-foreground">{j.hace}</span>
-                              <Button variant="ghost" size="sm" className="text-[9px] h-6 px-1.5 text-red-500 hover:text-red-400 hover:bg-red-500/10"
-                                onClick={() => cancelJob(j.id)}>
-                                <XCircle className="h-3 w-3" />
-                              </Button>
-                            </div>
+                            {j._hasError && j._errorText && (
+                              <p className="text-[9px] text-red-600 dark:text-red-400 mt-0.5 truncate" title={j._errorText}>
+                                {j._errorText}
+                              </p>
+                            )}
+                            {!j._hasError && j._cambiado && j._detalle && (
+                              <p className="text-[9px] text-emerald-600 dark:text-emerald-400 mt-0.5 truncate" title={j._detalle}>
+                                {j._detalle}
+                              </p>
+                            )}
+                            {!j._hasError && !j._cambiado && j._detalle && (
+                              <p className="text-[9px] text-muted-foreground mt-0.5 truncate" title={j._detalle}>
+                                {j._detalle}
+                              </p>
+                            )}
                           </div>
-                          <p className="text-[9px] text-red-600 dark:text-red-400 font-medium truncate">{j.error}</p>
-                          <p className="text-[9px] text-muted-foreground">
-                            {j.intentos}/{j.maxIntentos} intentos
-                            {j.duracionSegundos !== null && ` · ${formatDuration(j.duracionSegundos)}`}
-                            {j.fuente && ` · Fuente: ${j.fuente}`}
+                        ))}
+                        {allJobs.length > 20 && (
+                          <p className="text-[9px] text-muted-foreground text-center pt-1">
+                            Mostrando 20 de {allJobs.length} jobs
                           </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 py-2">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-xs font-medium">Sin fallidos en las últimas 24 horas</span>
-                  </div>
-                )}
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
               </div>
             )}
 
@@ -705,6 +764,16 @@ export function PipelineMonitor({ data, onRefresh }: PipelineMonitorProps) {
                     {actionLoading === 'worker' ? <Loader2 className="h-3 w-3 animate-spin" /> :
                       workerRunning ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
                     {workerRunning ? 'Pausar Worker' : 'Reanudar Worker'}
+                  </Button>
+                  <Button variant="outline" size="sm" className="text-[10px] gap-1 h-7 px-2"
+                    disabled={actionLoading === 'reschedule'} onClick={rescheduleTasks}>
+                    {actionLoading === 'reschedule' ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                    Reprogramar Tareas
+                  </Button>
+                  <Button variant="outline" size="sm" className="text-[10px] gap-1 h-7 px-2"
+                    disabled={actionLoading === 'force_check'} onClick={forceCheckAll}>
+                    {actionLoading === 'force_check' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+                    Forzar Check Ahora
                   </Button>
                   <Button variant="outline" size="sm" className="text-[10px] gap-1 h-7 px-2"
                     disabled={actionLoading === 'reclaim'} onClick={reclaimOrphans}>

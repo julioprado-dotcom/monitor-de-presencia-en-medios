@@ -565,6 +565,40 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      // ── Forzar check de TODAS las fuentes activas ───
+      case 'ejecutar_uno_all': {
+        const fuentesActivas = await db.fuenteEstado.findMany({
+          where: { activo: true },
+          include: { medio: true },
+        })
+
+        if (fuentesActivas.length === 0) {
+          return NextResponse.json({ error: 'No hay fuentes activas' }, { status: 400 })
+        }
+
+        ensureWorkerRunning()
+
+        let encolados = 0
+        for (const fuente of fuentesActivas) {
+          await enqueue({
+            tipo: 'check_fuente',
+            prioridad: 0,
+            payload: { fuenteId: fuente.id, medioId: fuente.medioId },
+          }).catch(err => {
+            console.warn(`[ScrapingPhase] Error encolando check para ${fuente.medio.nombre}:`, err)
+          })
+          encolados++
+        }
+
+        console.log(`[ScrapingPhase] Forzado check para ${encolados} fuentes`)
+
+        return NextResponse.json({
+          exito: true,
+          mensaje: `${encolados} checks encolados (P0) para fuentes activas`,
+          fuentes: fuentesActivas.map(f => f.medio.nombre),
+        })
+      }
+
       // ── Forzar check de una fuente ────────────────
       case 'forzar_check': {
         const { fuenteId } = body as { fuenteId?: string }
@@ -609,6 +643,7 @@ export async function POST(request: NextRequest) {
               'retroceder_fase',
               'seleccionar_fuentes',
               'ejecutar_uno',
+              'ejecutar_uno_all',
               'reiniciar',
               'forzar_check',
             ],

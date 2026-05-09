@@ -156,11 +156,19 @@ export function ScrapingPhaseControl() {
     )
   }
 
-  const completados = state.scrapeResultados.filter(r => r.estado === 'completado' && !r.error).length
-  const sinCambios = state.scrapeResultados.filter(r => r.estado === 'completado' && !r.error && r.menciones === 0).length
-  const errores = state.scrapeResultados.filter(r => r.estado === 'error').length
+  // Detectar errores reales: tanto por estado como por patrones en error/detalle
+  const ERROR_PATTERNS = [/HTTP \d{3}/i, /fetch failed/i, /timeout/i, /forbidden/i, /empty|vacío|vacio/i, /no parseable/i, /Error:/i]
+  const isRealError = (r: typeof state.scrapeResultados[0]) => {
+    if (r.estado === 'error') return true
+    if (r.error && ERROR_PATTERNS.some(p => p.test(r.error ?? ''))) return true
+    if (r.detalle && ERROR_PATTERNS.some(p => p.test(r.detalle ?? '')) && r.menciones === 0) return true
+    return false
+  }
+  const completados = state.scrapeResultados.filter(r => r.estado === 'completado' && !isRealError(r) && r.menciones > 0).length
+  const sinCambios = state.scrapeResultados.filter(r => r.estado === 'completado' && !isRealError(r) && r.menciones === 0).length
+  const errores = state.scrapeResultados.filter(r => isRealError(r)).length
   const pausados = state.scrapeResultados.filter(r => r.estado === 'pausado').length
-  const totalMenciones = state.scrapeResultados.reduce((sum, r) => sum + r.menciones, 0)
+  const totalMenciones = state.scrapeResultados.filter(r => !isRealError(r)).reduce((sum, r) => sum + r.menciones, 0)
   const progresoPct = state.scrapeProgreso
     ? Math.round((state.scrapeProgreso.actual / state.scrapeProgreso.total) * 100)
     : 0
@@ -635,11 +643,13 @@ export function ScrapingPhaseControl() {
                     {totalMenciones > 0 && <span className="text-blue-600">{totalMenciones} menc.</span>}
                   </div>
                 </div>
-                {state.scrapeResultados.map((r) => (
+                {state.scrapeResultados.map((r) => {
+                  const errorFlag = isRealError(r)
+                  return (
                   <div
                     key={r.fuenteId}
                     className={`py-1.5 px-2 rounded text-xs ${
-                      r.estado === 'error'
+                      errorFlag
                         ? 'bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30'
                         : r.estado === 'completado' && r.menciones > 0
                           ? 'bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30'
@@ -656,13 +666,13 @@ export function ScrapingPhaseControl() {
                         {r.estado === 'scrapeando' && (
                           <Loader2 className="h-3 w-3 text-blue-500 animate-spin shrink-0" />
                         )}
-                        {r.estado === 'completado' && r.menciones > 0 && (
+                        {r.estado === 'completado' && !errorFlag && r.menciones > 0 && (
                           <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
                         )}
-                        {r.estado === 'completado' && r.menciones === 0 && (
+                        {r.estado === 'completado' && !errorFlag && r.menciones === 0 && (
                           <CheckCircle2 className="h-3 w-3 text-emerald-500 opacity-40 shrink-0" />
                         )}
-                        {r.estado === 'error' && (
+                        {errorFlag && (
                           <XCircle className="h-3 w-3 text-red-500 shrink-0" />
                         )}
                         {r.estado === 'pausado' && (
@@ -681,11 +691,6 @@ export function ScrapingPhaseControl() {
                             {r.menciones} menc.
                           </Badge>
                         )}
-                        {r.detalle && r.estado === 'completado' && r.menciones === 0 && !r.error && (
-                          <span className="text-[10px] text-slate-400 max-w-[140px] truncate" title={r.detalle}>
-                            {r.detalle}
-                          </span>
-                        )}
                         {!isRunning && r.estado !== 'scrapeando' && r.estado !== 'pendiente' && (
                           <Button
                             size="sm"
@@ -699,21 +704,30 @@ export function ScrapingPhaseControl() {
                         )}
                       </div>
                     </div>
-                    {/* Línea de detalle para errores o estrategias rotadas */}
-                    {r.error && (
+                    {/* Línea de detalle: error o sin cambios */}
+                    {errorFlag && (r.error || r.detalle) && (
                       <div className="flex items-start gap-1 mt-0.5 pl-5">
-                        {r.error.includes('Rotación') || r.error.includes('FAIL') ? (
+                        {(r.error?.includes('Rotación') || r.error?.includes('FAIL') || r.detalle?.includes('Rotación')) ? (
                           <RefreshCw className="h-2.5 w-2.5 text-red-400 mt-0.5 shrink-0" />
                         ) : (
                           <ShieldAlert className="h-2.5 w-2.5 text-red-400 mt-0.5 shrink-0" />
                         )}
                         <span className="text-[10px] text-red-600 dark:text-red-400 leading-tight break-all">
-                          {r.error}
+                          {r.error || r.detalle}
+                        </span>
+                      </div>
+                    )}
+                    {!errorFlag && r.detalle && r.estado === 'completado' && r.menciones === 0 && (
+                      <div className="flex items-start gap-1 mt-0.5 pl-5">
+                        <Info className="h-2.5 w-2.5 text-slate-400 mt-0.5 shrink-0" />
+                        <span className="text-[10px] text-slate-400 truncate" title={r.detalle}>
+                          {r.detalle}
                         </span>
                       </div>
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
