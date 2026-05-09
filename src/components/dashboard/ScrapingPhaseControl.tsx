@@ -8,6 +8,7 @@ import {
   Play, Square, ChevronRight, ChevronLeft, RotateCcw, CheckCircle2,
   XCircle, Loader2, AlertTriangle, Pause,
   Globe, BarChart3, Check, ListChecks,
+  RefreshCw, ShieldAlert, Info,
 } from 'lucide-react'
 import { fetchWithTimeout } from '@/lib/fetch-utils'
 
@@ -156,8 +157,7 @@ export function ScrapingPhaseControl() {
   }
 
   const completados = state.scrapeResultados.filter(r => r.estado === 'completado' && !r.error).length
-  const sinCambios = state.scrapeResultados.filter(r => r.estado === 'completado' && r.error && r.menciones === 0).length
-  const conError = state.scrapeResultados.filter(r => r.estado === 'completado' && r.error && r.menciones > 0).length
+  const sinCambios = state.scrapeResultados.filter(r => r.estado === 'completado' && !r.error && r.menciones === 0).length
   const errores = state.scrapeResultados.filter(r => r.estado === 'error').length
   const pausados = state.scrapeResultados.filter(r => r.estado === 'pausado').length
   const totalMenciones = state.scrapeResultados.reduce((sum, r) => sum + r.menciones, 0)
@@ -447,14 +447,9 @@ export function ScrapingPhaseControl() {
             <span className="flex items-center gap-1 text-emerald-600">
               <CheckCircle2 className="h-3 w-3" /> {completados}
             </span>
-            {sinCambios > 0 && (
+            {sinCambios > 0 && completados > 0 && (
               <span className="flex items-center gap-1 text-slate-400">
-                <CheckCircle2 className="h-3 w-3 opacity-50" /> {sinCambios}
-              </span>
-            )}
-            {conError > 0 && (
-              <span className="flex items-center gap-1 text-amber-600">
-                <AlertTriangle className="h-3 w-3" /> {conError}
+                <Info className="h-3 w-3" /> {sinCambios} sin camb.
               </span>
             )}
             {pausados > 0 && (
@@ -635,7 +630,6 @@ export function ScrapingPhaseControl() {
                   <div className="flex items-center gap-2 text-[10px]">
                     <span className="text-emerald-600">{completados} OK</span>
                     {sinCambios > 0 && <span className="text-slate-400">{sinCambios} sin camb.</span>}
-                    {conError > 0 && <span className="text-amber-600">{conError} advert.</span>}
                     {pausados > 0 && <span className="text-amber-600">{pausados} paus.</span>}
                     {errores > 0 && <span className="text-red-600">{errores} err</span>}
                     {totalMenciones > 0 && <span className="text-blue-600">{totalMenciones} menc.</span>}
@@ -644,66 +638,80 @@ export function ScrapingPhaseControl() {
                 {state.scrapeResultados.map((r) => (
                   <div
                     key={r.fuenteId}
-                    className="flex items-center justify-between py-1 px-2 rounded text-xs bg-slate-50 dark:bg-slate-800/50"
+                    className={`py-1.5 px-2 rounded text-xs ${
+                      r.estado === 'error'
+                        ? 'bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30'
+                        : r.estado === 'completado' && r.menciones > 0
+                          ? 'bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30'
+                          : r.estado === 'scrapeando'
+                            ? 'bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/30'
+                            : 'bg-slate-50 dark:bg-slate-800/50'
+                    }`}
                   >
-                    <div className="flex items-center gap-2">
-                      {r.estado === 'pendiente' && (
-                        <div className="h-2.5 w-2.5 rounded-full border border-slate-300" />
-                      )}
-                      {r.estado === 'scrapeando' && (
-                        <Loader2 className="h-3 w-3 text-blue-500 animate-spin" />
-                      )}
-                      {r.estado === 'completado' && r.error && r.menciones > 0 && (
-                        <AlertTriangle className="h-3 w-3 text-amber-500" />
-                      )}
-                      {r.estado === 'completado' && r.error && r.menciones === 0 && (
-                        <AlertTriangle className="h-3 w-3 text-amber-500" />
-                      )}
-                      {r.estado === 'completado' && !r.error && r.menciones > 0 && (
-                        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                      )}
-                      {r.estado === 'completado' && !r.error && r.menciones === 0 && (
-                        <CheckCircle2 className="h-3 w-3 text-emerald-500 opacity-40" />
-                      )}
-                      {r.estado === 'error' && (
-                        <XCircle className="h-3 w-3 text-red-500" />
-                      )}
-                      {r.estado === 'pausado' && (
-                        <Pause className="h-3 w-3 text-amber-500" />
-                      )}
-                      <span className={r.estado === 'scrapeando' ? 'font-medium' : ''}>{r.nombre}</span>
-                      {r.duracionMs && (
-                        <span className="text-[10px] text-slate-400">{(r.duracionMs / 1000).toFixed(1)}s</span>
-                      )}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {r.estado === 'pendiente' && (
+                          <div className="h-2.5 w-2.5 rounded-full border border-slate-300 shrink-0" />
+                        )}
+                        {r.estado === 'scrapeando' && (
+                          <Loader2 className="h-3 w-3 text-blue-500 animate-spin shrink-0" />
+                        )}
+                        {r.estado === 'completado' && r.menciones > 0 && (
+                          <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                        )}
+                        {r.estado === 'completado' && r.menciones === 0 && (
+                          <CheckCircle2 className="h-3 w-3 text-emerald-500 opacity-40 shrink-0" />
+                        )}
+                        {r.estado === 'error' && (
+                          <XCircle className="h-3 w-3 text-red-500 shrink-0" />
+                        )}
+                        {r.estado === 'pausado' && (
+                          <Pause className="h-3 w-3 text-amber-500 shrink-0" />
+                        )}
+                        <span className={`truncate ${r.estado === 'scrapeando' ? 'font-medium' : ''}`}>
+                          {r.nombre}
+                        </span>
+                        {r.duracionMs && (
+                          <span className="text-[10px] text-slate-400 shrink-0">{(r.duracionMs / 1000).toFixed(1)}s</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {r.menciones > 0 && (
+                          <Badge variant="outline" className="h-4 px-1 text-[10px] bg-blue-50 text-blue-600 border-blue-200">
+                            {r.menciones} menc.
+                          </Badge>
+                        )}
+                        {r.detalle && r.estado === 'completado' && r.menciones === 0 && !r.error && (
+                          <span className="text-[10px] text-slate-400 max-w-[140px] truncate" title={r.detalle}>
+                            {r.detalle}
+                          </span>
+                        )}
+                        {!isRunning && r.estado !== 'scrapeando' && r.estado !== 'pendiente' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => accion('ejecutar_uno', { fuenteId: r.fuenteId })}
+                            className="h-5 w-5 p-0"
+                            title="Re-ejecutar"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {r.menciones > 0 && (
-                        <Badge variant="outline" className="h-4 px-1 text-[10px] bg-blue-50 text-blue-600 border-blue-200">
-                          {r.menciones} menc.
-                        </Badge>
-                      )}
-                      {r.error && r.estado === 'completado' && (
-                        <span className="text-[10px] text-amber-600 max-w-[120px] truncate" title={r.error}>
+                    {/* Línea de detalle para errores o estrategias rotadas */}
+                    {r.error && (
+                      <div className="flex items-start gap-1 mt-0.5 pl-5">
+                        {r.error.includes('Rotación') || r.error.includes('FAIL') ? (
+                          <RefreshCw className="h-2.5 w-2.5 text-red-400 mt-0.5 shrink-0" />
+                        ) : (
+                          <ShieldAlert className="h-2.5 w-2.5 text-red-400 mt-0.5 shrink-0" />
+                        )}
+                        <span className="text-[10px] text-red-600 dark:text-red-400 leading-tight break-all">
                           {r.error}
                         </span>
-                      )}
-                      {r.error && r.estado === 'error' && (
-                        <span className="text-[10px] text-red-500 max-w-[120px] truncate" title={r.error}>
-                          {r.error}
-                        </span>
-                      )}
-                      {!isRunning && r.estado !== 'scrapeando' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => accion('ejecutar_uno', { fuenteId: r.fuenteId })}
-                          className="h-5 w-5 p-0"
-                          title="Re-ejecutar"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

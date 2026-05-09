@@ -690,7 +690,8 @@ async function ejecutarScrapeSecuencial(reanudando: boolean = false): Promise<vo
               scrapeResultados[resultIdx].estado = 'error'
               scrapeResultados[resultIdx].error = 'Job procesado pero no encontrado en DB'
             } else if (lastJob.estado === 'fallido') {
-              scrapeResultados[resultIdx].estado = 'completado'
+              // BUG FIX: antes marcaba como 'completado', ahora correctamente 'error'
+              scrapeResultados[resultIdx].estado = 'error'
               scrapeResultados[resultIdx].error = lastJob.error || 'Job fallido'
             } else {
               // Job completado — parse resultado to check cambiado
@@ -701,15 +702,30 @@ async function ejecutarScrapeSecuencial(reanudando: boolean = false): Promise<vo
 
               const cambiado = resultadoData.cambiado === true
               const detalle = resultadoData.detalle as string | undefined
+              const resultadoError = resultadoData.error as string | undefined
+              const estrategiasProbadas = resultadoData.estrategiasProbadas as
+                | Array<{ estrategia: string; exito: boolean; detalle: string }>
+                | undefined
 
-              scrapeResultados[resultIdx].estado = 'completado'
-              scrapeResultados[resultIdx].detalle = detalle
-
-              if (!cambiado) {
-                // No changes detected — set error to the detalle explanation
-                scrapeResultados[resultIdx].error = detalle || 'Sin cambios detectados'
+              // Si el resultado indica error interno (estrategias fallaron), marcar como error
+              if (resultadoError) {
+                scrapeResultados[resultIdx].estado = 'error'
+                const rotacionInfo = estrategiasProbadas
+                  ? estrategiasProbadas.map(e => `${e.estrategia}:${e.exito ? 'OK' : 'FAIL'}`).join(' → ')
+                  : ''
+                scrapeResultados[resultIdx].error = rotacionInfo
+                  ? `[${rotacionInfo}] ${resultadoError}`
+                  : resultadoError
+                scrapeResultados[resultIdx].detalle = detalle
+              } else if (cambiado) {
+                // Cambio detectado — éxito real
+                scrapeResultados[resultIdx].estado = 'completado'
+                scrapeResultados[resultIdx].detalle = detalle
+              } else {
+                // Sin cambios pero sin error — éxito parcial (sitio accesible)
+                scrapeResultados[resultIdx].estado = 'completado'
+                scrapeResultados[resultIdx].detalle = detalle || 'Sin cambios detectados'
               }
-              // If cambiado === true, no error — true success
             }
           } catch (dbErr) {
             const dbMsg = dbErr instanceof Error ? dbErr.message : String(dbErr)
