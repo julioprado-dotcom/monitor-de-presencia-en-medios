@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { enqueue } from '@/lib/jobs/queue'
 import { ensureWorkerRunning } from '@/lib/jobs'
+import { rescheduleAll } from '@/lib/jobs/scheduler'
 import { scrapingState } from '@/lib/scraping-state'
 
 // ── Configuración de fases ─────────────────────────────────────────
@@ -267,6 +268,10 @@ export async function POST(request: NextRequest) {
         console.log(
           `[ScrapingPhase] Fuentes: ${fuentes.map(f => f.medio.nombre).join(', ')}`,
         )
+
+        // Actualizar scheduler con las nuevas fuentes activas
+        ensureWorkerRunning()
+        await rescheduleAll()
 
         return NextResponse.json({
           exito: true,
