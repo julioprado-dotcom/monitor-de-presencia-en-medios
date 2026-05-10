@@ -9,6 +9,7 @@ import { getFrecuenciaEfectiva, frecuenciaToChecksDia } from './frequency/calcul
 import { calcularHorariosOptimos, getHorariosDefault } from './histogram/calculator'
 import { buildCronEntries, getBoletinCronEntries, getMantenimientoCronEntry, formatCronHuman } from './histogram/cron-builder'
 import { CHECK_FIRST_CONFIG, QUEUE_LIMITS } from './constants'
+import { determinarCapa, descripcionCapa, evaluarDegradacionMasiva } from './source-lifecycle'
 
 // ─── Estado compartido via globalThis ──────────────────────────────
 // IMPORTANTE: En Next.js con Turbopack, instrumentation.ts y los API routes
@@ -66,7 +67,7 @@ export function stopScheduler(): void {
   console.log('[Scheduler] Detenido')
 }
 
-// Programar checks para todas las fuentes activas
+// Programar checks para todas las fuentes activas (lifecycle: estado='activa')
 async function scheduleCheckJobs(): Promise<void> {
   const fuentes = await db.fuenteEstado.findMany({
     where: { estado: 'activa' },
@@ -79,9 +80,31 @@ async function scheduleCheckJobs(): Promise<void> {
   }
 
   let scheduledCount = 0
+  let omitidasPorCapa = 0
 
   for (const fuente of fuentes) {
     try {
+      // Lifecycle check: verificar capa mínima de capacidad
+      const capa = determinarCapa({
+        ultimoCheckOk: fuente.ultimoCheckOk,
+        ultimoHeadline: fuente.ultimoHeadline,
+        ultimoTexto: fuente.ultimoTexto,
+        ultimoMencion: fuente.ultimoMencion,
+        estado: fuente.estado || 'creada',
+        activo: fuente.activo,
+        fallosConsecutivos: fuente.fallosConsecutivos || 0,
+      })
+
+      if (capa < 1) {
+        // Capa 0: fuente sin check OK reciente — no programar
+        omitidasPorCapa++
+        console.log(
+          `[Scheduler] ${fuente.medio.nombre}: omitida (capa ${capa} — sin check OK reciente). ` +
+          `El scheduler la intentará de nuevo en el próximo ciclo de mantenimiento.`
+        )
+        continue
+      }
+
       const count = scheduleFuente(fuente)
       scheduledCount += count
     } catch (error) {
@@ -90,7 +113,10 @@ async function scheduleCheckJobs(): Promise<void> {
     }
   }
 
-  console.log(`[Scheduler] Programados checks para ${fuentes.length} fuentes (${scheduledCount} tareas)`)
+  if (omitidasPorCapa > 0) {
+    console.warn(`[Scheduler] ${omitidasPorCapa} fuentes omitidas por capa 0 (sin respuesta reciente)`)
+  }
+  console.log(`[Scheduler] Programados checks para ${fuentes.length} fuentes (${scheduledCount} tareas, ${omitidasPorCapa} omitidas por capa 0)`)
 }
 
 // Programar checks para una fuente individual
@@ -332,8 +358,9 @@ function scheduleMaintenanceJob(): void {
         prioridad: 9,
         payload: {
           tareas: [
-            'recalcular_horarios',
             'degradar_fuentes',
+            'recalcular_horarios',
+            'recalcular_scheduler',
             'limpiar_jobs',
           ],
         },

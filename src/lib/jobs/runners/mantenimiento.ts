@@ -12,6 +12,7 @@ import { batchRecalcularHorarios } from '../histogram/tracker'
 import type { JobPayload, RunnerResult, MantenimientoResult, TareaMantenimiento } from '../types'
 import { QUEUE_LIMITS } from '../constants'
 import { createSnapshot, archiveBeforePurge } from '@/lib/backup'
+import { evaluarDegradacionMasiva } from '../source-lifecycle'
 
 export async function run(payload: JobPayload): Promise<RunnerResult> {
   const tareas = (payload.tareas as TareaMantenimiento[]) || [
@@ -124,11 +125,22 @@ async function ejecutarTarea(tarea: TareaMantenimiento): Promise<MantenimientoRe
     }
 
     case 'degradar_fuentes': {
-      const count = await batchDegradar()
+      // 1. Degradación por frequency adapter (fuentes sin cambios por mucho tiempo)
+      const freqDegradadas = await batchDegradar()
+
+      // 2. Degradación por lifecycle engine (fallos consecutivos, tiempo sin check OK, inactiva→deprecada)
+      const lifecycleResult = await evaluarDegradacionMasiva()
+
+      const totalDegradadas = freqDegradadas + lifecycleResult.degradadas
+      const detalles = lifecycleResult.detalles.map(d => `${d.nombre}: ${d.accion}`).join('; ')
+      const detalleLifecycle = lifecycleResult.degradadas > 0
+        ? ` [lifecycle: ${detalles}]`
+        : ''
+
       return {
         tarea,
         completada: true,
-        detalle: `${count} fuentes degradadas por inactividad`,
+        detalle: `${totalDegradadas} fuentes degradadas (${freqDegradadas} frecuencia, ${lifecycleResult.degradadas} lifecycle de ${lifecycleResult.evaluadas} evaluadas)${detalleLifecycle}`,
       }
     }
 
