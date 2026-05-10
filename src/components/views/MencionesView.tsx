@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Eye, Newspaper, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Eye, Newspaper, RefreshCw, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -70,7 +70,7 @@ export function MencionesView() {
                 Registro de menciones
               </CardTitle>
               <CardDescription className="text-xs mt-1">
-                Total: {mencionesTotal} menciones
+                Total: {mencionesTotal} menciones — haga clic en una fila para abrir la fuente original
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -100,9 +100,12 @@ export function MencionesView() {
                 </TableHeader>
                 <TableBody>
                   {menciones.map((m) => (
-                    <TableRow key={m.id}>
+                    <TableRow key={m.id} className="cursor-pointer hover:bg-muted/80 group" onClick={() => m.url && window.open(m.url, '_blank', 'noopener,noreferrer')}>
                       <TableCell className="py-2.5">
-                        <p className="text-sm font-medium text-foreground max-w-[140px] truncate">{m.persona?.nombre || m.titulo?.substring(0, 30) || '—'}</p>
+                        <p className="text-sm font-medium text-foreground max-w-[140px] truncate flex items-center gap-1">
+                          {m.persona?.nombre || m.titulo?.substring(0, 30) || '—'}
+                          {m.url && <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />}
+                        </p>
                       </TableCell>
                       <TableCell className="py-2.5 text-xs text-muted-foreground hidden sm:table-cell">{m.persona?.camara || '—'}</TableCell>
                       <TableCell className="py-2.5 hidden md:table-cell">
