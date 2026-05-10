@@ -163,6 +163,12 @@ async function ejecutarEstrategia(
           estrategia,
         }
         datosActualizacion.fingerprint = zaiResult.hash
+
+        // Si hubo cambio, guardar HTML para que scrape-fuente no tenga que descargarlo de nuevo
+        if (hashChanged && zaiResult.html) {
+          datosActualizacion.homepageHtml = zaiResult.html
+        }
+
         return result
       }
 

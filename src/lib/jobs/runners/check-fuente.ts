@@ -21,12 +21,20 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
 
     if (result.cambiado) {
       // Encolar scrape_fuente automaticamente al detectar cambio
+      // Si check-first (Z.ai) descargó el HTML, pasarlo en el payload para evitar doble descarga
       if (medioId) {
         const urls = (result.datosNuevos as Array<{link?: string}> | undefined)
           ?.map(d => d.link).filter(Boolean)
+        const homepageHtml = (result.datosActualizacion as Record<string, unknown> | undefined)
+          ?.homepageHtml as string | undefined
         await enqueue({
           tipo: 'scrape_fuente',
-          payload: { fuenteId, medioId, ...(urls?.length ? { urls } : {}) },
+          payload: {
+            fuenteId,
+            medioId,
+            ...(urls?.length ? { urls } : {}),
+            ...(homepageHtml ? { homepageHtml } : {}),
+          },
           prioridad: 1, // alta prioridad para scrape tras cambio detectado
         }).catch(err => {
           console.warn(`[check-fuente] Error encolando scrape para fuente ${fuenteId}:`, err)

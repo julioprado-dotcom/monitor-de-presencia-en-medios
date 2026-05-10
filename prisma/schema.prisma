@@ -338,6 +338,7 @@ model FuenteEstado {
   fingerprint      String   @default("")          // SHA-256 del contenido
   ultimoValor      String   @default("")          // Último valor capturado (para APIs)
   ultimosIds       String   @default("[]")        // JSON: IDs de las últimas entries RSS
+  homepageHtml     String   @default("")          // Cache: HTML homepage (Z.ai) para reuse por scrape
 
   // Métricas
   ultimoCheck      DateTime?

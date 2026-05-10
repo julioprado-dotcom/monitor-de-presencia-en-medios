@@ -124,6 +124,7 @@ export async function zaiFingerprint(url: string): Promise<{
   hash: string
   title: string
   length: number
+  html?: string
 } | null> {
   const page = await zaiFetch(url)
   if (!page) return null
@@ -144,6 +145,7 @@ export async function zaiFingerprint(url: string): Promise<{
     hash,
     title: page.title,
     length: normalized.length,
+    html: page.html, // pasar HTML para que scrape-fuente lo reutilice
   }
 }
 
