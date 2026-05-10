@@ -9,6 +9,7 @@ import { registrarCambio } from '../histogram/tracker'
 import { evaluarFrecuencia } from '../frequency/adapter'
 import type { JobPayload, RunnerResult } from '../types'
 import { extraerTextoDeHtml, extraerMencionesDeTexto, crearMencionesExtraidas, type ExtractionResult } from '@/lib/ai/extractor-menciones'
+import { zaiFetch } from '../fetch/zai-fetcher'
 
 export async function run(payload: JobPayload): Promise<RunnerResult> {
   const fuenteId = payload.fuenteId as string
@@ -42,34 +43,65 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
 
     for (const url of urlsToScrape) {
       try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), CHECK_FIRST_CONFIG.timeoutMs)
+        let html = ''
+        let titulo = ''
+        let status = 0
+        let usedZai = false
 
-        // Rate limiting por dominio anti-ban
-        await domainRateLimiter.waitIfNecessary(url)
+        // ── Intento 1: fetch directo ──
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), CHECK_FIRST_CONFIG.timeoutMs)
 
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': getRandomUserAgent(),
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'es-BO,es;q=0.9,en;q=0.8',
-            'Accept-Encoding': 'gzip, deflate',
-          },
-          signal: controller.signal,
-        })
-        domainRateLimiter.recordRequest(url)
-        clearTimeout(timeoutId)
+          // Rate limiting por dominio anti-ban
+          await domainRateLimiter.waitIfNecessary(url)
 
-        if (!response.ok) {
-          resultados.push({ url, status: response.status, titulo: '', menciones: 0 })
-          continue
+          const response = await fetch(url, {
+            headers: {
+              'User-Agent': getRandomUserAgent(),
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'es-BO,es;q=0.9,en;q=0.8',
+              'Accept-Encoding': 'gzip, deflate',
+            },
+            signal: controller.signal,
+          })
+          domainRateLimiter.recordRequest(url)
+          clearTimeout(timeoutId)
+
+          if (response.ok) {
+            html = await response.text()
+            status = response.status
+          }
+        } catch (fetchError) {
+          const fetchMsg = fetchError instanceof Error ? fetchError.message : String(fetchError)
+          console.warn(`[scrape-fuente] fetch directo fallo para ${url}: ${fetchMsg}`)
         }
 
-        const html = await response.text()
+        // ── Intento 2: Z.ai page_reader (fallback) ──
+        if (!html) {
+          console.log(`[scrape-fuente] Intentando Z.ai page_reader para ${url}...`)
+          const zaiResult = await zaiFetch(url)
+          if (zaiResult) {
+            html = zaiResult.html
+            titulo = zaiResult.title
+            status = 200
+            usedZai = true
+            console.log(`[scrape-fuente] Z.ai exitoso para ${url} (${html.length} chars)`)
+          } else {
+            console.error(`[scrape-fuente] Z.ai tambien fallo para ${url}`)
+            resultados.push({ url, status: 0, titulo: '', menciones: 0 })
+            await db.capturaLog.create({
+              data: { medioId, nivel: fuente.medio.nivel, exitosa: false, errores: 'fetch + Z.ai fallaron' },
+            })
+            continue
+          }
+        }
 
         // 3. Extraer titulo y texto del contenido
-        const tituloMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
-        const titulo = tituloMatch ? tituloMatch[1].trim() : ''
+        if (!titulo) {
+          const tituloMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+          titulo = tituloMatch ? tituloMatch[1].trim() : ''
+        }
         const texto = extraerTextoDeHtml(html)
 
         // 4. Extraer menciones con LLM si hay suficiente texto
@@ -96,7 +128,7 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
           },
         })
 
-        resultados.push({ url, status: response.status, titulo, menciones: mencionesEncontradas })
+        resultados.push({ url, status, titulo, menciones: mencionesEncontradas })
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error)
         resultados.push({ url, status: 0, titulo: '', menciones: 0 })
