@@ -47,3 +47,24 @@ Stage Summary:
 - DB ahora persiste via repo (prisma/db/custom.db trackeada en git)
 - Sandbox ya no puede perder datos operacionales al destruirse
 - Backup automático cada 6h/100 ciclos con rotación de 5 archivos
+
+---
+Task ID: 4a
+Agent: Main Agent
+Task: Axis 4A — Analizar dashboard actual y mapear sidebar a widgets
+
+Work Log:
+- Leído src/constants/nav.ts: 18 secciones sidebar en 4 grupos (Analisis, ONION200, Gestion Comercial, Configuracion)
+- Leído src/components/dashboard/DashboardShell.tsx: sidebar con grupos colapsables, prominent styling por color
+- Leído src/components/dashboard/DashboardCommandCenter.tsx: 10 componentes de seccion existentes
+- Leído src/components/dashboard/CollapsibleWidget.tsx: componente base 3-tier ya implementado
+- Leído docs/HOJA_DE_RUTA_2026-05-11.md secciones 4.1-4.7: especificacion completa del dashboard
+- Analizado 10 componentes existentes: SystemStatusOrbs, EntregasHoy, CategoryCardsGrid, ActivityFeed, QuickActions, CachePressurePanel, PipelineMonitor, ScrapingPhaseControl, TopVariations, AlarmasComerciales
+- Creado docs/DASHBOARD_DESIGN.md con mapeo completo 18 secciones sidebar ↔ widgets
+- Identificados: 8 widgets a crear, 9 a refactorizar, 16 APIs summary a crear
+
+Stage Summary:
+- Commit e5d92b8: "axis-4a: mapeo sidebar-dashboard + diseño completo"
+- Documento de diseño: docs/DASHBOARD_DESIGN.md (695 lineas)
+- Mapeo completo de 18 secciones sidebar con especificacion 3-tier por widget
+- Plan de implementacion definido para sub-bloques 4B-4E
