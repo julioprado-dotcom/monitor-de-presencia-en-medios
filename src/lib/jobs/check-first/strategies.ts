@@ -5,6 +5,7 @@
 import db from '@/lib/db'
 import { CHECK_FIRST_CONFIG, TIPO_CHECK_PATTERNS } from '../constants'
 import type { CheckResult, TipoCheck } from '../types'
+import { registrarResultadoCheck, determinarCapa, descripcionCapa } from '../source-lifecycle'
 import { checkRSS } from './rss'
 import { checkETag } from './etag'
 import { checkFingerprint } from './fingerprint'
@@ -309,21 +310,39 @@ export async function checkFuente(fuenteId: string): Promise<CheckResult & {
     datosActualizacionFinal.tipoCheck = estrategiaExitosa
   }
 
-  // Update capacity demonstration timestamps
-  datosActualizacionFinal.ultimoCheckOk = new Date()
-  datosActualizacionFinal.strategyValid = estrategiaExitosa
+  // ─── 3. Determinar resultado: éxito si AL MENOS UNA estrategia funcionó ─
+  const checkExitoso = !!estrategiaExitosa
 
-  // If source is "validando" or "creada" and check succeeded, promote to "activa"
-  if (fuente.estado === 'validando' || fuente.estado === 'creada') {
-    datosActualizacionFinal.estado = 'activa'
-    datosActualizacionFinal.activo = true
-    console.log(`[CheckFirst] ${fuente.medio.nombre}: promovida de "${fuente.estado || 'creada'}" a "activa"`)
+  // Update capacity demonstration timestamps — SOLO si hubo éxito
+  if (checkExitoso) {
+    datosActualizacionFinal.ultimoCheckOk = new Date()
+    datosActualizacionFinal.strategyValid = estrategiaExitosa
+    datosActualizacionFinal.capaActual = determinarCapa({
+      ultimoCheckOk: new Date(),
+      ultimoHeadline: fuente.ultimoHeadline,
+      ultimoTexto: fuente.ultimoTexto,
+      ultimoMencion: fuente.ultimoMencion,
+      estado: fuente.estado || 'creada',
+      activo: fuente.activo,
+      fallosConsecutivos: 0, // Se acaba de resetear
+    })
+  }
+
+  // Lifecycle: registrar resultado del check (actualiza fallos, estado, capa)
+  const lifecycleResult = await registrarResultadoCheck(fuenteId, checkExitoso)
+  if (lifecycleResult.degradacion) {
+    console.warn(
+      `[CheckFirst] ${fuente.medio.nombre}: lifecycle degradación → ${lifecycleResult.degradacion.accion}`,
+    )
+  }
+  if (lifecycleResult.promovida) {
+    console.log(`[CheckFirst] ${fuente.medio.nombre}: lifecycle promoción a "activa" (capa ${lifecycleResult.capa})`)
   }
 
   // Si TODAS fallaron, marcar error
-  if (!estrategiaExitosa) {
+  if (!checkExitoso) {
     console.error(
-      `[CheckFirst] ${fuente.medio.nombre}: TODAS las estrategias fallaron:`,
+      `[CheckFirst] ${fuente.medio.nombre}: TODAS las estrategias fallaron (capa ${lifecycleResult.capa}, ${fuente.fallosConsecutivos + 1} fallos consecutivos):`,
       estrategiasProbadas.map(e => `${e.estrategia}(${e.exito ? 'OK' : 'FAIL'})`).join(', '),
     )
   }
