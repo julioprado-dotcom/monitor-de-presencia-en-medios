@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { EmptyState } from '@/components/shared/KPICard';
-import { SENTIMIENTO_STYLES, TIPO_MENCION_LABELS } from '@/constants/ui';
+import { TRATAMIENTO_STYLES, TRATAMIENTO_LABELS, TIPO_MENCION_LABELS } from '@/constants/ui';
 import type { MencionRow } from '@/types/dashboard';
 
 export function MencionesView() {
@@ -94,7 +94,7 @@ export function MencionesView() {
                     <TableHead className="text-xs">Medio</TableHead>
                     <TableHead className="text-xs hidden lg:table-cell">Título</TableHead>
                     <TableHead className="text-xs">Tipo</TableHead>
-                    <TableHead className="text-xs hidden sm:table-cell">Sentimiento</TableHead>
+                    <TableHead className="text-xs hidden sm:table-cell">Tratamiento</TableHead>
                     <TableHead className="text-xs hidden lg:table-cell">Fecha</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -102,7 +102,7 @@ export function MencionesView() {
                   {menciones.map((m) => (
                     <TableRow key={m.id}>
                       <TableCell className="py-2.5">
-                        <p className="text-sm font-medium text-foreground max-w-[140px] truncate">{m.persona?.nombre || '—'}</p>
+                        <p className="text-sm font-medium text-foreground max-w-[140px] truncate">{m.persona?.nombre || m.titulo?.substring(0, 30) || '—'}</p>
                       </TableCell>
                       <TableCell className="py-2.5 text-xs text-muted-foreground hidden sm:table-cell">{m.persona?.camara || '—'}</TableCell>
                       <TableCell className="py-2.5 hidden md:table-cell">
@@ -116,8 +116,8 @@ export function MencionesView() {
                         <span className="text-[10px] text-muted-foreground">{TIPO_MENCION_LABELS[m.tipoMencion] || m.tipoMencion}</span>
                       </TableCell>
                       <TableCell className="py-2.5 hidden sm:table-cell">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${SENTIMIENTO_STYLES[m.sentimiento] || SENTIMIENTO_STYLES.no_clasificado}`}>
-                          {m.sentimiento.replace('_', ' ')}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${TRATAMIENTO_STYLES[m.tratamientoPeriodistico] || TRATAMIENTO_STYLES.sin_tratamiento}`}>
+                          {TRATAMIENTO_LABELS[m.tratamientoPeriodistico] || 'S/C'}
                         </span>
                       </TableCell>
                       <TableCell className="py-2.5 text-xs text-muted-foreground hidden lg:table-cell">

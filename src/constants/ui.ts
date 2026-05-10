@@ -28,18 +28,49 @@ export const PARTIDO_TEXT_COLORS: Record<string, string> = {
 export const SENTIMIENTO_STYLES: Record<string, string> = {
   positivo: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
   negativo: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+  neutro: 'bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300',
   neutral: 'bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300',
+  mixto: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
   critico: 'bg-red-200 text-red-900 dark:bg-red-900/50 dark:text-red-200',
   elogioso: 'bg-green-200 text-green-900 dark:bg-green-900/40 dark:text-green-300',
   no_clasificado: 'bg-stone-50 text-stone-500 dark:bg-stone-800 dark:text-stone-400',
 };
 
+// Styles for tratamiento periodístico (the actual LLM classification)
+export const TRATAMIENTO_STYLES: Record<string, string> = {
+  tratamiento_informativo: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
+  tratamiento_analitico: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
+  tratamiento_critico: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+  tratamiento_editorial: 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300',
+  tratamiento_agresivo: 'bg-red-200 text-red-900 dark:bg-red-900/50 dark:text-red-200',
+  tratamiento_elogioso: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+  tratamiento_ambiguo: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  sin_tratamiento: 'bg-stone-50 text-stone-500 dark:bg-stone-800 dark:text-stone-400',
+};
+
+// Short display labels for tratamiento periodístico
+export const TRATAMIENTO_LABELS: Record<string, string> = {
+  tratamiento_informativo: 'Informativo',
+  tratamiento_analitico: 'Analítico',
+  tratamiento_critico: 'Crítico',
+  tratamiento_editorial: 'Editorial',
+  tratamiento_agresivo: 'Agresivo',
+  tratamiento_elogioso: 'Elogioso',
+  tratamiento_ambiguo: 'Ambiguo',
+  sin_tratamiento: 'S/C',
+};
+
 export const TIPO_MENCION_LABELS: Record<string, string> = {
-  cita_directa: 'Cita directa',
+  mencion_directa: 'Cita directa',
   mencion_pasiva: 'Mención pasiva',
+  mencion_activa: 'Mención activa',
+  mencion_critica: 'Mención crítica',
+  referencia_tematica: 'Ref. temática',
+  cita_directa: 'Cita directa',
   cobertura_declaracion: 'Cob. declaración',
   contexto: 'En contexto',
   foto_video: 'Foto/Video',
+  no_clasificado: 'No clasificado',
 };
 
 export const NIVEL_LABELS: Record<string, string> = {

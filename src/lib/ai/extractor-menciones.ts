@@ -405,6 +405,20 @@ function tratamientoToSentimiento(tratamiento: string): string {
   }
 }
 
+/**
+ * Derive tipoMencion from tratamiento periodístico + presence of direct quote.
+ * - Direct quote + critical/aggressive treatment → mencion_critica
+ * - Direct quote + elogioso treatment → mencion_activa
+ * - Direct quote (neutral/other) → mencion_directa
+ * - No direct quote → mencion_pasiva
+ */
+function tratamientoToTipoMencion(tratamiento: string, tieneCitaDirecta: boolean): string {
+  if (!tieneCitaDirecta) return 'mencion_pasiva';
+  if (tratamiento === 'tratamiento_critico' || tratamiento === 'tratamiento_agresivo') return 'mencion_critica';
+  if (tratamiento === 'tratamiento_elogioso') return 'mencion_activa';
+  return 'mencion_directa';
+}
+
 // ─── Main extraction function ─────────────────────────────────
 
 /**
@@ -727,7 +741,7 @@ export async function crearMencionesExtraidas(
     intencionMedio: resultado.intencionMedio,
     confianzaClasificacion: resultado.confianzaClasificacion,
     preguntasFundamentales: resultado.preguntas_fundamentales as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    sentimiento: resultado.tratamientoPeriodistico, // compatibility mapping
+    sentimiento: resultado.sentimiento_general, // backward-compatible sentiment from tratamiento
     temas: resultado.temas_detectados.join(', '),
   };
 
@@ -789,7 +803,7 @@ export async function crearMencionesExtraidas(
           texto: leg.cita,
           textoCompleto: leg.contexto,
           url,
-          tipoMencion: 'no_clasificado',
+          tipoMencion: tratamientoToTipoMencion(resultado.tratamientoPeriodistico, Boolean(leg.cita)),
           verificado: false,
           ...(dedupResult?.eventoId ? { eventoId: dedupResult.eventoId } : {}),
           deduplicacionLog: dedupLog,

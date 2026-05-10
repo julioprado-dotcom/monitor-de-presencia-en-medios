@@ -2,6 +2,29 @@ import { Prisma } from '@prisma/client';
 import ZAI from 'z-ai-web-dev-sdk';
 import db from '@/lib/db';
 
+// ─── Helpers ──────────────────────────────────────────────────
+
+/**
+ * Map tratamiento_periodistico to backward-compatible sentimiento.
+ */
+function tratamientoToSentimiento(tratamiento: string): string {
+  switch (tratamiento) {
+    case 'tratamiento_informativo':
+    case 'tratamiento_analitico':
+    case 'tratamiento_editorial':
+      return 'neutro';
+    case 'tratamiento_critico':
+    case 'tratamiento_agresivo':
+      return 'negativo';
+    case 'tratamiento_elogioso':
+      return 'positivo';
+    case 'tratamiento_ambiguo':
+      return 'mixto';
+    default:
+      return 'no_clasificado';
+  }
+}
+
 // ─── Ejes temáticos disponibles ────────────────────────────────
 
 export const EJES_TEMATICOS = [
@@ -324,7 +347,7 @@ export async function analyzeMencion(titulo: string, texto: string): Promise<Ana
 
     return {
       tipoMencion: parsed.tipoMencion || 'contexto',
-      sentimiento: tratamientoRaw,               // backward compat
+      sentimiento: tratamientoToSentimiento(tratamientoRaw),
       tratamientoPeriodistico: tratamientoRaw,
       intencionMedio,
       confianzaClasificacion: confianzaValida,
@@ -344,7 +367,7 @@ export async function applyAnalysisToMencion(mencionId: string, result: AnalyzeR
     where: { id: mencionId },
     data: {
       tipoMencion: result.tipoMencion,
-      sentimiento: result.tratamientoPeriodistico,       // compatibility mapping
+      sentimiento: result.sentimiento,
       tratamientoPeriodistico: result.tratamientoPeriodistico,
       intencionMedio: result.intencionMedio,              // FASE 4D
       confianzaClasificacion: result.confianzaClasificacion,

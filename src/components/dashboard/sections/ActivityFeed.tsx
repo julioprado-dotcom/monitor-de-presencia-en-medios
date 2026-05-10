@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from '@/components/ui/table';
 import { Newspaper, Monitor, ChevronRight } from 'lucide-react';
 import { MiniGauge } from '@/components/dashboard/gauges/MiniGauge';
-import { TIPO_MENCION_LABELS, SENTIMIENTO_STYLES } from '@/constants/ui';
+import { TIPO_MENCION_LABELS, TRATAMIENTO_STYLES, TRATAMIENTO_LABELS } from '@/constants/ui';
 import type { DashboardData, MediosHealthData } from '@/types/dashboard';
 
 // ─── Animation variants (local to this section) ──────────────
@@ -68,7 +68,7 @@ export function ActivityFeed({ data, mediosHealth, setActiveView }: ActivityFeed
                       <TableHead className="text-[10px] h-7">Legislador</TableHead>
                       <TableHead className="text-[10px] h-7 hidden sm:table-cell">Medio</TableHead>
                       <TableHead className="text-[10px] h-7">Tipo</TableHead>
-                      <TableHead className="text-[10px] h-7 hidden md:table-cell">Sent.</TableHead>
+                      <TableHead className="text-[10px] h-7 hidden md:table-cell">Trat.</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -76,8 +76,8 @@ export function ActivityFeed({ data, mediosHealth, setActiveView }: ActivityFeed
                       <TableRow key={m.id} className="hover:bg-muted/50">
                         <TableCell className="py-1.5 px-2">
                           <div className="min-w-0">
-                            <p className="text-[11px] font-medium text-foreground truncate max-w-[100px]">{m.persona?.nombre || '—'}</p>
-                            <p className="text-[9px] text-muted-foreground">{m.persona?.partidoSigla}</p>
+                            <p className="text-[11px] font-medium text-foreground truncate max-w-[100px]">{m.persona?.nombre || m.titulo?.substring(0, 25) || '—'}</p>
+                            <p className="text-[9px] text-muted-foreground">{m.persona?.partidoSigla || (m.tipoMencion === 'referencia_tematica' ? 'Temático' : '')}</p>
                           </div>
                         </TableCell>
                         <TableCell className="py-1.5 px-2 hidden sm:table-cell">
@@ -89,8 +89,8 @@ export function ActivityFeed({ data, mediosHealth, setActiveView }: ActivityFeed
                           </Badge>
                         </TableCell>
                         <TableCell className="py-1.5 px-2 hidden md:table-cell">
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${SENTIMIENTO_STYLES[m.sentimiento] || SENTIMIENTO_STYLES.no_clasificado}`}>
-                            {m.sentimiento?.replace('_', ' ') || '—'}
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${TRATAMIENTO_STYLES[m.tratamientoPeriodistico] || TRATAMIENTO_STYLES.sin_tratamiento}`}>
+                            {TRATAMIENTO_LABELS[m.tratamientoPeriodistico] || 'S/C'}
                           </span>
                         </TableCell>
                       </TableRow>

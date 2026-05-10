@@ -37,6 +37,8 @@ export interface MencionRow {
   url: string;
   tipoMencion: string;
   sentimiento: string;
+  tratamientoPeriodistico: string;
+  intencionMedio: string;
   temas: string;
   fechaCaptura: string;
   enlaceActivo: boolean;
@@ -44,7 +46,7 @@ export interface MencionRow {
   textoCompleto: string;
   comentariosCount: number;
   comentariosResumen: string;
-  persona: { id: string; nombre: string; partidoSigla: string; camara: string };
+  persona: { id: string; nombre: string; partidoSigla: string; camara: string } | null;
   medio: { id: string; nombre: string; tipo: string };
 }
 
