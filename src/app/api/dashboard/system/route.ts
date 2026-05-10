@@ -211,7 +211,10 @@ function diagnoseDevOverhead(): Diagnosis {
   }
 }
 
-function diagnoseWorker(stats: ReturnType<typeof getWorkerStats>): Diagnosis {
+function diagnoseWorker(
+  stats: ReturnType<typeof getWorkerStats>,
+  schedulerStats?: ReturnType<typeof getSchedulerStatus>,
+): Diagnosis {
   if (!stats.running) {
     return {
       id: 'worker',
@@ -222,16 +225,72 @@ function diagnoseWorker(stats: ReturnType<typeof getWorkerStats>): Diagnosis {
       team: 'desarrollo',
     };
   }
+
+  // Worker corriendo — verificar estado del scheduler para determinar si esta activo o esperando
+  const schedulerOk = schedulerStats
+    ? schedulerStats.running && schedulerStats.totalTasks > 0
+    : false
+  const schedulerStopped = schedulerStats
+    ? !schedulerStats.running
+    : true
+  const schedulerSinTareas = schedulerStats
+    ? schedulerStats.running && schedulerStats.totalTasks === 0
+    : false
+
   if (stats.lastJobTime === null) {
+    // Worker corriendo pero sin jobs completados en esta sesion.
+    // Al reiniciar el servidor, el worker se reprograma automaticamente.
+    // Si el scheduler esta activo con tareas, el worker esta ESPERANDO
+    // el proximo horario programado — NO esta "sin actividad".
+    // Solo es un problema si el scheduler TAMBIEN tiene problemas.
+
+    if (schedulerStopped) {
+      return {
+        id: 'worker',
+        severity: 'warning',
+        message: 'Worker esperando (scheduler detenido)',
+        detail: `Worker activo hace ${stats.uptime} sin completar jobs. Scheduler no esta corriendo — no hay tareas programadas.`,
+        action: 'Reiniciar scheduler: /api/jobs/scheduler con accion=recalcular.',
+        team: 'administrador',
+      };
+    }
+
+    if (schedulerSinTareas) {
+      return {
+        id: 'worker',
+        severity: 'warning',
+        message: 'Worker esperando (sin tareas)',
+        detail: `Worker activo hace ${stats.uptime} sin completar jobs. Scheduler corriendo pero sin tareas programadas.`,
+        action: 'Verificar fuentes activas. Usar /api/jobs/scheduler con accion=recalcular.',
+        team: 'administrador',
+      };
+    }
+
+    // Scheduler activo con tareas — worker esta ESPERANDO, no sin actividad.
+    // El connectivity_test ya se encolo como primera tarea post-restart.
     return {
       id: 'worker',
-      severity: 'warning',
-      message: 'Worker sin actividad',
-      detail: `Worker corriendo hace ${stats.uptime} pero sin jobs procesados. Puede no haber fuentes activas o tareas programadas.`,
-      action: 'Verificar fuentes activas y scheduler. Usar /api/scraping/phase para iniciar monitoreo.',
-      team: 'administrador',
+      severity: 'ok',
+      message: 'Worker esperando',
+      detail: `Worker activo hace ${stats.uptime}. Esperando proximo job programado (scheduler: ${schedulerStats?.totalTasks ?? 0} tareas). Primera tarea: connectivity_test.`,
     };
   }
+
+  // Worker con actividad — verificar que no este idle demasiado tiempo con jobs pendientes
+  const idleMs = stats.lastJobTime ? Date.now() - stats.lastJobTime.getTime() : 0
+  const idleMinutes = Math.floor(idleMs / 60000)
+
+  if (idleMinutes > 120 && schedulerOk) {
+    // Mas de 2 horas sin completar un job pero scheduler activo — podria ser normal
+    // (fuera de horarios programados) o podria indicar un problema de dequeue.
+    return {
+      id: 'worker',
+      severity: 'ok',
+      message: 'Worker en espera',
+      detail: `${stats.jobsCompleted} completados, ${stats.jobsFailed} fallidos (${stats.jobsPerHour} jobs/h). Ultimo job hace ${idleMinutes}m. Scheduler: ${schedulerStats?.totalTasks ?? 0} tareas activas.`,
+    };
+  }
+
   return {
     id: 'worker',
     severity: 'ok',
@@ -320,7 +379,7 @@ export async function GET() {
 
     // --- Diagnósticos ---
     const diagnoses: Diagnosis[] = [
-      diagnoseWorker(workerStats),
+      diagnoseWorker(workerStats, schedulerStatus),
       diagnoseScheduler(schedulerStatus),
       diagnoseMemory(mem, heapLimit, cgroup),
       diagnoseContainer(cgroup),

@@ -14,6 +14,7 @@ import { run as runGenerarBoletin } from './runners/generar-boletin'
 import { run as runEnviarEntrega } from './runners/enviar-entrega'
 import { run as runVerificarEnlaces } from './runners/verificar-enlaces'
 import { run as runMantenimiento } from './runners/mantenimiento'
+import { run as runConnectivityTest } from './runners/connectivity-test'
 
 // Registro de runners por tipo de job
 const runners = new Map<string, RunnerFn>()
@@ -195,7 +196,10 @@ export function registerDefaultRunners(): void {
   registerRunner('verificar_enlaces', runVerificarEnlaces)
   registerRunner('mantenimiento', runMantenimiento)
 
-  console.log('[Worker] Runners registrados (8 tipos)')
+  // Startup
+  registerRunner('connectivity_test', runConnectivityTest)
+
+  console.log('[Worker] Runners registrados (9 tipos)')
 }
 
 function sleep(ms: number): Promise<void> {

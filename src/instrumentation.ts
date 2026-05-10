@@ -24,7 +24,8 @@ export async function register() {
       `${recovery.diagnostico.conteos.personas} personas, ` +
       `${recovery.diagnostico.conteos.medios} medios, ` +
       `${recovery.diagnostico.conteos.fuentes} fuentes, ` +
-      `${recovery.diagnostico.conteos.ejes} ejes`
+      `${recovery.diagnostico.conteos.ejes} ejes, ` +
+      `MC: ${recovery.diagnostico.conteos.marcoConceptual ? 'activo' : 'NO configurado'}`
     )
 
     // 1. Iniciar Job System (worker, scheduler, health monitor)

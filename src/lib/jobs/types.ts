@@ -13,6 +13,7 @@ export type JobTipo =
   | 'enviar_entrega'
   | 'verificar_enlaces'
   | 'mantenimiento'
+  | 'connectivity_test'
 
 export type JobPrioridad = 0 | 1 | 3 | 5 | 7 | 9
 

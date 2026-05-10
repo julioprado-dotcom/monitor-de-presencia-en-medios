@@ -10,19 +10,33 @@ import { calcularHorariosOptimos, getHorariosDefault } from './histogram/calcula
 import { buildCronEntries, getBoletinCronEntries, getMantenimientoCronEntry, formatCronHuman } from './histogram/cron-builder'
 import { CHECK_FIRST_CONFIG, QUEUE_LIMITS } from './constants'
 
-// Tareas programadas activas
-const scheduledTasks: ScheduledTask[] = []
+// ─── Estado compartido via globalThis ──────────────────────────────
+// IMPORTANTE: En Next.js con Turbopack, instrumentation.ts y los API routes
+// corren en contextos de modulo diferentes. Por eso usamos globalThis
+// (igual que worker.ts) para compartir estado entre contextos.
 
-// Estado del scheduler
-let schedulerRunning = false
+interface SchedulerGlobalState {
+  running: boolean
+  tasks: ScheduledTask[]
+}
+
+const _gs = globalThis as unknown as { __decodex_scheduler__: SchedulerGlobalState | undefined }
+
+function getState(): SchedulerGlobalState {
+  if (!_gs.__decodex_scheduler__) {
+    _gs.__decodex_scheduler__ = { running: false, tasks: [] }
+  }
+  return _gs.__decodex_scheduler__
+}
 
 // Iniciar el scheduler (llamar una sola vez)
 export async function startScheduler(): Promise<void> {
-  if (schedulerRunning) {
+  const state = getState()
+  if (state.running) {
     console.log('[Scheduler] Ya esta corriendo')
     return
   }
-  schedulerRunning = true
+  state.running = true
 
   console.log('[Scheduler] Iniciando programacion de jobs...')
 
@@ -35,16 +49,17 @@ export async function startScheduler(): Promise<void> {
   // 3. Programar mantenimiento nocturno
   scheduleMaintenanceJob()
 
-  console.log(`[Scheduler] ${scheduledTasks.length} tareas programadas`)
+  console.log(`[Scheduler] ${getState().tasks.length} tareas programadas`)
 }
 
 // Detener el scheduler
 export function stopScheduler(): void {
-  for (const task of scheduledTasks) {
+  const state = getState()
+  for (const task of state.tasks) {
     task.stop()
   }
-  scheduledTasks.length = 0
-  schedulerRunning = false
+  state.tasks.length = 0
+  state.running = false
   console.log('[Scheduler] Detenido')
 }
 
@@ -199,7 +214,7 @@ function scheduleSingleCheck(
     }
   })
 
-  scheduledTasks.push(task)
+  getState().tasks.push(task)
 }
 
 // Programar generacion de boletines ONION200
@@ -230,7 +245,7 @@ function scheduleBoletinJobs(): void {
       }
     })
 
-    scheduledTasks.push(task)
+    getState().tasks.push(task)
   }
 
   console.log(`[Scheduler] Programados ${entries.length} boletines ONION200`)
@@ -261,7 +276,7 @@ function scheduleMaintenanceJob(): void {
     }
   })
 
-  scheduledTasks.push(task)
+  getState().tasks.push(task)
   console.log('[Scheduler] Mantenimiento nocturno programado (04:00 AM)')
 }
 
@@ -271,10 +286,11 @@ export function getSchedulerStatus(): {
   totalTasks: number
   tasks: { expresion: string; humana: string }[]
 } {
+  const state = getState()
   return {
-    running: schedulerRunning,
-    totalTasks: scheduledTasks.length,
-    tasks: scheduledTasks.map(task => {
+    running: state.running,
+    totalTasks: state.tasks.length,
+    tasks: state.tasks.map(task => {
       // node-cron no expone la expresion directamente, pero podemos inferirla
       // del getHumanReadable si esta disponible
       const options = (task as unknown as { getOptions?: () => { expression: string } }).getOptions?.()
@@ -293,14 +309,14 @@ export async function rescheduleAll(): Promise<void> {
 
   // Detener tareas existentes
   stopScheduler()
-  schedulerRunning = true // mantener flag
+  getState().running = true // mantener flag
 
   // Re-programar
   await scheduleCheckJobs()
   scheduleBoletinJobs()
   scheduleMaintenanceJob()
 
-  console.log(`[Scheduler] Reprogramacion completa: ${scheduledTasks.length} tareas`)
+  console.log(`[Scheduler] Reprogramacion completa: ${getState().tasks.length} tareas`)
 }
 
 // Helper: distribucion fallback

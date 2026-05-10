@@ -1,3 +1,5 @@
 #!/bin/bash
+# DECODEX Bolivia — Server startup script
+# Usage: bash start-server.sh
 cd /home/z/my-project/connect
-exec npx next dev --turbopack -p 3000
+exec ./node_modules/.bin/next start -p 3000

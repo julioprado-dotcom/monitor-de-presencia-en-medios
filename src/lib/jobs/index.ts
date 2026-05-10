@@ -9,14 +9,25 @@
 import { startWorker, stopWorker, registerDefaultRunners, getWorkerStats } from './worker'
 import { startHealthMonitor, stopHealthMonitor } from './health'
 import { startScheduler, stopScheduler } from './scheduler'
+import { enqueue } from './queue'
 
 
-let initialized = false
+// Flag de inicializacion via globalThis — en Next.js Turbopack,
+// instrumentation.ts y API routes corren en contextos de modulo
+// diferentes. Module-level variables NO se comparten.
+const _gi = globalThis as unknown as { __decodex_jobs_initialized__: boolean | undefined }
+
+function isInitialized(): boolean {
+  return _gi.__decodex_jobs_initialized__ === true
+}
+function setInitialized(v: boolean): void {
+  _gi.__decodex_jobs_initialized__ = v
+}
 
 // Iniciar todo el sistema (llamar una sola vez)
 export async function initJobSystem(): Promise<void> {
-  if (initialized) return
-  initialized = true
+  if (isInitialized()) return
+  setInitialized(true)
 
   console.log('[Jobs] Iniciando sistema de Job Queue...')
 
@@ -25,6 +36,18 @@ export async function initJobSystem(): Promise<void> {
 
   // 2. Iniciar worker (background loop)
   startWorker()
+
+  // 2b. Primera tarea del worker: test de conectividad
+  // Al reiniciar, el worker debe verificar que puede contactar el mundo exterior.
+  enqueue({
+    tipo: 'connectivity_test',
+    prioridad: 0,
+    payload: { reason: 'startup' },
+  }).then(jobId => {
+    console.log(`[Jobs] Connectivity test encolado (${jobId}) como primera tarea post-restart`)
+  }).catch(err => {
+    console.warn('[Jobs] Error encolando connectivity test:', (err as Error).message)
+  })
 
   // 3. Iniciar health monitor (cada 60s)
   startHealthMonitor()
@@ -75,6 +98,6 @@ export async function shutdownJobSystem(): Promise<void> {
   } catch { /* ya no estaba activo */ }
   stopHealthMonitor()
   stopWorker()
-  initialized = false
+  setInitialized(false)
   console.log('[Jobs] Sistema detenido')
 }
