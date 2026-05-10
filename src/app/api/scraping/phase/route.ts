@@ -70,9 +70,9 @@ let ultimoScrapeInicio: string | null = null
 
 export async function GET() {
   try {
-    // Contar fuentes activas en DB solo si hay fase activa
+    // Contar fuentes activas en DB solo si hay fase activa (usa lifecycle: estado='activa')
     const fuentesActivas = scrapingState.faseActual > 0
-      ? await db.fuenteEstado.count({ where: { activo: true } })
+      ? await db.fuenteEstado.count({ where: { estado: 'activa' } })
       : 0
 
     const fuentesTotales = await db.fuenteEstado.count()
@@ -200,25 +200,24 @@ export async function POST(request: NextRequest) {
 
         const faseConfig = FASES[targetFase - 1]
 
-        // Desactivar todas las fuentes primero (limpieza)
-        await db.fuenteEstado.updateMany({
-          data: { activo: false },
-        })
-
-        // Activar solo las fuentes de esta fase
+        // Seleccionar fuentes para esta fase — RESPETA lifecycle:
+        // - Fuentes "activa" (ya validadas): se incluyen directamente
+        // - Fuentes "validando" o "creada": se encolan para check-first (no se activan a ciegas)
+        // - Fuentes "inactiva" o "deprecada": se excluyen
         let fuentes
         if (faseConfig.fuentesEspecificas && faseConfig.fuentesEspecificas.length > 0) {
-          // Modo explícito: seleccionar medios por nombre exacto
+          // Modo explícito: seleccionar medios por nombre exacto (solo activas)
           fuentes = await db.fuenteEstado.findMany({
             where: {
-              medio: { nombre: { in: faseConfig.fuentesEspecificas } }
+              medio: { nombre: { in: faseConfig.fuentesEspecificas } },
+              estado: 'activa',
             },
             include: { medio: { select: { nombre: true, nivel: true } } },
             orderBy: { medio: { nombre: 'asc' } },
           })
         } else {
-          // Modo filtro: seleccionar por nivel y tomar maxFuentes
-          const whereClause: Record<string, unknown> = {}
+          // Modo filtro: seleccionar por nivel, solo fuentes activas (lifecycle)
+          const whereClause: Record<string, unknown> = { estado: 'activa' }
           if (faseConfig.filtros.nivel?.length) {
             whereClause.medio = { nivel: { in: faseConfig.filtros.nivel } }
           }
@@ -230,20 +229,44 @@ export async function POST(request: NextRequest) {
           })
         }
 
-        if (fuentes.length === 0) {
+        // También buscar fuentes "validando" o "creada" que podrían ser útiles para esta fase
+        // pero NO activarlas — solo reportar al operador
+        let fuentesPendientes = 0
+        if (faseConfig.fuentesEspecificas && faseConfig.fuentesEspecificas.length > 0) {
+          fuentesPendientes = await db.fuenteEstado.count({
+            where: {
+              medio: { nombre: { in: faseConfig.fuentesEspecificas } },
+              estado: { in: ['validando', 'creada'] },
+            },
+          })
+        } else if (faseConfig.filtros.nivel?.length) {
+          fuentesPendientes = await db.fuenteEstado.count({
+            where: {
+              medio: { nivel: { in: faseConfig.filtros.nivel } },
+              estado: { in: ['validando', 'creada'] },
+            },
+          })
+        }
+
+        if (fuentes.length === 0 && fuentesPendientes === 0) {
           return NextResponse.json(
             { error: 'No hay fuentes disponibles para esta fase. Ejecuta /api/seed-fuentes primero.' },
             { status: 400 },
           )
         }
 
-        // Activar las fuentes seleccionadas
-        for (const fuente of fuentes) {
-          await db.fuenteEstado.update({
-            where: { id: fuente.id },
-            data: { activo: true },
-          })
+        if (fuentes.length === 0 && fuentesPendientes > 0) {
+          return NextResponse.json(
+            {
+              error: `Hay ${fuentesPendientes} fuentes pendientes de validación para esta fase. Deja que el scheduler las valide (check-first) antes de activar la fase.`,
+              fuentesPendientes,
+            },
+            { status: 202 },
+          )
         }
+
+        // NO desactivar todas las fuentes — eso rompería el lifecycle
+        // Solo se usan las fuentes activas seleccionadas para esta fase
 
         // Actualizar estado compartido
         scrapingState.faseActual = targetFase
@@ -475,10 +498,9 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        await db.fuenteEstado.updateMany({ data: { activo: false } })
         await db.fuenteEstado.updateMany({
           where: { id: { in: fuenteIds } },
-          data: { activo: true },
+          data: { estado: 'activa', activo: true },
         })
 
         scrapingState.scrapeFuentes = fuentesValidas.map(f => ({
@@ -545,7 +567,12 @@ export async function POST(request: NextRequest) {
         scrapingState.scrapeEnProgreso = false
         scrapingState.scrapePausado = false
 
-        await db.fuenteEstado.updateMany({ data: { activo: false } })
+        // Reset lifecycle: marcar todas las fuentes no-deprecadas como creadas
+        // (no deprecadas porque esas requieren intervención manual)
+        await db.fuenteEstado.updateMany({
+          where: { estado: { not: 'deprecada' } },
+          data: { estado: 'creada', activo: false },
+        })
 
         scrapingState.faseActual = 0
         scrapingState.estadoFase = 'inactivo'
@@ -568,7 +595,7 @@ export async function POST(request: NextRequest) {
       // ── Forzar check de TODAS las fuentes activas ───
       case 'ejecutar_uno_all': {
         const fuentesActivas = await db.fuenteEstado.findMany({
-          where: { activo: true },
+          where: { estado: 'activa' },
           include: { medio: true },
         })
 
