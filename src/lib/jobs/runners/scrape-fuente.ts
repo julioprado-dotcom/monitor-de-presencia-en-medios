@@ -16,6 +16,7 @@ import { extraerTextoDeHtml, extraerMencionesDeTexto, crearMencionesExtraidas } 
 import { zaiFetch } from '../fetch/zai-fetcher'
 import { extraerLinksDeNoticias, extraerLeadDeBloque, type NotaLink } from '../link-extractor'
 import { trijarNotas, type TriajeResult } from '../keyword-triaje'
+import { checkAndBackupDB } from '@/lib/auto-recovery'
 
 // ─── Configuración ───────────────────────────────────────────
 
@@ -246,6 +247,12 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
 
     console.log(`[scrape-fuente] Completado ${fuente.medio.nombre}: ${notas.length} notas → ${seleccionadas.length} seleccionadas → ${totalMencionesCreadas} menciones [${responseTime}ms]`)
 
+    // Backup periódico de DB (cada 100 ciclos o 6h)
+    const backup = checkAndBackupDB()
+    if (backup.backed) {
+      console.log(`[scrape-fuente] Backup ejecutado: ${backup.path}`)
+    }
+
     return {
       success: true,
       data: {
@@ -383,6 +390,12 @@ async function procesarUrlsDirectas(
     data: { medioId, nivel, exitosa: true, totalArticulos: urls.length, mencionesEncontradas: totalMenciones },
   })
 
+  // Backup periódico de DB (cada 100 ciclos o 6h)
+  const backup = checkAndBackupDB()
+  if (backup.backed) {
+    console.log(`[scrape-fuente] Backup ejecutado: ${backup.path}`)
+  }
+
   return {
     success: true,
     data: { urlsProcesadas: urls.length, totalMencionesCreadas: totalMenciones, responseTime: Date.now() - startTime },
@@ -418,6 +431,12 @@ async function procesarFallbackHomepage(
   await db.capturaLog.create({
     data: { medioId, nivel, exitosa: true, totalArticulos: 1, mencionesEncontradas: menciones },
   })
+
+  // Backup periódico de DB (cada 100 ciclos o 6h)
+  const backup = checkAndBackupDB()
+  if (backup.backed) {
+    console.log(`[scrape-fuente] Backup ejecutado: ${backup.path}`)
+  }
 
   return {
     success: true,
