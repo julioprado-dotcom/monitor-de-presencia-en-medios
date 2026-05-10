@@ -294,7 +294,7 @@ async function descargarHomepage(url: string): Promise<string> {
       },
       signal: controller.signal,
     })
-    domainRateLimiter.recordRequest(url)
+    // recordRequest ya se llama dentro de waitIfNecessary — no duplicar
     clearTimeout(timeoutId)
 
     if (response.ok) {
@@ -334,7 +334,7 @@ async function descargarNota(url: string): Promise<string> {
       },
       signal: controller.signal,
     })
-    domainRateLimiter.recordRequest(url)
+    // recordRequest ya se llama dentro de waitIfNecessary — no duplicar
     clearTimeout(timeoutId)
 
     if (response.ok) {
