@@ -22,6 +22,44 @@ const CRITICAL_TABLES = [
   'CapturaLog',
   'IndicadorValor',
   'FuenteEstado',
+  'Comentario',
+  'Reporte',
+  'Entrega',
+  'ReporteSectorial',
+  'EnvioReporte',
+] as const
+
+// Tablas CONFIG (master data) — para backup diferencial
+const CONFIG_TABLES = [
+  'Persona',
+  'Medio',
+  'EjeTematico',
+  'MarcoConceptual',
+  'Cliente',
+  'Contrato',
+  'EjeTematicoCliente',
+  'FuenteEstado',
+  'Indicador',
+  'Suscriptor',
+  'SuscriptorGratuito',
+] as const
+
+// Tablas OPERACIONALES — para backup diferencial
+const OPERACIONAL_TABLES = [
+  'Mencion',
+  'MencionTema',
+  'MencionClienteEje',
+  'Comentario',
+  'CapturaLog',
+  'Job',
+  'Reporte',
+  'Entrega',
+  'ReporteSectorial',
+  'ReporteEje',
+  'EnvioReporte',
+  'IndicadorValor',
+  'IndicadorEvaluacion',
+  'CambioMarcoConceptual',
 ] as const
 
 // Retención de backups
@@ -475,5 +513,134 @@ export async function getBackupSummary(): Promise<BackupSummary> {
     archivesSize: formatBytes(archivesBytes),
     ultimoSnapshot,
     dbSize,
+  }
+}
+
+// ── 7. Backup Diferencial por Dominio ─────────────────────────────────
+//
+// Guarda tablas CONFIG y OPERACIONALES como JSON separados.
+// CONFIG: daily (24h) — datos que cambian poco pero son críticos
+// OPERACIONAL: weekly (7d) — datos que crecen rápido
+
+export interface DomainBackupResult {
+  success: boolean
+  domain: 'config' | 'operacional'
+  archivo: string
+  registros: Record<string, number>
+  tamanio: string
+  timestamp: string
+  error?: string
+}
+
+/**
+ * Crea un backup JSON diferencial de un dominio específico.
+ * Los archivos se guardan en backups/archives/{domain}-{timestamp}.json
+ */
+export async function createDomainBackup(
+  domain: 'config' | 'operacional'
+): Promise<DomainBackupResult> {
+  const tables = domain === 'config' ? CONFIG_TABLES : OPERACIONAL_TABLES
+  const ts = timestampLaPaz()
+  const fileName = `${domain}-${ts}.json`
+  const filePath = path.join(ARCHIVE_DIR, fileName)
+  const registros: Record<string, number> = {}
+
+  await ensureDirs()
+
+  try {
+    const allData: Record<string, unknown[]> = {}
+
+    for (const tabla of tables) {
+      try {
+        // @ts-expect-error — acceso dinámico a modelos Prisma
+        const rows = await db[tabla.charAt(0).toLowerCase() + tabla.slice(1)].findMany({
+          take: 200000, // límite generoso
+        })
+
+        if (rows.length === 0) {
+          registros[tabla] = 0
+          continue
+        }
+
+        // Serializar limpiando BigInt y Date
+        const cleaned = rows.map((row: Record<string, unknown>) => {
+          const clean: Record<string, unknown> = {}
+          for (const [key, value] of Object.entries(row)) {
+            if (typeof value === 'bigint') clean[key] = Number(value)
+            else if (value instanceof Date) clean[key] = value.toISOString()
+            else clean[key] = value
+          }
+          return clean
+        })
+
+        allData[tabla] = cleaned
+        registros[tabla] = rows.length
+      } catch (tableError: unknown) {
+        const msg = tableError instanceof Error ? tableError.message : String(tableError)
+        console.warn(`[Backup] Tabla ${tabla} no disponible para backup ${domain}: ${msg}`)
+        registros[tabla] = 0
+      }
+    }
+
+    await fs.writeFile(filePath, JSON.stringify({ domain, timestamp: ts, tablas: allData }, null, 2), 'utf-8')
+    const stat = await fs.stat(filePath)
+
+    console.log(
+      `[Backup] Backup ${domain} creado: ${fileName} (${formatBytes(stat.size)}) — ` +
+      `${Object.values(registros).reduce((a, b) => a + b, 0)} registros en ${Object.keys(registros).length} tablas`
+    )
+
+    return {
+      success: true,
+      domain,
+      archivo: fileName,
+      registros,
+      tamanio: formatBytes(stat.size),
+      timestamp: ts,
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error(`[Backup] Error creando backup ${domain}: ${msg}`)
+
+    return {
+      success: false,
+      domain,
+      archivo: '',
+      registros: {},
+      tamanio: '0 B',
+      timestamp: ts,
+      error: msg,
+    }
+  }
+}
+
+/**
+ * Verifica si es momento de hacer backup diferencial según el último archivo.
+ * Busca el archivo más reciente del dominio y compara con el intervalo configurado.
+ */
+export async function shouldBackupDomain(
+  domain: 'config' | 'operacional',
+  intervalHours: number
+): Promise<boolean> {
+  try {
+    await ensureDirs()
+    const files = await fs.readdir(ARCHIVE_DIR)
+    const prefix = `${domain}-`
+    const domainFiles = files
+      .filter(f => f.startsWith(prefix) && f.endsWith('.json'))
+      .sort()
+      .reverse()
+
+    if (domainFiles.length === 0) return true
+
+    const lastFile = domainFiles[0]
+    const lastPath = path.join(ARCHIVE_DIR, lastFile)
+    const stat = await fs.stat(lastPath)
+    const elapsedMs = Date.now() - stat.mtimeMs
+    const intervalMs = intervalHours * 60 * 60 * 1000
+
+    return elapsedMs >= intervalMs
+  } catch {
+    return true // si hay error, mejor hacer backup
   }
 }

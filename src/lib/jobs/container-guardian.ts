@@ -192,6 +192,30 @@ async function tick(): Promise<void> {
   status.trendMB = trend.trendMB
   status.trendPctPerHour = trend.trendPctPerHour
 
+  // ── Backup diferencial por dominio (solo en stable, cada ~10 ticks = ~5 min) ─
+  if (level === 'stable' && snapshots.length % 10 === 0) {
+    try {
+      const { shouldBackupDomain, createDomainBackup } = require('@/lib/backup') as {
+        shouldBackupDomain: (d: 'config' | 'operacional', h: number) => Promise<boolean>,
+        createDomainBackup: (d: 'config' | 'operacional') => Promise<{ success: boolean; tamanio: string; registros: Record<string, number> }>,
+      }
+      if (await shouldBackupDomain('config', GUARDIAN_CONFIG.backupConfigIntervalHours)) {
+        const result = await createDomainBackup('config')
+        if (result.success) {
+          console.log(`[Guardian] Backup CONFIG creado (${result.tamanio})`)
+        }
+      }
+      if (await shouldBackupDomain('operacional', GUARDIAN_CONFIG.backupOperacionalIntervalHours)) {
+        const result = await createDomainBackup('operacional')
+        if (result.success) {
+          console.log(`[Guardian] Backup OPERACIONAL creado (${result.tamanio})`)
+        }
+      }
+    } catch {
+      /* backup es nice-to-have, no debe romper el guardian */
+    }
+  }
+
   // Crear snapshot
   const snapshot: GuardianSnapshot = {
     timestamp: new Date().toISOString(),

@@ -134,6 +134,9 @@ export const GUARDIAN_CONFIG = {
   recoveryPct: 65,            // <65% → reiniciar scheduler + worker
   maxSnapshots: 20,           // historial de lecturas
   trendWindowMinutes: 5,      // ventana para calcular tendencia
+  // Backup diferencial por dominio
+  backupConfigIntervalHours: 24,    // CONFIG backup cada 24 horas
+  backupOperacionalIntervalHours: 168, // OPERACIONAL backup cada 7 días
 }
 
 // ── Configuracion de Health Monitor ────────────────────────────────────

@@ -1,3 +1,26 @@
+// ═══════════════════════════════════════════════════════════════
+// DECODEX Bolivia — Prisma Schema v0.14.0
+// ═══════════════════════════════════════════════════════════════
+//
+// CLASIFICACIÓN DE TABLAS POR DOMINIO:
+//
+//   CONFIG (master data, baja volatilidad):
+//     Persona, Medio, EjeTematico, MarcoConceptual, CambioMarcoConceptual,
+//     Cliente, Contrato, EjeTematicoCliente, FuenteEstado, Indicador,
+//     Suscriptor, SuscriptorGratuito
+//
+//   OPERACIONAL (datos capturados/procesados, alta volatilidad):
+//     Mencion, MencionTema, MencionClienteEje, Comentario, CapturaLog,
+//     Job, Reporte, Entrega, ReporteSectorial, ReporteEje, EnvioReporte,
+//     IndicadorValor, IndicadorEvaluacion
+//
+//   AUTH (NextAuth v5):
+//     User, Account, Session, VerificationToken
+//
+// NOTA: Cuando el volumen operacional supere 50K registros,
+// evaluar separación física en dos archivos DB.
+// ═══════════════════════════════════════════════════════════════
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -6,6 +29,8 @@ datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
+
+// ─── CONFIG: Legisladores a monitorear ────────────────────────
 
 model Persona {
   id              String   @id @default(cuid())
@@ -27,6 +52,8 @@ model Persona {
   reportes  Reporte[]
 }
 
+// ─── CONFIG: Medios de comunicación ──────────────────────────
+
 model Medio {
   id            String   @id @default(cuid())
   nombre        String
@@ -47,6 +74,8 @@ model Medio {
   fuenteEstado   FuenteEstado?
 }
 
+// ─── CONFIG: Ejes temáticos de análisis ──────────────────────
+
 model EjeTematico {
   id            String   @id @default(cuid())
   parentId      String?
@@ -65,6 +94,8 @@ model EjeTematico {
 
   menciones MencionTema[]
 }
+
+// ─── OPERACIONAL: Menciones capturadas ─────────────────────
 
 model Mencion {
   id                String   @id @default(cuid())
@@ -117,6 +148,8 @@ model Mencion {
   ejesCliente     MencionClienteEje[]
 }
 
+// ─── OPERACIONAL: Relación Mención↔Eje ─────────────────────
+
 model MencionTema {
   id            String   @id @default(cuid())
   mencionId     String
@@ -127,6 +160,8 @@ model MencionTema {
 
   @@unique([mencionId, ejeTematicoId])
 }
+
+// ─── OPERACIONAL: Reportes generados ───────────────────────
 
 model Reporte {
   id                     String   @id @default(cuid())
@@ -151,6 +186,8 @@ model Reporte {
   persona Persona? @relation(fields: [personaId], references: [id])
 }
 
+// ─── OPERACIONAL: Comentarios de artículos ─────────────────
+
 model Comentario {
   id              String   @id @default(cuid())
   mencionId       String
@@ -163,6 +200,8 @@ model Comentario {
   mencion Mencion @relation(fields: [mencionId], references: [id], onDelete: Cascade)
 }
 
+// ─── CONFIG: Suscriptores legacy ────────────────────────────
+
 model Suscriptor {
   id               String   @id @default(cuid())
   nombre           String
@@ -172,6 +211,8 @@ model Suscriptor {
   fechaSuscripcion DateTime @default(now())
   activo           Boolean  @default(true)
 }
+
+// ─── OPERACIONAL: Logs de captura ──────────────────────────
 
 model CapturaLog {
   id                   String   @id @default(cuid())
@@ -186,7 +227,7 @@ model CapturaLog {
   medio Medio @relation(fields: [medioId], references: [id])
 }
 
-// ─── ONION200: Clientes y Contratos ──────────────────────────
+// ─── CONFIG: Clientes ONION200 ─────────────────────────────
 
 model Cliente {
   id               String   @id @default(cuid())
@@ -213,6 +254,8 @@ model Cliente {
   ejesPersonalizados EjeTematicoCliente[]
 }
 
+// ─── CONFIG: Contratos por cliente ─────────────────────────
+
 model Contrato {
   id               String   @id @default(cuid())
   clienteId        String
@@ -235,7 +278,7 @@ model Contrato {
   entregas Entrega[]
 }
 
-// ─── ONION200: Entregas (Tracking de boletines enviados) ─────────
+// ─── OPERACIONAL: Tracking de entregas ─────────────────────
 
 model Entrega {
   id               String    @id @default(cuid())
@@ -258,7 +301,7 @@ model Entrega {
   @@index([fechaEnvio])
 }
 
-// ─── JOB QUEUE ──────────────────────────────────────────────────
+// ─── OPERACIONAL: Cola de trabajos ─────────────────────────
 
 model Job {
   id                String    @id @default(cuid())
@@ -281,7 +324,7 @@ model Job {
   @@index([fechaCreacion])
 }
 
-// ─── ESTADO DE FUENTES (Check-First + Frecuencia + Histograma) ───
+// ─── CONFIG: Estado de fuentes (check-first + adaptativo) ──
 
 model FuenteEstado {
   id               String   @id @default(cuid())
@@ -323,7 +366,7 @@ model FuenteEstado {
   @@index([activo])
 }
 
-// ─── ONION200: Capa de Indicadores ───────────────────────────────
+// ─── CONFIG: Definición de indicadores ─────────────────────
 
 model Indicador {
   id              String   @id @default(cuid())
@@ -353,6 +396,8 @@ model Indicador {
   evaluaciones IndicadorEvaluacion[]
 }
 
+// ─── OPERACIONAL: Valores de indicadores (serie temporal) ──
+
 model IndicadorValor {
   id            String   @id @default(cuid())
   indicadorId   String
@@ -368,8 +413,7 @@ model IndicadorValor {
   @@index([indicadorId, fecha])
 }
 
-// ─── IndicadorEvaluacion: evaluaciones cualitativas ────────────────
-// Para indicadores cualitativos que se construyen analizando multiples variables
+// ─── OPERACIONAL: Evaluaciones cualitativas ──────────────────
 
 model IndicadorEvaluacion {
   id              String   @id @default(cuid())
@@ -391,7 +435,7 @@ model IndicadorEvaluacion {
   @@index([escalaNivel])
 }
 
-// ─── Autenticación (NextAuth v5) ──────────────────────────────────
+// ─── AUTH: Usuarios (NextAuth v5) ──────────────────────────
 
 model User {
   id            String    @id @default(cuid())
@@ -460,7 +504,7 @@ model SuscriptorGratuito {
   @@index([email])
 }
 
-// ─── MARCO CONCEPTUAL DEL SISTEMA DE IA ────────────────────────
+// ─── CONFIG: Marco conceptual del sistema de IA ────────────
 
 model MarcoConceptual {
   id           Int      @id @default(autoincrement())
@@ -495,6 +539,8 @@ model MarcoConceptual {
   @@map("marco_conceptual")
 }
 
+// ─── OPERACIONAL: Audit log de cambios al marco ────────────
+
 model CambioMarcoConceptual {
   id             Int             @id @default(autoincrement())
   marcoId        Int
@@ -509,7 +555,7 @@ model CambioMarcoConceptual {
   @@map("cambio_marco_conceptual")
 }
 
-// ─── EJES TEMÁTICOS POR CLIENTE ────────────────────────────────
+// ─── CONFIG: Ejes temáticos personalizados por cliente ─────
 
 model EjeTematicoCliente {
   id             Int      @id @default(autoincrement())
@@ -533,6 +579,8 @@ model EjeTematicoCliente {
   @@map("eje_tematico_cliente")
 }
 
+// ─── OPERACIONAL: Relación Mención↔EjeCliente ──────────────
+
 model MencionClienteEje {
   id             Int             @id @default(autoincrement())
   mencionId      String
@@ -553,6 +601,8 @@ enum EstadoReporte {
   enviado
   fallido
 }
+
+// ─── OPERACIONAL: Reportes sectoriales (premium) ────────────
 
 model ReporteSectorial {
   id               String        @id @default(cuid())
@@ -579,6 +629,8 @@ model ReporteSectorial {
   @@index([estado])
 }
 
+// ─── OPERACIONAL: Desglose por eje en reporte sectorial ────
+
 model ReporteEje {
   id               String   @id @default(cuid())
   reporteId        String
@@ -592,6 +644,8 @@ model ReporteEje {
 
   @@index([reporteId])
 }
+
+// ─── OPERACIONAL: Envíos de reportes ─────────────────────────
 
 model EnvioReporte {
   id               String   @id @default(cuid())
