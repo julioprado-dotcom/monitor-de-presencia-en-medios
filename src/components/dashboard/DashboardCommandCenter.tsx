@@ -113,6 +113,25 @@ const AlarmasComerciales = dynamic(
   { ssr: false, loading: () => <SectionSkeleton /> }
 );
 
+// ─── New Axis 4C widgets (code-split) ────────────────────────
+
+const AlertasWidget = dynamic(
+  () => import('./widgets/AlertasWidget').then(m => ({ default: m.AlertasWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const IndicadoresWidget = dynamic(
+  () => import('./widgets/IndicadoresWidget').then(m => ({ default: m.IndicadoresWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const FuentesWidget = dynamic(
+  () => import('./widgets/FuentesWidget').then(m => ({ default: m.FuentesWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const MediosWidget = dynamic(
+  () => import('./widgets/MediosWidget').then(m => ({ default: m.MediosWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+
 // ─── Animation variants ──────────────────────────────────────
 
 function SectionSkeleton() {
@@ -491,6 +510,41 @@ export function DashboardCommandCenter() {
             )}
           </CollapsibleWidget>
         </motion.div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════
+          ONION200 — Indicadores
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="ONION200" icon={Package} color="#8B5CF6" />
+
+      {/* Widget: Indicadores (NUEVO 4C) */}
+      <ChunkErrorBoundary>
+        <IndicadoresWidget onNavigate={setActiveView} />
+      </ChunkErrorBoundary>
+
+      {/* ═══════════════════════════════════════════════════
+          ALERTAS TEMPRANAS — Menciones criticas/agresivas (NUEVO 4C)
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Alertas Tempranas" icon={Bell} color="#EF4444" />
+
+      {/* Widget: Alertas (NUEVO 4C) */}
+      <ChunkErrorBoundary>
+        <AlertasWidget onNavigate={setActiveView} />
+      </ChunkErrorBoundary>
+
+      {/* ═══════════════════════════════════════════════════
+          CONFIGURACION — Fuentes + Medios (NUEVO 4C)
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Configuracion" icon={Settings} color="#0EA5E9" />
+
+      {/* Widgets: Fuentes + Medios side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChunkErrorBoundary>
+          <FuentesWidget onNavigate={setActiveView} />
+        </ChunkErrorBoundary>
+        <ChunkErrorBoundary>
+          <MediosWidget onNavigate={setActiveView} />
+        </ChunkErrorBoundary>
       </div>
 
       {/* ═══════════════════════════════════════════════════
