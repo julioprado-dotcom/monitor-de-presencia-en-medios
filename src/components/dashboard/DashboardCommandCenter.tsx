@@ -4,14 +4,22 @@ import React, { useState, useCallback, Component, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
-import { BarChart3, TrendingUp, ShieldAlert, Loader2 } from 'lucide-react';
+import {
+  BarChart3, TrendingUp, ShieldAlert, Loader2,
+  Activity, Send, Database, Globe, Zap, Radio,
+  Newspaper, UsersRound, Tag, Bell, Mail, FileBarChart,
+  Package, Rocket, UserCircle, FileCheck, Users,
+  Shield, Settings, LayoutGrid,
+} from 'lucide-react';
 import { useDashboardStore } from '@/stores/useDashboardStore';
 import { TopVariations } from '@/components/dashboard/TopVariations';
+import { CollapsibleWidget } from '@/components/dashboard/CollapsibleWidget';
 import { fetchWithTimeout } from '@/lib/fetch-utils';
 import { usePolling } from './hooks/usePolling';
 import type { SystemMetrics } from '@/types/dashboard';
 import type { AiHealthData } from './sections/SystemStatusOrbs';
 import type { EntregasHoyData } from './sections/EntregasHoy';
+import type { WidgetStatus } from '@/components/dashboard/CollapsibleWidget';
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -28,7 +36,6 @@ class ChunkErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryStat
   }
 
   componentDidCatch(error: Error) {
-    // Solo log ChunkLoadError, no spam la consola con otros errores
     if (error?.message?.includes('ChunkLoadError') || error?.message?.includes('Failed to load chunk')) {
       console.warn('[Dashboard] ChunkLoadError capturado — la sección se mostrará como fallback');
     }
@@ -93,8 +100,6 @@ const CachePressurePanel = dynamic(
 
 // ─── Already-dynamic heavy sub-components ─────────────────────
 
-// Dynamic imports con cache-bust para evitar ChunkLoadError por HMR stale refs
-// Turbopack regenera chunk IDs al cambiar el loader, limpiando cache del navegador
 const PipelineMonitor = dynamic(
   () => import(/* webpackChunkName: "pipeline-monitor" */'@/components/dashboard/PipelineMonitor').then(m => ({ default: m.PipelineMonitor })),
   { ssr: false, loading: () => <SectionSkeleton /> }
@@ -110,7 +115,6 @@ const AlarmasComerciales = dynamic(
 
 // ─── Animation variants ──────────────────────────────────────
 
-/** Skeleton reutilizable para secciones lazy-loaded */
 function SectionSkeleton() {
   return (
     <Card className="border">
@@ -133,6 +137,67 @@ const fadeInUp = {
 const stagger = {
   visible: { transition: { staggerChildren: 0.05 } },
 };
+
+// ─── Group Header ────────────────────────────────────────────
+
+function GroupHeader({ label, icon: Icon, color }: { label: string; icon: React.ElementType; color: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-2 pb-1">
+      <div
+        className="flex items-center justify-center h-5 w-5 rounded-md"
+        style={{ backgroundColor: `${color}20` }}
+      >
+        <Icon className="h-3.5 w-3.5" style={{ color }} />
+      </div>
+      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: `${color}CC` }}>
+        {label}
+      </span>
+      <div className="flex-1 border-t border-border/40" />
+    </div>
+  );
+}
+
+// ─── Derived status helpers ──────────────────────────────────
+
+function systemStatus(sysMetrics: SystemMetrics | null, aiHealth: AiHealthData | null): WidgetStatus {
+  if (!sysMetrics) return 'loading';
+  const criticals = sysMetrics.diagnoses?.filter(d => d.severity === 'critical') || [];
+  if (criticals.length > 0) return 'error';
+  const warnings = sysMetrics.diagnoses?.filter(d => d.severity === 'warning') || [];
+  if (warnings.length > 0) return 'warn';
+  if (aiHealth?.statusLevel === 'critical') return 'error';
+  return 'ok';
+}
+
+function entregasStatus(entregas: EntregasHoyData | null): WidgetStatus {
+  if (!entregas) return 'loading';
+  if (entregas.fallidas > 0) return 'error';
+  if (entregas.pendientes > 0) return 'warn';
+  return 'ok';
+}
+
+function pipelineStatus(data: unknown): WidgetStatus {
+  if (!data) return 'loading';
+  const d = data as { pasado?: { fallidos?: Array<unknown> }; presente?: { worker?: { running?: boolean }; enEjecucion?: Array<unknown> } };
+  if ((d.pasado?.fallidos?.length ?? 0) > 5) return 'error';
+  if ((d.pasado?.fallidos?.length ?? 0) > 0) return 'warn';
+  if (d.presente?.worker?.running) return 'ok';
+  return 'idle';
+}
+
+function scrapingStatus(loading: boolean): WidgetStatus {
+  return loading ? 'loading' : 'idle';
+}
+
+function alertasStatus(alertas: AlertasComercialesData | null): WidgetStatus {
+  if (!alertas) return 'loading';
+  if ((alertas.contratosPorVencer?.length ?? 0) > 0) {
+    const minDays = Math.min(...alertas.contratosPorVencer.map(c => c.diasRestantes));
+    if (minDays <= 7) return 'error';
+    return 'warn';
+  }
+  return 'ok';
+}
 
 // ═══════════════════════════════════════════════════════════
 // Main Orchestrator
@@ -219,86 +284,218 @@ export function DashboardCommandCenter() {
     );
   }
 
+  // ─── Derived badge values ────────────────────────────────
+  const uptimeStr = sysMetrics?.uptimeFormatted || '--';
+  const healthScore = sysMetrics?.healthScore ?? null;
+  const workerRunning = (pipelineData as { presente?: { worker?: { running?: boolean } } })?.presente?.worker?.running ?? false;
+  const fallidosCount = (pipelineData as { pasado?: { fallidos?: unknown[] } })?.pasado?.fallidos?.length ?? 0;
+  const fuentesActivas = (pipelineData as { presente?: { fuentes?: unknown[] } })?.presente?.fuentes?.length ?? 0;
+
   return (
     <div className="space-y-6">
 
-      {/* ═══ Section 1: Diagnostico del Sistema + StatusOrbs ═══ */}
-      <motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-1 gap-3 sm:gap-4">
+      {/* ═══════════════════════════════════════════════════
+          SISTEMA — Diagnosticos + infraestructura
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Sistema" icon={Activity} color="#0EA5E9" />
+
+      <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-3">
+
+        {/* Widget: Diagnostico del Sistema */}
         <motion.div custom={0} variants={fadeInUp}>
-          <SystemStatusOrbs
-            sysMetrics={sysMetrics}
-            entregasHoy={entregasHoy}
-            aiHealth={aiHealth}
-            mcResumen={mcResumen}
-            setActiveView={setActiveView}
-          />
+          <CollapsibleWidget
+            id="widget-system-status"
+            title="Diagnostico del Sistema"
+            icon={Activity}
+            status={systemStatus(sysMetrics, aiHealth)}
+            badge={healthScore !== null ? `${healthScore}%` : undefined}
+            badgeLabel="health"
+            targetView="jobs"
+            onNavigate={setActiveView}
+            mode="section"
+          >
+            <SystemStatusOrbs
+              sysMetrics={sysMetrics}
+              entregasHoy={entregasHoy}
+              aiHealth={aiHealth}
+              mcResumen={mcResumen}
+              setActiveView={setActiveView}
+            />
+          </CollapsibleWidget>
         </motion.div>
+
+        {/* Widget: Entregas Hoy → Boletines */}
         <motion.div custom={1} variants={fadeInUp}>
-          <EntregasHoy entregasHoy={entregasHoy} setActiveView={setActiveView} />
+          <CollapsibleWidget
+            id="widget-entregas"
+            title="Entregas Hoy"
+            icon={Send}
+            status={entregasStatus(entregasHoy)}
+            badge={entregasHoy ? `${entregasHoy.enviadas}/${entregasHoy.total}` : undefined}
+            badgeLabel="enviadas"
+            targetView="boletines"
+            onNavigate={setActiveView}
+            mode="section"
+          >
+            <EntregasHoy entregasHoy={entregasHoy} setActiveView={setActiveView} />
+          </CollapsibleWidget>
         </motion.div>
+
+        {/* Widget: Pipeline Monitor → Jobs */}
         <motion.div custom={2} variants={fadeInUp}>
-          <ChunkErrorBoundary>
-            <PipelineMonitor data={pipelineData} onRefresh={fetchPipelineStats} />
-          </ChunkErrorBoundary>
+          <CollapsibleWidget
+            id="widget-pipeline"
+            title="Monitor de Pipeline"
+            icon={Zap}
+            status={pipelineStatus(pipelineData)}
+            badge={fuentesActivas}
+            badgeLabel="fuentes"
+            targetView="jobs"
+            onNavigate={setActiveView}
+            mode="section"
+          >
+            <ChunkErrorBoundary>
+              <PipelineMonitor data={pipelineData} onRefresh={fetchPipelineStats} />
+            </ChunkErrorBoundary>
+          </CollapsibleWidget>
         </motion.div>
+
+        {/* Widget: Scraping Phase Control */}
         <motion.div custom={3} variants={fadeInUp}>
-          <ChunkErrorBoundary>
-            <ScrapingPhaseControl />
-          </ChunkErrorBoundary>
+          <CollapsibleWidget
+            id="widget-scraping"
+            title="Control de Scraping"
+            icon={Globe}
+            status={scrapingStatus(false)}
+            targetView="captura"
+            onNavigate={setActiveView}
+            mode="section"
+          >
+            <ChunkErrorBoundary>
+              <ScrapingPhaseControl />
+            </ChunkErrorBoundary>
+          </CollapsibleWidget>
         </motion.div>
+
+        {/* Widget: Cache Pressure → Configuracion */}
         <motion.div custom={4} variants={fadeInUp}>
-          <ChunkErrorBoundary>
-            <CachePressurePanel />
-          </ChunkErrorBoundary>
+          <CollapsibleWidget
+            id="widget-cache"
+            title="Contenedor & Cache"
+            icon={Database}
+            status={sysMetrics ? (sysMetrics.healthScore < 50 ? 'warn' : 'ok') : 'loading'}
+            badge={sysMetrics ? `${sysMetrics.uptimeFormatted || '--'}` : undefined}
+            badgeLabel="uptime"
+            targetView="configuracion"
+            onNavigate={setActiveView}
+            mode="section"
+          >
+            <ChunkErrorBoundary>
+              <CachePressurePanel />
+            </ChunkErrorBoundary>
+          </CollapsibleWidget>
         </motion.div>
       </motion.div>
 
-      {/* ═══ Section 2: Category Cards ═══ */}
-      <CategoryCardsGrid data={data} mediosHealth={mediosHealth} setActiveView={setActiveView} />
+      {/* ═══════════════════════════════════════════════════
+          ANALISIS — Menciones, variaciones, alertas
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Analisis" icon={BarChart3} color="#3B82F6" />
 
-      {/* ═══ Section 3: Activity Feed ═══ */}
-      <ActivityFeed data={data} mediosHealth={mediosHealth} setActiveView={setActiveView} />
+      {/* Widget: KPIs por categoria */}
+      <CollapsibleWidget
+        id="widget-kpis"
+        title="Resumen por Categoria"
+        icon={LayoutGrid}
+        status="ok"
+        badge={data.totalEjes}
+        badgeLabel="ejes"
+        mode="section"
+      >
+        <CategoryCardsGrid data={data} mediosHealth={mediosHealth} setActiveView={setActiveView} />
+      </CollapsibleWidget>
 
-      {/* ═══ Section 4: Top Variaciones + Alarmas Comerciales ═══ */}
+      {/* Widget: Activity Feed — Menciones + Medios */}
+      <CollapsibleWidget
+        id="widget-activity"
+        title="Menciones & Medios"
+        icon={Newspaper}
+        status={data.mencionesSemana > 0 ? 'ok' : 'idle'}
+        badge={data.mencionesSemana}
+        badgeLabel="esta semana"
+        targetView="menciones"
+        onNavigate={setActiveView}
+        mode="section"
+      >
+        <ActivityFeed data={data} mediosHealth={mediosHealth} setActiveView={setActiveView} />
+      </CollapsibleWidget>
+
+      {/* Widgets: Top Variaciones + Alarmas Comerciales (side by side) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <motion.div variants={fadeInUp} initial="hidden" animate="visible" custom={8}>
-          {alertasCom ? (
-            <TopVariations data={alertasCom.topVariaciones} onNavigate={setActiveView} />
-          ) : (
-            <Card className="hover:shadow-md transition-all">
-              <CardContent className="py-10 text-center">
-                <div className="animate-pulse flex flex-col items-center gap-2 text-muted-foreground">
-                  <TrendingUp className="h-5 w-5 opacity-40" />
-                  <span className="text-xs">Calculando variaciones...</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <CollapsibleWidget
+            id="widget-top-variaciones"
+            title="Top Variaciones"
+            icon={TrendingUp}
+            status={alertasCom ? 'ok' : 'loading'}
+            badge={alertasCom ? `${alertasCom.topVariaciones.personas.length} personas` : undefined}
+            targetView="personas-seguimiento"
+            onNavigate={setActiveView}
+            mode="section"
+          >
+            {alertasCom ? (
+              <TopVariations data={alertasCom.topVariaciones} onNavigate={setActiveView} />
+            ) : (
+              <Card className="hover:shadow-md transition-all">
+                <CardContent className="py-10 text-center">
+                  <div className="animate-pulse flex flex-col items-center gap-2 text-muted-foreground">
+                    <TrendingUp className="h-5 w-5 opacity-40" />
+                    <span className="text-xs">Calculando variaciones...</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </CollapsibleWidget>
         </motion.div>
+
         <motion.div variants={fadeInUp} initial="hidden" animate="visible" custom={9}>
-          {alertasCom ? (
-            <ChunkErrorBoundary>
-              <AlarmasComerciales
-                contratosPorVencer={alertasCom.contratosPorVencer}
-                solicitudesPendientes={alertasCom.solicitudesPendientes}
-                entregasPendientes={alertasCom.entregasPendientes}
-                onNavigate={setActiveView}
-              />
-            </ChunkErrorBoundary>
-          ) : (
-            <Card className="hover:shadow-md transition-all">
-              <CardContent className="py-10 text-center">
-                <div className="animate-pulse flex flex-col items-center gap-2 text-muted-foreground">
-                  <ShieldAlert className="h-5 w-5 opacity-40" />
-                  <span className="text-xs">Cargando alarmas comerciales...</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <CollapsibleWidget
+            id="widget-alarmas-comerciales"
+            title="Alarmas Comerciales"
+            icon={ShieldAlert}
+            status={alertasStatus(alertasCom)}
+            badge={alertasCom ? alertasCom.contratosPorVencer.length : undefined}
+            badgeLabel="por vencer"
+            targetView="contratos"
+            onNavigate={setActiveView}
+            mode="section"
+          >
+            {alertasCom ? (
+              <ChunkErrorBoundary>
+                <AlarmasComerciales
+                  contratosPorVencer={alertasCom.contratosPorVencer}
+                  solicitudesPendientes={alertasCom.solicitudesPendientes}
+                  entregasPendientes={alertasCom.entregasPendientes}
+                  onNavigate={setActiveView}
+                />
+              </ChunkErrorBoundary>
+            ) : (
+              <Card className="hover:shadow-md transition-all">
+                <CardContent className="py-10 text-center">
+                  <div className="animate-pulse flex flex-col items-center gap-2 text-muted-foreground">
+                    <ShieldAlert className="h-5 w-5 opacity-40" />
+                    <span className="text-xs">Cargando alarmas comerciales...</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </CollapsibleWidget>
         </motion.div>
       </div>
 
-      {/* ═══ Section 5: Quick Actions ═══ */}
+      {/* ═══════════════════════════════════════════════════
+          ACCIONES RAPIDAS
+          ═══════════════════════════════════════════════════ */}
       <motion.div variants={fadeInUp} initial="hidden" animate="visible" custom={10}>
         <QuickActions sysMetrics={sysMetrics} setActiveView={setActiveView} />
       </motion.div>
