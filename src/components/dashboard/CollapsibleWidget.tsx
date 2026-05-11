@@ -34,6 +34,12 @@ interface CollapsibleWidgetProps {
   className?: string;
   /** Quick action buttons shown in expanded mode */
   actions?: ReactNode;
+  /**
+   * Render mode:
+   * - 'card' (default): wraps everything in a Card with inner bordered content area.
+   *   - 'section': no outer Card — child renders its own Card. Provides header + animation + actions only.
+   */
+  mode?: 'card' | 'section';
 }
 
 // ─── Status color mapping ────────────────────────────────────
@@ -150,6 +156,7 @@ export function CollapsibleWidget({
   children,
   className,
   actions,
+  mode = 'card',
 }: CollapsibleWidgetProps) {
   // ─── State ──────────────────────────────────────────────
   const STORAGE_KEY = `widget-collapsed-${id}`;
@@ -185,79 +192,141 @@ export function CollapsibleWidget({
   const colors = STATUS_COLORS[status];
   const hasBadge = badge !== undefined && badge !== null;
 
-  // ─── Render ─────────────────────────────────────────────
+  // ─── Shared: header row (both modes) ──────────────────
+  const headerRow = (
+    <button
+      type="button"
+      onClick={toggle}
+      className={cn(
+        'flex items-center w-full gap-2.5 px-3 py-2 text-left',
+        'hover:bg-muted/30 transition-colors duration-150 cursor-pointer',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+        collapsed ? 'min-h-[40px]' : 'min-h-[44px]',
+      )}
+      aria-expanded={!collapsed}
+      aria-controls={`widget-content-${id}`}
+    >
+      {/* Icon */}
+      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+
+      {/* Title */}
+      <span className="text-xs font-medium text-foreground truncate">
+        {title}
+      </span>
+
+      {/* Spacer */}
+      <span className="flex-1" />
+
+      {/* Badge or skeleton */}
+      <span className="flex items-center gap-1.5 shrink-0">
+        {hasBadge ? (
+          <>
+            <span className={cn('text-xs font-semibold tabular-nums', colors.text)}>
+              {badge}
+            </span>
+            {badgeLabel && (
+              <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                {badgeLabel}
+              </span>
+            )}
+          </>
+        ) : (
+          <BadgeSkeleton />
+        )}
+      </span>
+
+      {/* Status dot */}
+      <StatusDot status={status} />
+
+      {/* Chevron */}
+      <motion.span
+        animate={{ rotate: collapsed ? 0 : 90 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        className="shrink-0 text-muted-foreground"
+      >
+        <ChevronRight className="h-3.5 w-3.5" />
+      </motion.span>
+    </button>
+  );
+
+  // ─── Shared: action bar ──────────────────────────────────
+  const actionBar = (targetView && onNavigate || actions) ? (
+    <div className="flex items-center justify-between px-4 pb-3 pt-1 gap-2">
+      <div className="flex items-center gap-1.5">{actions}</div>
+      {targetView && onNavigate && (
+        <button
+          type="button"
+          onClick={handleNavigate}
+          className={cn(
+            'inline-flex items-center gap-1 text-[11px] font-medium',
+            'text-muted-foreground hover:text-foreground',
+            'transition-colors duration-150 cursor-pointer',
+            'focus-visible:outline-none focus-visible:underline',
+            'group/view',
+          )}
+        >
+          Ver completo
+          <ArrowRight className="h-3 w-3 transition-transform duration-150 group-hover/view:translate-x-0.5" />
+        </button>
+      )}
+    </div>
+  ) : null;
+
+  // ─── Section mode: no Card wrapper, child has its own Card ──
+  if (mode === 'section') {
+    return (
+      <div
+        className={cn(
+          'transition-all duration-300',
+          collapsed ? cn('shadow-sm', colors.glow, 'rounded-lg ring-1', colors.ring) : 'rounded-lg',
+          !collapsed && 'hover:' + colors.glow,
+          className,
+        )}
+        data-widget-id={id}
+        data-widget-status={status}
+      >
+        {/* Header */}
+        {headerRow}
+
+        {/* Expanded content — no CardContent wrapper, child renders its own Card */}
+        <AnimatePresence initial={false}>
+          {!collapsed && (
+            <motion.div
+              id={`widget-content-${id}`}
+              variants={contentVariants}
+              initial="collapsed"
+              animate="expanded"
+              exit="collapsed"
+              className="overflow-hidden"
+            >
+              {children}
+              {actionBar}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  // ─── Card mode (default): full Card wrapper with inner content area ──
   return (
     <Card
       className={cn(
         'overflow-hidden transition-shadow duration-300',
         'hover:shadow-md',
-        // Subtle border glow based on status
         collapsed
           ? cn('shadow-sm', colors.glow, colors.ring, 'ring-1')
           : 'ring-1 ring-foreground/10',
-        // Hover glow in expanded mode
         !collapsed && 'hover:' + colors.glow,
         className,
       )}
       data-widget-id={id}
       data-widget-status={status}
     >
-      {/* ── Collapsed: single row ~40px ── */}
-      <button
-        type="button"
-        onClick={toggle}
-        className={cn(
-          'flex items-center w-full gap-2.5 px-3 py-2 text-left',
-          'hover:bg-muted/30 transition-colors duration-150 cursor-pointer',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
-          collapsed ? 'min-h-[40px]' : 'min-h-[44px]',
-        )}
-        aria-expanded={!collapsed}
-        aria-controls={`widget-content-${id}`}
-      >
-        {/* Icon */}
-        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+      {/* Header */}
+      {headerRow}
 
-        {/* Title */}
-        <span className="text-xs font-medium text-foreground truncate">
-          {title}
-        </span>
-
-        {/* Spacer */}
-        <span className="flex-1" />
-
-        {/* Badge or skeleton */}
-        <span className="flex items-center gap-1.5 shrink-0">
-          {hasBadge ? (
-            <>
-              <span className={cn('text-xs font-semibold tabular-nums', colors.text)}>
-                {badge}
-              </span>
-              {badgeLabel && (
-                <span className="text-[10px] text-muted-foreground hidden sm:inline">
-                  {badgeLabel}
-                </span>
-              )}
-            </>
-          ) : (
-            <BadgeSkeleton />
-          )}
-        </span>
-
-        {/* Status dot */}
-        <StatusDot status={status} />
-
-        {/* Chevron */}
-        <motion.span
-          animate={{ rotate: collapsed ? 0 : 90 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="shrink-0 text-muted-foreground"
-        >
-          <ChevronRight className="h-3.5 w-3.5" />
-        </motion.span>
-      </button>
-
-      {/* ── Expanded content ── */}
+      {/* Expanded content */}
       <AnimatePresence initial={false}>
         {!collapsed && (
           <motion.div
@@ -268,38 +337,13 @@ export function CollapsibleWidget({
             exit="collapsed"
             className="overflow-hidden"
           >
-            {/* Mini visualization area */}
             <CardContent className="pt-0 pb-2">
               <div className="rounded-lg bg-muted/20 border border-border/50 p-3 min-h-[120px]">
                 {children}
               </div>
             </CardContent>
 
-            {/* Action bar: actions + Ver completo */}
-            <div className="flex items-center justify-between px-4 pb-3 pt-1 gap-2">
-              {/* Quick actions */}
-              <div className="flex items-center gap-1.5">
-                {actions}
-              </div>
-
-              {/* Ver completo link */}
-              {targetView && onNavigate && (
-                <button
-                  type="button"
-                  onClick={handleNavigate}
-                  className={cn(
-                    'inline-flex items-center gap-1 text-[11px] font-medium',
-                    'text-muted-foreground hover:text-foreground',
-                    'transition-colors duration-150 cursor-pointer',
-                    'focus-visible:outline-none focus-visible:underline',
-                    'group/view',
-                  )}
-                >
-                  Ver completo
-                  <ArrowRight className="h-3 w-3 transition-transform duration-150 group-hover/view:translate-x-0.5" />
-                </button>
-              )}
-            </div>
+            {actionBar}
           </motion.div>
         )}
       </AnimatePresence>
