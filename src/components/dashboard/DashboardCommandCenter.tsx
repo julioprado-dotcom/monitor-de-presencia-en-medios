@@ -167,6 +167,33 @@ const EjesTematicosWidget = dynamic(
   { ssr: false, loading: () => <SectionSkeleton /> }
 );
 
+// ─── Axis 4E widgets (code-split) ────────────────────────────
+
+const GeneradoresWidget = dynamic(
+  () => import('./widgets/GeneradoresWidget').then(m => ({ default: m.GeneradoresWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const AuditoriaWidget = dynamic(
+  () => import('./widgets/AuditoriaWidget').then(m => ({ default: m.AuditoriaWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const CapturasWidget = dynamic(
+  () => import('./widgets/CapturasWidget').then(m => ({ default: m.CapturasWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const JobsWidget = dynamic(
+  () => import('./widgets/JobsWidget').then(m => ({ default: m.JobsWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const ConfigWidget = dynamic(
+  () => import('./widgets/ConfigWidget').then(m => ({ default: m.ConfigWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const EstrategiaWidget = dynamic(
+  () => import('./widgets/EstrategiaWidget').then(m => ({ default: m.EstrategiaWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+
 // ─── Animation variants ──────────────────────────────────────
 
 function SectionSkeleton() {
@@ -644,6 +671,42 @@ export function DashboardCommandCenter() {
 
       <ChunkErrorBoundary>
         <SuscriptoresWidget onNavigate={setActiveView} />
+      </ChunkErrorBoundary>
+
+      {/* ═══════════════════════════════════════════════════
+          CONFIGURACION — Generadores + Auditoria + Captura (4E)
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Configuracion" icon={Settings} color="#0EA5E9" />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChunkErrorBoundary>
+          <GeneradoresWidget onNavigate={setActiveView} />
+        </ChunkErrorBoundary>
+        <ChunkErrorBoundary>
+          <AuditoriaWidget onNavigate={setActiveView} />
+        </ChunkErrorBoundary>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChunkErrorBoundary>
+          <CapturasWidget onNavigate={setActiveView} />
+        </ChunkErrorBoundary>
+        <ChunkErrorBoundary>
+          <JobsWidget onNavigate={setActiveView} />
+        </ChunkErrorBoundary>
+      </div>
+
+      <ChunkErrorBoundary>
+        <ConfigWidget onNavigate={setActiveView} />
+      </ChunkErrorBoundary>
+
+      {/* ═══════════════════════════════════════════════════
+          ESTRATEGIA — Roadmap y hitos (4E)
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Estrategia" icon={Rocket} color="#F59E0B" />
+
+      <ChunkErrorBoundary>
+        <EstrategiaWidget onNavigate={setActiveView} />
       </ChunkErrorBoundary>
 
       {/* ═══════════════════════════════════════════════════
