@@ -113,7 +113,7 @@ const AlarmasComerciales = dynamic(
   { ssr: false, loading: () => <SectionSkeleton /> }
 );
 
-// ─── New Axis 4C widgets (code-split) ────────────────────────
+// ─── Axis 4C widgets (code-split) ────────────────────────────
 
 const AlertasWidget = dynamic(
   () => import('./widgets/AlertasWidget').then(m => ({ default: m.AlertasWidget })),
@@ -129,6 +129,41 @@ const FuentesWidget = dynamic(
 );
 const MediosWidget = dynamic(
   () => import('./widgets/MediosWidget').then(m => ({ default: m.MediosWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+
+// ─── Axis 4D widgets (code-split) ────────────────────────────
+
+const PersonasRadarWidget = dynamic(
+  () => import('./widgets/PersonasRadarWidget').then(m => ({ default: m.PersonasRadarWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const MencionesRecientesWidget = dynamic(
+  () => import('./widgets/MencionesRecientesWidget').then(m => ({ default: m.MencionesRecientesWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const BoletinesWidget = dynamic(
+  () => import('./widgets/BoletinesWidget').then(m => ({ default: m.BoletinesWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const ReportesWidget = dynamic(
+  () => import('./widgets/ReportesWidget').then(m => ({ default: m.ReportesWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const ClientesWidget = dynamic(
+  () => import('./widgets/ClientesWidget').then(m => ({ default: m.ClientesWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const ContratosWidget = dynamic(
+  () => import('./widgets/ContratosWidget').then(m => ({ default: m.ContratosWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const SuscriptoresWidget = dynamic(
+  () => import('./widgets/SuscriptoresWidget').then(m => ({ default: m.SuscriptoresWidget })),
+  { ssr: false, loading: () => <SectionSkeleton /> }
+);
+const EjesTematicosWidget = dynamic(
+  () => import('./widgets/EjesTematicosWidget').then(m => ({ default: m.EjesTematicosWidget })),
   { ssr: false, loading: () => <SectionSkeleton /> }
 );
 
@@ -546,6 +581,70 @@ export function DashboardCommandCenter() {
           <MediosWidget onNavigate={setActiveView} />
         </ChunkErrorBoundary>
       </div>
+
+      {/* ═══════════════════════════════════════════════════
+          PERSONAS — Radar de seguimiento (4D)
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Personas" icon={UserCircle} color="#F59E0B" />
+
+      <ChunkErrorBoundary>
+        <PersonasRadarWidget onNavigate={setActiveView} />
+      </ChunkErrorBoundary>
+
+      {/* ═══════════════════════════════════════════════════
+          MENCIONES — Capturas recientes (4D)
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Menciones" icon={Newspaper} color="#3B82F6" />
+
+      <ChunkErrorBoundary>
+        <MencionesRecientesWidget onNavigate={setActiveView} />
+      </ChunkErrorBoundary>
+
+      {/* ═══════════════════════════════════════════════════
+          EJES TEMATICOS — Marco conceptual (4D)
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Ejes Tematicos" icon={Tag} color="#8B5CF6" />
+
+      <ChunkErrorBoundary>
+        <EjesTematicosWidget onNavigate={setActiveView} />
+      </ChunkErrorBoundary>
+
+      {/* ═══════════════════════════════════════════════════
+          ENTREGAS — Boletines & Productos (4D)
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Entregas" icon={FileBarChart} color="#06B6D4" />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChunkErrorBoundary>
+          <BoletinesWidget onNavigate={setActiveView} />
+        </ChunkErrorBoundary>
+        <ChunkErrorBoundary>
+          <ReportesWidget onNavigate={setActiveView} />
+        </ChunkErrorBoundary>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════
+          COMERCIAL — Clientes & Contratos (4D)
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Comercial" icon={Package} color="#F59E0B" />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChunkErrorBoundary>
+          <ClientesWidget onNavigate={setActiveView} />
+        </ChunkErrorBoundary>
+        <ChunkErrorBoundary>
+          <ContratosWidget onNavigate={setActiveView} />
+        </ChunkErrorBoundary>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════
+          SUSCRIPTORES — Crecimiento de audiencia (4D)
+          ═══════════════════════════════════════════════════ */}
+      <GroupHeader label="Suscriptores" icon={Mail} color="#10B981" />
+
+      <ChunkErrorBoundary>
+        <SuscriptoresWidget onNavigate={setActiveView} />
+      </ChunkErrorBoundary>
 
       {/* ═══════════════════════════════════════════════════
           ACCIONES RAPIDAS
