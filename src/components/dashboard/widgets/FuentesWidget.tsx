@@ -8,6 +8,7 @@ import { fetchWithTimeout } from '@/lib/fetch-utils';
 import { usePolling } from '../hooks/usePolling';
 import { CollapsibleWidget } from '../CollapsibleWidget';
 import type { WidgetStatus } from '../CollapsibleWidget';
+import { timeAgo } from './time-helpers';
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -70,19 +71,6 @@ function deriveStatus(data: FuentesSummaryData | null, loading: boolean): Widget
   if (inactivasRate > 0.3) return 'error';
   if (data.degradadas > 0 || inactivasRate > 0.1) return 'warn';
   return 'ok';
-}
-
-function timeAgo(dateStr: string | null): string {
-  if (!dateStr) return 'nunca';
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMin = Math.floor((now - then) / 60_000);
-  if (diffMin < 1) return 'ahora';
-  if (diffMin < 60) return `${diffMin}m`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `${diffH}h`;
-  const diffD = Math.floor(diffH / 24);
-  return `${diffD}d`;
 }
 
 // ─── Component ────────────────────────────────────────────────

@@ -66,7 +66,7 @@ export async function GET() {
         estado: e.estado,
         canal: e.canal,
         fechaEnvio: e.fechaEnvio?.toISOString() ?? null,
-        cliente: e.contrato.cliente.nombre,
+        cliente: e.contrato?.cliente?.nombre ?? 'Sin cliente',
       })),
     });
   } catch (error: unknown) {

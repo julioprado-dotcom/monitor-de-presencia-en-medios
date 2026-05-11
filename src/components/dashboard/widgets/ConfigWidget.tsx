@@ -3,19 +3,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Loader2, CheckCircle2, AlertTriangle, Clock, Cpu, Gauge } from 'lucide-react';
+import { Settings, Loader2, CheckCircle2, AlertTriangle, Clock, Cpu, Gauge, AlertCircle, Database } from 'lucide-react';
 import { fetchWithTimeout } from '@/lib/fetch-utils';
 import { usePolling } from '../hooks/usePolling';
 import { CollapsibleWidget } from '../CollapsibleWidget';
 import type { WidgetStatus } from '../CollapsibleWidget';
 
 // ─── Types ────────────────────────────────────────────────────
-
-interface SystemMetrics {
-  uptimeFormatted: string;
-  healthScore: number;
-  diagnoses: { severity: string; message: string }[];
-}
 
 interface SystemSummaryData {
   timestamp: string;
@@ -49,6 +43,7 @@ function deriveStatus(data: SystemSummaryData | null, loading: boolean): WidgetS
 export function ConfigWidget({ onNavigate }: ConfigWidgetProps) {
   const [data, setData] = useState<SystemSummaryData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -125,7 +120,7 @@ export function ConfigWidget({ onNavigate }: ConfigWidgetProps) {
         setLoading(false);
       }
     } catch {
-      // silent
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -152,7 +147,7 @@ export function ConfigWidget({ onNavigate }: ConfigWidgetProps) {
         <CardContent className="p-4 space-y-3">
           {/* System overview */}
           {data && (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
               <div className="flex flex-col items-center py-2 rounded-lg bg-muted/40 border border-border/50">
                 <Gauge className="h-4 w-4 text-primary mb-1" />
                 <span className="text-lg font-bold text-foreground">{data.healthScore}%</span>
@@ -169,6 +164,20 @@ export function ConfigWidget({ onNavigate }: ConfigWidgetProps) {
                   {data.memoryUsage ? `${data.memoryUsage}MB` : 'N/A'}
                 </span>
                 <span className="text-[9px] text-muted-foreground">RAM</span>
+              </div>
+              <div className="flex flex-col items-center py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                <Settings className="h-4 w-4 text-emerald-500 mb-1" />
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                  {data.nodeVersion || 'N/A'}
+                </span>
+                <span className="text-[9px] text-muted-foreground">Node</span>
+              </div>
+              <div className="flex flex-col items-center py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                <Database className="h-4 w-4 text-amber-500 mb-1" />
+                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                  {data.databaseSize || 'N/A'}
+                </span>
+                <span className="text-[9px] text-muted-foreground">DB</span>
               </div>
             </div>
           )}
@@ -204,7 +213,17 @@ export function ConfigWidget({ onNavigate }: ConfigWidgetProps) {
             </div>
           )}
 
-          {loading && (
+          {error && !data && (
+            <div className="py-6 text-center text-muted-foreground">
+              <AlertCircle className="h-5 w-5 mx-auto mb-1.5 opacity-40 text-amber-500" />
+              <p className="text-xs">Error al cargar datos del sistema</p>
+              <p className="text-[10px] opacity-60 mt-0.5">
+                Reintentara automaticamente
+              </p>
+            </div>
+          )}
+
+          {loading && !error && (
             <div className="py-6 flex items-center justify-center">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             </div>

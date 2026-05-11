@@ -8,6 +8,7 @@ import { fetchWithTimeout } from '@/lib/fetch-utils';
 import { usePolling } from '../hooks/usePolling';
 import { CollapsibleWidget } from '../CollapsibleWidget';
 import type { WidgetStatus } from '../CollapsibleWidget';
+import { timeAgo } from './time-helpers';
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -46,16 +47,6 @@ function deriveStatus(data: JobsSummaryData | null, loading: boolean): WidgetSta
   if (data.fallidos24h > 2) return 'warn';
   if (data.completadosHoy === 0 && data.enProgreso === 0) return 'idle';
   return 'ok';
-}
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'ahora';
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
 }
 
 const ESTADO_STYLES: Record<string, string> = {
@@ -128,7 +119,7 @@ export function JobsWidget({ onNavigate }: JobsWidgetProps) {
         <CardContent className="p-4 space-y-3">
           {/* Status counters */}
           {data && (
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-5 gap-2">
               <div className="flex flex-col items-center py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
                 <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{data.completadosHoy}</span>
                 <span className="text-[8px] text-muted-foreground">Completados</span>
@@ -146,6 +137,11 @@ export function JobsWidget({ onNavigate }: JobsWidgetProps) {
                 <Clock className="h-3.5 w-3.5 text-muted-foreground mb-0.5" />
                 <span className="text-sm font-bold text-slate-600 dark:text-slate-400">{data.pendientes}</span>
                 <span className="text-[8px] text-muted-foreground">Pendientes</span>
+              </div>
+              <div className="flex flex-col items-center py-1.5 rounded-lg bg-zinc-500/5 border border-zinc-500/20">
+                <XCircle className="h-3.5 w-3.5 text-zinc-400 mb-0.5" />
+                <span className="text-sm font-bold text-zinc-600 dark:text-zinc-400">{data.cancelados}</span>
+                <span className="text-[8px] text-muted-foreground">Cancelados</span>
               </div>
             </div>
           )}

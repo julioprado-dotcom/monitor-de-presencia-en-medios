@@ -9,6 +9,7 @@ import { usePolling } from '../hooks/usePolling';
 import { TRATAMIENTO_LABELS, TRATAMIENTO_STYLES } from '@/constants/ui';
 import { CollapsibleWidget } from '../CollapsibleWidget';
 import type { WidgetStatus } from '../CollapsibleWidget';
+import { timeAgo } from './time-helpers';
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -41,18 +42,6 @@ function deriveStatus(data: AlertasSummaryData | null, loading: boolean): Widget
   if (data.agresivasHoy > 5) return 'error';
   if (data.totalAlertasHoy > 0) return 'warn';
   return 'ok';
-}
-
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMin = Math.floor((now - then) / 60_000);
-  if (diffMin < 1) return 'ahora';
-  if (diffMin < 60) return `${diffMin}m`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `${diffH}h`;
-  const diffD = Math.floor(diffH / 24);
-  return `${diffD}d`;
 }
 
 // ─── Component ────────────────────────────────────────────────

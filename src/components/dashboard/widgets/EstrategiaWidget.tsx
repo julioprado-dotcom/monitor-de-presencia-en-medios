@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Rocket, CheckCircle2, Clock, Circle, Target } from 'lucide-react';
@@ -67,12 +66,12 @@ const FASES: RoadmapFase[] = [
     id: 'fase-4',
     nombre: 'Fase 4: Inteligencia',
     descripcion: 'Generadores ONION200 (Termometro, Saldo, Foco, Radar)',
-    estado: 'pendiente',
+    estado: 'en_progreso',
     hitos: [
-      { label: 'Generador Termometro', completado: false },
-      { label: 'Generador Saldo', completado: false },
-      { label: 'Generador El Foco', completado: false },
-      { label: 'Generador El Radar', completado: false },
+      { label: 'Generador Termometro (configurado)', completado: true },
+      { label: 'Generador Saldo (configurado)', completado: true },
+      { label: 'Generador El Foco (configurado)', completado: true },
+      { label: 'Generador El Radar (configurado)', completado: true },
     ],
   },
   {
@@ -224,7 +223,9 @@ export function EstrategiaWidget({ onNavigate }: EstrategiaWidgetProps) {
           {/* Version tag */}
           <div className="text-center pt-1">
             <Badge variant="outline" className="text-[9px] px-2 py-0.5">
-              v0.15.0 · DECODEX Bolivia
+              {typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_APP_VERSION
+                ? `v${process.env.NEXT_PUBLIC_APP_VERSION} · DECODEX Bolivia`
+                : 'DECODEX Bolivia · ONION200 v0.14.0'}
             </Badge>
           </div>
         </CardContent>

@@ -8,14 +8,13 @@ import { fetchWithTimeout } from '@/lib/fetch-utils';
 import { usePolling } from '../hooks/usePolling';
 import { CollapsibleWidget } from '../CollapsibleWidget';
 import type { WidgetStatus } from '../CollapsibleWidget';
+import { timeAgo } from './time-helpers';
 
 // ─── Types ────────────────────────────────────────────────────
 
 interface AuditoriaRow {
   id: string;
-  medioId: string;
   nombre: string;
-  url: string;
   estado: string;
   activo: boolean;
   capaActual: number;
@@ -26,8 +25,6 @@ interface AuditoriaRow {
   checksSinCambio: number;
   responseTime: number;
   esDegradado: boolean;
-  estaMuerto: boolean;
-  strategyValid: string | null;
 }
 
 interface AuditoriaData {
@@ -104,23 +101,19 @@ export function AuditoriaWidget({ onNavigate }: AuditoriaWidgetProps) {
           degradadas,
           sinCheckReciente,
           scorePromedio,
-          fuentes: fuentes.map((f: { id: string; medioId: string; nombre: string; url: string; estado: string; activo: boolean; capaActual: number; ultimoCheck: string | null; totalChecks: number; totalCambios: number; checksSinCambio: number; responseTime: number }) => ({
+          fuentes: fuentes.map((f: { id: string; nombre: string; estado: string; activo: boolean; capaActual: number; ultimoCheck: string | null; totalChecks: number; totalCambios: number; checksSinCambio: number; responseTime: number }) => ({
             id: f.id,
-            medioId: f.medioId,
             nombre: f.nombre,
-            url: f.url,
             estado: f.estado,
             activo: f.activo,
             capaActual: f.capaActual,
             ultimoCheck: f.ultimoCheck,
-            ultimoCheckHace: f.ultimoCheck ? getRelativeTime(f.ultimoCheck) : 'nunca',
+            ultimoCheckHace: f.ultimoCheck ? timeAgo(f.ultimoCheck) : 'nunca',
             totalChecks: f.totalChecks,
             totalCambios: f.totalCambios,
             checksSinCambio: f.checksSinCambio,
             responseTime: f.responseTime,
             esDegradado: f.checksSinCambio >= 7,
-            estaMuerto: false,
-            strategyValid: null,
           })),
         });
         setLoading(false);
@@ -251,14 +244,4 @@ export function AuditoriaWidget({ onNavigate }: AuditoriaWidgetProps) {
       </Card>
     </CollapsibleWidget>
   );
-}
-
-function getRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'ahora';
-  if (mins < 60) return `hace ${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `hace ${hours}h`;
-  return `hace ${Math.floor(hours / 24)}d`;
 }

@@ -8,6 +8,7 @@ import { fetchWithTimeout } from '@/lib/fetch-utils';
 import { usePolling } from '../hooks/usePolling';
 import { CollapsibleWidget } from '../CollapsibleWidget';
 import type { WidgetStatus } from '../CollapsibleWidget';
+import { timeAgo } from './time-helpers';
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -47,18 +48,6 @@ function TendenciaBadge({ tendencia }: { tendencia: 'up' | 'down' | 'stable' }) 
   if (tendencia === 'up') return <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />;
   if (tendencia === 'down') return <TrendingDown className="h-3.5 w-3.5 text-red-500" />;
   return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
-}
-
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMin = Math.floor((now - then) / 60_000);
-  if (diffMin < 1) return 'ahora';
-  if (diffMin < 60) return `${diffMin}m`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `${diffH}h`;
-  const diffD = Math.floor(diffH / 24);
-  return `${diffD}d`;
 }
 
 const TRATAMIENTO_STYLES: Record<string, string> = {

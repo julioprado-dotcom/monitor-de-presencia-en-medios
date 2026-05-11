@@ -31,36 +31,42 @@ export async function GET() {
 
     const totalActivos = ejes.length;
 
-    const ejesMapped = await Promise.all(
-      ejes.map(async (eje) => {
-        // Collect root + children IDs
-        const allEjeIds = [eje.id, ...eje.children.map((c) => c.id)];
+    // Batch query for today mentions (avoid N+1)
+    const allEjeIds = ejes.flatMap((e) => [e.id, ...e.children.map((c) => c.id)]);
+    const todayMentionCounts = await db.mencionTema.groupBy({
+      by: ['ejeTematicoId'],
+      where: {
+        ejeTematicoId: { in: allEjeIds },
+        mencion: { fechaCaptura: { gte: todayStart } },
+      },
+      _count: true,
+    });
+    const todayCountMap = new Map<string, number>();
+    for (const row of todayMentionCounts) {
+      todayCountMap.set(row.ejeTematicoId, row._count);
+    }
 
-        // Today mentions via MencionTema → Mencion join
-        const mencionesHoy = await db.mencionTema.count({
-          where: {
-            ejeTematicoId: { in: allEjeIds },
-            mencion: { fechaCaptura: { gte: todayStart } },
-          },
-        });
+    const ejesMapped = ejes.map((eje) => {
+      const ejeIds = [eje.id, ...eje.children.map((c) => c.id)];
+      const mencionesHoy = ejeIds.reduce(
+        (sum, id) => sum + (todayCountMap.get(id) ?? 0),
+        0,
+      );
+      const totalMenciones =
+        eje._count.menciones +
+        eje.children.reduce((s, c) => s + c._count.menciones, 0);
 
-        // Total mentions (all time, root + children)
-        const totalMenciones =
-          eje._count.menciones +
-          eje.children.reduce((s, c) => s + c._count.menciones, 0);
-
-        return {
-          id: eje.id,
-          nombre: eje.nombre,
-          slug: eje.slug,
-          color: eje.color,
-          icono: eje.icono,
-          mencionesHoy,
-          totalMenciones,
-          temasCount: eje.children.length,
-        };
-      }),
-    );
+      return {
+        id: eje.id,
+        nombre: eje.nombre,
+        slug: eje.slug,
+        color: eje.color,
+        icono: eje.icono,
+        mencionesHoy,
+        totalMenciones,
+        temasCount: eje.children.length,
+      };
+    });
 
     const conActividadHoy = ejesMapped.filter((e) => e.mencionesHoy > 0).length;
 

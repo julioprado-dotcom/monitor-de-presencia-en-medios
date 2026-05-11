@@ -39,11 +39,15 @@ export async function GET() {
       }),
     ]);
 
-    // Jobs by type
-    const jobsByType = recentJobs.reduce<Record<string, number>>((acc, j) => {
-      acc[j.tipo] = (acc[j.tipo] || 0) + 1;
-      return acc;
-    }, {});
+    // Jobs by type — aggregate from ALL jobs, not just recent 10
+    const jobsByTypeRaw = await db.job.groupBy({
+      by: ['tipo'],
+      _count: true,
+    });
+    const jobsByType: Record<string, number> = {};
+    for (const row of jobsByTypeRaw) {
+      jobsByType[row.tipo] = row._count;
+    }
 
     const ultimos = recentJobs.map((j) => {
       const duracion =

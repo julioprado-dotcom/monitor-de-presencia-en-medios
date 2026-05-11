@@ -40,7 +40,7 @@ export async function GET() {
       plan: c.plan,
       segmento: c.segmento,
       contratosCount: c._count.contratos,
-      fechaCreacion: c.fechaCreacion.toISOString(),
+      fechaCreacion: c.fechaCreacion?.toISOString() ?? new Date().toISOString(),
     }));
 
     return NextResponse.json({
@@ -56,7 +56,7 @@ export async function GET() {
             organizacion: ultimoRegistro.organizacion,
             plan: ultimoRegistro.plan,
             segmento: ultimoRegistro.segmento,
-            fechaCreacion: ultimoRegistro.fechaCreacion.toISOString(),
+            fechaCreacion: ultimoRegistro.fechaCreacion?.toISOString() ?? new Date().toISOString(),
           }
         : null,
       topClientes,
