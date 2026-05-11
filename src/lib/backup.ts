@@ -12,8 +12,11 @@ import db from '@/lib/db'
 
 // ── Configuración ────────────────────────────────────────────────────
 
-const BACKUP_DIR = path.join(process.cwd(), 'backups')
-const ARCHIVE_DIR = path.join(process.cwd(), 'backups', 'archives')
+// Use __dirname-based resolution instead of process.cwd() (Edge Runtime compatible)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const _PROJECT_ROOT = path.resolve(process.env.PROJECT_ROOT || path.dirname(require.main?.filename ?? __dirname))
+const BACKUP_DIR = path.join(_PROJECT_ROOT, 'backups')
+const ARCHIVE_DIR = path.join(_PROJECT_ROOT, 'backups', 'archives')
 
 // Tablas críticas a exportar antes de cualquier purge
 const CRITICAL_TABLES = [
@@ -102,7 +105,7 @@ function getDbPath(): string {
   let dbPath = match[1]
   // Si es ruta relativa, resolver desde prisma/
   if (!path.isAbsolute(dbPath)) {
-    dbPath = path.join(process.cwd(), 'prisma', dbPath)
+    dbPath = path.join(_PROJECT_ROOT, 'prisma', dbPath)
   }
   return dbPath
 }
