@@ -20,8 +20,8 @@ const db = new PrismaClient()
 
 // ─── Configuración ─────────────────────────────────────────────
 const DAYS_TO_EXTRACT = 7
-const DELAY_BETWEEN_SOURCES_A = 4 * 60 * 1000  // 4 min entre fuentes A
-const DELAY_BETWEEN_SOURCES_B = 2 * 60 * 1000  // 2 min entre fuentes B
+const DELAY_BETWEEN_SOURCES_A = 1 * 60 * 1000  // 1 min entre fuentes A (acelerado)
+const DELAY_BETWEEN_SOURCES_B = 1 * 60 * 1000  // 1 min entre fuentes B (acelerado)
 const MAX_ARTICLES_PER_SOURCE = 50               // máximo artículos a extraer por fuente
 const MAX_SOURCES_PER_HOUR = 12
 const CPU_THRESHOLD = 80
@@ -30,62 +30,59 @@ const MEM_THRESHOLD = 80
 const DRY_RUN = process.argv.includes('--dry-run')
 
 // ─── Nivel A: Fuentes con sitemap o archivo por fecha ──────────
-const FUENTES_NIVEL_A: Record<string, { tipo: 'sitemap' | 'archivo_fecha'; sitemapUrl?: string; urlPattern?: string }> = {
-  'eldia.com.bo': {
-    tipo: 'archivo_fecha',
-    urlPattern: 'https://eldia.com.bo/{YYYY}/{MM}/{DD}/',
-  },
-  'la-razon.com': {
-    tipo: 'sitemap',
-    sitemapUrl: 'https://la-razon.com/sitemap_index.xml',
-  },
-  'correodelsur.com': {
-    tipo: 'archivo_fecha',
-    urlPattern: 'https://correodelsur.com/{YYYY}/{MM}/{DD}/',
-  },
-  'elpotosi.net': {
-    tipo: 'sitemap',
-    sitemapUrl: 'https://elpotosi.net/sitemap.xml',
-  },
-  'boliviaverifica.bo': {
-    tipo: 'sitemap',
-    sitemapUrl: 'https://boliviaverifica.bo/wp-sitemap-posts-post-1.xml',
-  },
-  'bolpress.com': {
-    tipo: 'sitemap',
-    sitemapUrl: 'https://bolpress.com/wp-sitemap-posts-post-1.xml',
-  },
-  'bolpress.com_2': {
-    tipo: 'sitemap',
-    sitemapUrl: 'https://bolpress.com/wp-sitemap-posts-post-2.xml',
-  },
-  'elperiodico.com.bo': {
-    tipo: 'sitemap',
-    sitemapUrl: 'https://elperiodico.com.bo/wp-sitemap-posts-post-1.xml',
-  },
-  'lavozdetarija.com': {
-    tipo: 'sitemap',
-    sitemapUrl: 'https://lavozdetarija.com/sitemap-index-1.xml',
-  },
+// Scouting results (2026-05-13):
+//   ✅ leo.bo: /{YYYY}/{MM}/{DD}/ → 21-25 articles/day (WORKS)
+//   ✅ bolpress.com: homepage has /2026/05/DD/slug pattern (WP, sitemap timeout)
+//   ✅ eldia.com.bo: homepage has /2026-MM-DD/seccion/slug pattern (NO archive)
+//   ✅ elperiodico.com.bo: homepage has /slug pattern (WP, sitemap empty 7d)
+//   ✅ lavozdetarija.com: homepage has /2026/MM/DD/slug pattern (WP)
+//   ✅ boliviaverifica.bo: homepage has /slug pattern (WP, sitemap slow)
+//   ✅ lostiempos.com: Drupal, links in HTML as /actualidad/seccion/YYYYMMDD/slug
+//   ❌ la-razon.com: Cloudflare managed challenge (BLOQUEADA)
+//   ❌ elpotosi.net: Cloudflare non-interactive challenge (BLOQUEADA)
+//   ❌ correodelsur.com: Cloudflare + SPA (no article links in HTML)
+//   ❌ opinion.com.bo: 403 Forbidden
+//   ❌ vision360.bo: SPA, no static article URLs
+//   ❌ elpais.bo: No useful archive pattern
+
+const FUENTES_NIVEL_A: Record<string, { tipo: 'sitemap' | 'archivo_fecha' | 'homepage'; sitemapUrl?: string; urlPattern?: string; homepageUrl?: string; articlePattern?: RegExp }> = {
   'leo.bo': {
     tipo: 'archivo_fecha',
     urlPattern: 'https://leo.bo/{YYYY}/{MM}/{DD}/',
   },
+  'bolpress.com': {
+    tipo: 'homepage',
+    homepageUrl: 'https://bolpress.com/',
+    articlePattern: /href="(https:\/\/bolpress\.com\/2026\/[0-9]{2}\/[0-9]{2}\/[^"]+)"/gi,
+  },
+  'eldia.com.bo': {
+    tipo: 'homepage',
+    homepageUrl: 'https://eldia.com.bo/',
+    articlePattern: /href="(https:\/\/eldia\.com\.bo\/2026-[0-9]{2}-[0-9]{2}\/[^"]+)"/gi,
+  },
+  'elperiodico.com.bo': {
+    tipo: 'homepage',
+    homepageUrl: 'https://elperiodico.com.bo/',
+    articlePattern: /href="(https:\/\/elperiodico\.com\.bo\/[a-z][^"]*-[a-z][^"\/]*\/)"/gi,
+  },
+  'lavozdetarija.com': {
+    tipo: 'homepage',
+    homepageUrl: 'https://lavozdetarija.com/',
+    articlePattern: /href="(https:\/\/lavozdetarija\.com\/2026\/[0-9]{2}\/[0-9]{2}\/[^"]+)"/gi,
+  },
+  'boliviaverifica.bo': {
+    tipo: 'homepage',
+    homepageUrl: 'https://boliviaverifica.bo/',
+    articlePattern: /href="(https:\/\/boliviaverifica\.bo\/[a-z][^"]*-[a-z][^"\/]*\/)"/gi,
+  },
+  'www.lostiempos.com': {
+    tipo: 'homepage',
+    homepageUrl: 'https://www.lostiempos.com/',
+    articlePattern: /href="(\/actualidad\/[^"]+\/202[0-9]{5}\/[^"]+)"/gi,
+  },
   'resumenlatinoamericano.org': {
     tipo: 'sitemap',
     sitemapUrl: 'https://resumenlatinoamericano.org/post-sitemap.xml',
-  },
-  'vision360.bo': {
-    tipo: 'sitemap',
-    sitemapUrl: 'https://vision360.bo/sitemap.xml',
-  },
-  'www.lostiempos.com': {
-    tipo: 'sitemap',
-    sitemapUrl: 'https://www.lostiempos.com/rss/portada',
-  },
-  'elpais.bo': {
-    tipo: 'archivo_fecha',
-    urlPattern: 'https://elpais.bo/seccion/flash/',
   },
 }
 
@@ -245,6 +242,36 @@ async function checkResources(): Promise<{ ok: boolean; cpu: number; mem: number
 
 // ─── Extract articles from archive page ────────────────────────
 
+async function fetchHomepage(url: string): Promise<string> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 20000)
+    const res = await fetch(url, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,*/*',
+      },
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    if (!res.ok) {
+      console.warn(`  ⚠️  HTTP ${res.status} para ${url}`)
+      return ''
+    }
+    const html = await res.text()
+    // Check for Cloudflare challenge pages
+    if (html.includes('Just a moment') || html.includes('challenge-platform')) {
+      console.warn(`  ⚠️  Cloudflare challenge detectado para ${url}`)
+      return ''
+    }
+    return html
+  } catch (e) {
+    console.warn(`  ⚠️  Fetch falló para ${url}: ${e instanceof Error ? e.message : e}`)
+    return ''
+  }
+}
+
 async function extractArticleUrlsFromArchive(archiveUrl: string): Promise<string[]> {
   try {
     const controller = new AbortController()
@@ -359,6 +386,41 @@ async function processNivelA(existingUrls: Set<string>, startDate: Date) {
         articleUrls = allEntries.map(e => e.url)
         console.log(`  📋 ${articleUrls.length} URLs totales de sub-sitemaps`)
       }
+
+    } else if (config.tipo === 'homepage' && config.homepageUrl && config.articlePattern) {
+      // Scrape homepage to extract article URLs via regex pattern
+      console.log(`  🌐 Homepage: ${config.homepageUrl}`)
+      const html = await fetchHomepage(config.homepageUrl)
+      if (!html) {
+        console.log(`  ❌ No se pudo obtener homepage`)
+        continue
+      }
+      // Reset regex lastIndex
+      const pattern = new RegExp(config.articlePattern.source, config.articlePattern.flags)
+      let match
+      const seen = new Set<string>()
+      while ((match = pattern.exec(html)) !== null) {
+        let url = match[1]
+        // Make absolute if relative (for lostiempos)
+        if (url.startsWith('/')) {
+          try {
+            url = new URL(url, config.homepageUrl).href
+          } catch { continue }
+        }
+        // Filter out non-article URLs
+        if (url.includes('/category/') || url.includes('/tag/') || url.includes('/page/') || url.includes('/author/') || url.endsWith('/wp-json/') || url.includes('/apps/')) continue
+        // For Bolivia Verifica, skip static analysis pages
+        if (url.includes('/analisis-del-discurso-20')) continue
+        // For date-based patterns, only keep last 7 days
+        const urlDate = parseDateFromUrl(url)
+        if (urlDate && !isWithinDays(urlDate, DAYS_TO_EXTRACT + 1)) continue
+        // For slug-based patterns (no date in URL), include all from homepage
+        if (!seen.has(url)) {
+          seen.add(url)
+          articleUrls.push(url)
+        }
+      }
+      console.log(`  📋 ${articleUrls.length} URLs extraídas de homepage`)
 
     } else if (config.tipo === 'archivo_fecha' && config.urlPattern) {
       // Construct URLs for each day
