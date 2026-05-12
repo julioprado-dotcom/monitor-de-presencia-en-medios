@@ -41,12 +41,12 @@ const PROJECT_ROOT = process.cwd()
 const SCRIPT_PATH = path.join(PROJECT_ROOT, 'scripts', 'backup-db-github.sh')
 const DB_PATH = path.join(PROJECT_ROOT, 'prisma', 'db', 'custom.db')
 
-// Horarios de backup (horas UTC) — 4 veces al día
+// Horarios de backup (horas UTC = Bolivia -4) — 4 veces al día
 const BACKUP_SCHEDULES: { utcHour: number; periodo: string }[] = [
-  { utcHour: 3,  periodo: '23-noche' },   // Bolivia 23:00
-  { utcHour: 10, periodo: '06-mañana' },   // Bolivia 06:00
-  { utcHour: 16, periodo: '12-mediodía' }, // Bolivia 12:00
-  { utcHour: 22, periodo: '18-tarde' },    // Bolivia 18:00
+  { utcHour: 9,  periodo: '05-mañana' },   // Bolivia 05:00 AM
+  { utcHour: 14, periodo: '10-mediodía' },  // Bolivia 10:00 AM
+  { utcHour: 20, periodo: '16-tarde' },    // Bolivia 16:00 (4 PM)
+  { utcHour: 3,  periodo: '23-noche' },    // Bolivia 23:00
 ]
 
 // Lock para evitar backups simultáneos
