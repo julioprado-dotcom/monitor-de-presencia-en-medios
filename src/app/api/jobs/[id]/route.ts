@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getJob, cancel, pauseJob, resumeJob, deleteJob } from '@/lib/jobs/queue'
 import { safeError } from '@/lib/rate-guard'
+import { withAuth } from '@/lib/auth-helpers'
 
 export async function GET(
   request: NextRequest,
@@ -71,6 +72,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { error: authError } = await withAuth()
+  if (authError) return authError
+
   try {
     const { id } = await params
 

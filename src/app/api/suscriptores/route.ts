@@ -5,6 +5,7 @@ import { guardedParse, rateGuard, RATE } from '@/lib/rate-guard';
 import { safeError as safeErrorGuard } from '@/lib/rate-guard';
 import { safeError } from '@/lib/safe-error';
 import { isRateLimited, getClientIp } from '@/lib/rate-limit';
+import { withAuth } from '@/lib/auth-helpers';
 
 /* ═══════════════════════════════════════════════════════════
    GET /api/suscriptores
@@ -151,6 +152,9 @@ export async function PUT(request: NextRequest) {
    ═══════════════════════════════════════════════════════════ */
 
 export async function DELETE(request: NextRequest) {
+  const { error: authError } = await withAuth();
+  if (authError) return authError;
+
   try {
     const ip = getClientIp(request);
     const { limited } = isRateLimited(ip, RATE.WRITE);

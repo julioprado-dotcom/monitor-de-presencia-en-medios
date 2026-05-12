@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { safeError } from '@/lib/safe-error';
+import { withAuth } from '@/lib/auth-helpers';
 
 // ─── GET: Detalle de un eje con menciones paginadas ─────────────
 
@@ -133,6 +134,9 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string; ejeId: string }> },
 ) {
+  const { error: authError } = await withAuth();
+  if (authError) return authError;
+
   try {
     const { id: clienteId, ejeId } = await params;
 

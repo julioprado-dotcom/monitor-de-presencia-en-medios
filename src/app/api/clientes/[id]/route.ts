@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { rateGuard, RATE } from '@/lib/rate-guard';
 import { isRateLimited, getClientIp } from '@/lib/rate-limit';
+import { withAuth } from '@/lib/auth-helpers';
 
 export async function GET(
   _request: NextRequest,
@@ -86,6 +87,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authError } = await withAuth();
+  if (authError) return authError;
+
   try {
     const ip = getClientIp(request);
     const { limited } = isRateLimited(ip, RATE.WRITE);

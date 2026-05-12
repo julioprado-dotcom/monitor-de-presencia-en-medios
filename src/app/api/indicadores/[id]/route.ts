@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { safeError } from '@/lib/rate-guard';
+import { withAuth } from '@/lib/auth-helpers';
 
 // GET /api/indicadores/[id] — Detalle de un indicador con valores o evaluaciones
 export async function GET(
@@ -112,6 +113,9 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authError } = await withAuth();
+  if (authError) return authError;
+
   try {
     const { id } = await params;
     await db.indicador.delete({ where: { id } });

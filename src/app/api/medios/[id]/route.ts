@@ -4,6 +4,7 @@ import { RATE, safeError } from '@/lib/rate-guard';
 import { isRateLimited, getClientIp } from '@/lib/rate-limit';
 import { medioUpdateSchema } from '@/lib/validations';
 import { guardedParse } from '@/lib/rate-guard';
+import { withAuth } from '@/lib/auth-helpers';
 
 export async function GET(
   _request: NextRequest,
@@ -56,6 +57,9 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authError } = await withAuth();
+  if (authError) return authError;
+
   try {
     const { id } = await params;
     const medio = await db.medio.findUnique({

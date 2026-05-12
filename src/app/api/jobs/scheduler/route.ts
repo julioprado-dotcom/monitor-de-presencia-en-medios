@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rescheduleAll, startScheduler, stopScheduler, getSchedulerStatus } from '@/lib/jobs/scheduler'
 import { safeError } from '@/lib/rate-guard'
+import { withAuth } from '@/lib/auth-helpers'
 
 export async function GET() {
   try {
@@ -16,6 +17,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const { error: authError } = await withAuth()
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { accion } = body as { accion?: string }

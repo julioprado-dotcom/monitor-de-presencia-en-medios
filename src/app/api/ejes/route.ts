@@ -3,6 +3,7 @@ import db from '@/lib/db';
 import { guardedParse, RATE, safeError } from '@/lib/rate-guard';
 import { isRateLimited, getClientIp } from '@/lib/rate-limit';
 import { ejeCreateSchema, ejePatchSchema } from '@/lib/validations';
+import { withAuth } from '@/lib/auth-helpers';
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -274,6 +275,9 @@ export async function PATCH(request: NextRequest) {
 // ─── DELETE — Soft delete ──────────────────────────────────────
 
 export async function DELETE(request: NextRequest) {
+  const { error: authError } = await withAuth();
+  if (authError) return authError;
+
   try {
     const ip = getClientIp(request);
     const { limited } = isRateLimited(ip, RATE.WRITE);

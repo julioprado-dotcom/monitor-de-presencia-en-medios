@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { safeError } from '@/lib/rate-guard'
+import { withAuth } from '@/lib/auth-helpers'
 
 // Tables to DELETE (test data)
 const TABLES_TO_DELETE = [
@@ -43,6 +44,9 @@ async function deleteTable(table: string): Promise<number> {
 }
 
 export async function POST(request: Request) {
+  const { error: authError } = await withAuth()
+  if (authError) return authError
+
   try {
     const body = await request.json().catch(() => ({}))
     const confirmed = body?.confirm === true

@@ -9,6 +9,7 @@ import {
   getBackupSummary,
   archiveBeforePurge,
 } from '@/lib/backup'
+import { withAuth } from '@/lib/auth-helpers'
 
 // GET /api/backup — Listar backups + resumen del sistema
 export async function GET() {
@@ -36,6 +37,9 @@ export async function GET() {
 // POST /api/backup — Crear backup manual
 // Body: { accion: 'snapshot' | 'archive' | 'full', razon?: string }
 export async function POST(request: Request) {
+  const { error: authError } = await withAuth()
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const accion = body.accion || 'full'
@@ -103,6 +107,9 @@ export async function POST(request: Request) {
 // PATCH /api/backup — Restaurar desde snapshot
 // Body: { archivo: 'snapshot-YYYYMMDD-HHMMSS.db' }
 export async function PATCH(request: Request) {
+  const { error: authError } = await withAuth()
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const archivo = body.archivo
