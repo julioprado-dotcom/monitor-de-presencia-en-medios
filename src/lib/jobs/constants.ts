@@ -63,10 +63,12 @@ export const FRECUENCIA_BASE_POR_CATEGORIA: Record<string, string> = {
 // ── Frecuencias base por medio especifico (override de categoria) ──────
 
 export const FRECUENCIA_BASE_POR_MEDIO: Record<string, string> = {
-  // Nivel 1 — Top 5 con 4x/dia
+  // PRIORIDAD MAXIMA — Los Tiempos: cada 15 min (16 checks/día)
+  'lostiempos.com': '15m',
+
+  // Nivel 1 — Top 4 con 4x/dia
   'la-razon.com': '1h',
   'eldeber.com.bo': '1h',
-  'lostiempos.com': '1h',
   'rtpbolivia.com.bo': '1h',
   'abi.bo': '1h',
 
@@ -87,9 +89,10 @@ export const FRECUENCIA_BASE_POR_MEDIO: Record<string, string> = {
 // ── Horarios por defecto (sin datos de histograma) ─────────────────────
 
 export const HORARIOS_DEFAULT: Record<string, number[]> = {
+  // Los Tiempos — PRIORIDAD MAXIMA: 16 checks/día (06:00–22:00)
+  'lostiempos.com': [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
   'la-razon.com': [7, 8, 10, 11],
   'eldeber.com.bo': [7, 8, 10, 11],
-  'lostiempos.com': [7, 8, 10, 11],
   'rtpbolivia.com.bo': [7, 8, 10, 11],
   'abi.bo': [8, 9, 15, 16],
   'unitel.bo': [7, 14],

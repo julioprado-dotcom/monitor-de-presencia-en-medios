@@ -14,6 +14,7 @@
 import { startWorkerIdle, startWorker, stopWorker, registerDefaultRunners, getWorkerStats } from './worker'
 import { startHealthMonitor, stopHealthMonitor } from './health'
 import { startScheduler, stopScheduler } from './scheduler'
+import { startBackupScheduler, stopBackupScheduler } from './backup-scheduler'
 import { enqueue } from './queue'
 import { WARMUP_CONFIG } from './constants'
 
@@ -83,6 +84,9 @@ export async function activateProductiveMode(): Promise<void> {
   // 2. Iniciar scheduler (node-cron para fuentes y boletines)
   await startScheduler()
 
+  // 3. Iniciar backup scheduler (4x/día a GitHub — NUNCA se borran)
+  startBackupScheduler()
+
   console.log('[Jobs] Modo productivo activo — scheduler + worker ejecutando')
 }
 
@@ -110,6 +114,7 @@ export function getStats() {
 
 // Detener todo el sistema
 export async function shutdownJobSystem(): Promise<void> {
+  stopBackupScheduler()
   stopScheduler()
   // Container Guardian — dynamic import para evitar Edge analysis
   try {

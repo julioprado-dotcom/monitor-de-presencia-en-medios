@@ -3,13 +3,21 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { rescheduleAll, startScheduler, stopScheduler, getSchedulerStatus } from '@/lib/jobs/scheduler'
+import { getBackupSchedulerStatus } from '@/lib/jobs/backup-scheduler'
 import { safeError } from '@/lib/rate-guard'
 import { withAuth } from '@/lib/auth-helpers'
 
 export async function GET() {
   try {
     const status = getSchedulerStatus()
-    return NextResponse.json(status)
+    const backupStatus = getBackupSchedulerStatus()
+    return NextResponse.json({
+      ...status,
+      backup: {
+        ...backupStatus,
+        politica: '4x/día — NUNCA se borran — GitHub',
+      },
+    })
   } catch (error: unknown) {
     console.error('[API /jobs/scheduler GET]', error)
     return NextResponse.json({ error: safeError(error, 'jobs/scheduler') }, { status: 500 })

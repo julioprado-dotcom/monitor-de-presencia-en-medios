@@ -170,7 +170,9 @@ function scheduleFuente(
   }).catch(() => {})
 
   // 5. Programar tareas con node-cron
-  const prioridad = fuente.medio.nivel === '1' ? 1 : 3
+  // Los Tiempos = P0 (prioridad absoluta), resto nivel 1 = P1, otros = P3
+  const domain = (fuente.medio.nombre || '').toLowerCase().includes('tiempos') ? 'lostiempos.com' : ''
+  const prioridad = domain === 'lostiempos.com' ? 0 : (fuente.medio.nivel === '1' ? 1 : 3)
 
   for (const hora of horarios) {
     scheduleSingleCheck(fuente, prioridad, hora)
