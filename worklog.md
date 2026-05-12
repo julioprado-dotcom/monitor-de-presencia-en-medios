@@ -271,3 +271,26 @@ Stage Summary:
 - El LLM classifier filtra artículos que no mencionan legisladores rastreados ni ejes temáticos
 - Necesario: ajustar umbrales del clasificador LLM o ampliar criterios de relevancia para retroactivos
 - Fuentes que bloquean scraping (403): elpotosi.net, opinion.com.bo
+---
+Task ID: 1
+Agent: Super Z (main)
+Task: PASO 0-7 — Corrección de Inconsistencias en Clasificación DECODEX v2
+
+Work Log:
+- Diagnóstico completo: 175 menciones, 35 ejes legacy, 1 día de datos, 39% clasificaciones en ejes CÓMO
+- Schema modificado: tablas Lente, Keyword, MencionLente + campo tipo en EjeTematico + ejeEstructuralId en Mencion
+- 9 ejes estructurales creados con 238 keywords
+- 9 lentes transversales creados con 212 keywords
+- Clasificador v2 implementado (keyword-based con regla especial movilización)
+- 158/175 menciones reclasificadas (90.3% cobertura)
+- 4/5 tests de prueba pasados (Test 5 requiere LLM semántico)
+- Eje Movilización Social: 129→9 menciones (como eje), 59 como lente
+- Git commits: 3
+
+Stage Summary:
+- Problema estructural resuelto: 39% de clasificaciones en CÓMO redistribuidas a ejes QUÉ correctos
+- Lente movilización-social captura 59 menciones como forma de acción
+- 17 menciones sin reclasificar (texto vacío/genérico)
+- Reportes generados: DIAGNOSTICO-CLASIFICACION.md, REPORTE-EJES-V2.md
+- Próximos pasos: integrar en pipeline de scrape, ampliar keywords, actualizar UI
+
