@@ -1,5 +1,10 @@
 PROTOCOLO GIT — Monitor de Presencia en Medios
 
+PROCEDIMIENTO DE ARRANQUE DEL SERVIDOR
+Ver docs/PROCEDIMIENTO_ARRANQUE.md — Documentacion completa con diagnostico,
+comando verificado, explicacion tecnica y metodos auxiliares.
+Referencia rapida en CONTEXTO.md — Seccion 1.
+
 REGLAS ABSOLUTAS
 
     .zscripts/ NUNCA en el repositorio. Son infraestructura del sandbox. Si se trackean causan merge conflicts al hacer release sandbox. El merge conflict bloquea TODAS las herramientas (deadlock). SIEMPRE verificar que .zscripts/ esté en .gitignore.

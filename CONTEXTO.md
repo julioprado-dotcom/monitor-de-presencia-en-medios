@@ -2,11 +2,37 @@ CONTEXTO — DECODEX Bolivia v0.14.0
 
 1. PROTOCOLO DE ACCION INMEDIATA
 
+    *** PROCEDIMIENTO DE ARRANQUE DEL SERVIDOR ***
+    *** Documentacion completa: docs/PROCEDIMIENTO_ARRANQUE.md ***
+
     Verificar servidor: curl -s -o /dev/null -w "%{http_code}" http://localhost:3000
-    Si devuelve 000 → servidor caido. Levantar con demonio persistente:
-        cd /home/z/my-project/connect && (setsid npx next start -p 3000 > /dev/null 2>&1 &)
+    Si devuelve 000 → servidor caido.
+
+    LEVANTAR SERVIDOR (metodo unico verificado para Z.ai sandbox):
+        node -e "
+        const { spawn } = require('child_process');
+        const fs = require('fs');
+        const log = fs.openSync('/tmp/decodex-server.log', 'a');
+        const child = spawn(
+          '/home/z/my-project/node_modules/next/dist/bin/next',
+          ['start', '-p', '3000'],
+          {
+            cwd: '/home/z/my-project',
+            stdio: ['ignore', log, log],
+            detached: true,
+            env: {...process.env, DATABASE_URL: 'file:/home/z/my-project/db/custom.db'}
+          }
+        );
+        child.unref();
+        "
+
     Verificar Caddy: curl -s -o /dev/null -w "%{http_code}" http://localhost:81
-    Verificar DB: ls -la db/custom.db (debe existir, ~229KB)
+    Verificar DB: ls -la prisma/db/custom.db (debe existir, ~6-7 MB)
+    Ver logs: tail -20 /tmp/decodex-server.log
+
+    NOTA: nohup, setsid y & directo NO funcionan en el Bash tool de Z.ai.
+    Solo spawn() con detached:true + unref() sobrevive entre llamadas.
+    Ver explicacion completa en docs/PROCEDIMIENTO_ARRANQUE.md
 
     LO QUE NO SE DEBE HACER
     NUNCA ejecutar bun run dev manualmente — colapsa el panel de preview
@@ -18,7 +44,7 @@ CONTEXTO — DECODEX Bolivia v0.14.0
     Contenedor Linux con usuario "z", Caddy en puerto 81, Next.js en puerto 3000
     Preview via iframe cross-origin: Firefox ETP bloquea cookies de terceros
     Por eso esta version (v07) NO tiene autenticacion — acceso directo al dashboard
-    Daemon persistente: setsid + nohup para mantener vivo sin sesion shell
+    Daemon persistente: spawn() con detached:true + unref() (ver PROCEDIMIENTO_ARRANQUE.md)
 
 2. IDENTIDAD DEL PROYECTO
 
@@ -202,7 +228,8 @@ Subtitulo: "Motor de inteligencia mediatica y analisis de senales del Sur Global
     CSP frame-ancestors 'self' bloqueaba iframe → Removido de next.config.ts
     HSTS 2 anos bloqueaba navegador → Reducido, luego eliminado
     output: 'standalone' causaba crashes → Deshabilitado
-    Server caia entre sesiones → Demonio persistente (setsid + nohup)
+    Server caia entre sesiones → Demonio persistente (setsid + nohup) — OBSOLETO
+    Server caia entre llamadas Bash tool → spawn() detached + unref() (ver docs/PROCEDIMIENTO_ARRANQUE.md)
 
 19. PREFERENCIAS DEL USUARIO
 
