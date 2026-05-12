@@ -294,3 +294,24 @@ Stage Summary:
 - Reportes generados: DIAGNOSTICO-CLASIFICACION.md, REPORTE-EJES-V2.md
 - Próximos pasos: integrar en pipeline de scrape, ampliar keywords, actualizar UI
 
+---
+Task ID: boletin-del-grano
+Agent: Main Agent
+Task: Implementación completa del producto BOLETÍN DEL GRANO (PASO 1-7)
+
+Work Log:
+- PASO 1: Verificado estado — Lente 9 existe, 46 medios, 175 menciones, 196 keywords preexistentes
+- PASO 2: Registrado producto en TipoBoletin, PRODUCTOS config, BOLETINES_SCHEDULE (lunes 08:00), ETIQUETAS_ENTREGA
+- PASO 3: 174 keywords nuevas agregadas a Lente 9 (total: 196) — cubre 7 ejes internos + EN/ES
+- PASO 4: 13 fuentes nuevas registradas (IBCE, SENASAG, OIC, SCA, Perfect Daily Grind, Coffee Review, etc.)
+- PASO 5: Creado generador PDF (boletin-del-grano.ts, 962 líneas) con 9 secciones + paleta cafetera
+- PASO 6: Prueba exitosa — HTML 25,643 bytes, 4 noticias ejemplo, 5/7 ejes activados, PDF mock
+- PASO 7: Reporte final guardado en download/REPORTE-BOLETIN-DEL-GRANO.md
+
+Stage Summary:
+- Producto BOLETIN_DEL_GRANO completamente implementado (6 commits)
+- API: POST /api/admin/bulletins/generate-boletin-grano
+- Generador: src/lib/services/boletin-del-grano.ts (9 secciones, paleta #3e2723)
+- Keywords: 196 en Lente 9 (cafe-economicas-regionales)
+- Fuentes: 46 medios (13 nuevas especializadas)
+- Pendiente: Puppeteer en producción, integración con scraper, clasificador LLM
