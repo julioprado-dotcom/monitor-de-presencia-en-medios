@@ -153,7 +153,7 @@ const fichaPersonaEjemplo: FichaPersonaData = {
       titular: 'Entrevista exclusiva: visión económica 2024-2025',
       sentimiento: 'positivo',
       ejeTematico: 'Economía',
-      url: 'https://lostiempos.com/entrevista/9999',
+      url: 'https://www.lostiempos.com/entrevista/9999',
       excerpt: 'En entrevista con Los Tiempos, el ministro compartió...',
     },
   ],
