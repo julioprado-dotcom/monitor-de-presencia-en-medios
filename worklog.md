@@ -337,3 +337,118 @@ Stage Summary:
 - 5 sources blocked by Cloudflare (need Puppeteer for bypass)
 - OIC Café is the most productive source (statistical/market reports)
 - PASO 7 (boletín generation test) requires running server
+# REPORTE: CAPTURA RETROACTIVA DE FUENTES DE CAFE
+## DECODEX Bolivia — ONION200 v0.15.0
+**Fecha:** 2026-05-12
+**Script:** captura-retroactiva-cafe-v3.ts
+**Commit:** 8b4c55e
+
+---
+
+## 1. Resumen Ejecutivo
+
+- **Menciones Lente 9 antes:** 23 (mayoria basura: nav pages, contenido no-cafe)
+- **Menciones Lente 9 despues:** 43
+- **Nuevas menciones creadas:** 20
+- **Objetivo minimo:** 15 → **Estado: SUPERADO (43/15)**
+- **DB total menciones:** 217
+- **DB menciones con lentes:** 228
+
+## 2. Distribucion por Fuente
+
+| # | Fuente | Menciones | Tipo |
+|---|--------|-----------|------|
+| 1 | Perfect Daily Grind | 30 | Articulos/datos |
+| 2 | OIC Café | 8 | Articulos/datos |
+| 3 | SENASAG | 2 | Articulos/datos |
+| 4 | SCA | 2 | Articulos/datos |
+| 5 | IBCE | 1 | Articulos/datos |
+
+## 3. Calidad del Contenido
+
+| Metrica | Valor |
+|---------|-------|
+| Texto promedio | 6,743 chars |
+| Texto minimo | 766 chars |
+| Texto maximo | 8,000 chars |
+| Rango temporal | 2023 a 2026 |
+| Score minimo cafe | 3 |
+
+## 4. Menciones Capturadas (43)
+
+- **Coffee Value Assessment** | SCA | 2026-05-12 | 2152 chars
+- **Global Knowledge Hub** | OIC Café | 2026-05-12 | 766 chars
+- **Datos Macroecon&oacute;micos** | IBCE | 2026-05-12 | 5643 chars
+- **Coffee Shop & Barista** | Perfect Daily Grind | 2026-05-12 | 8000 chars
+- **World Coffee Conference** | OIC Café | 2026-05-12 | 6311 chars
+- **International Coffee Day (ICD)** | OIC Café | 2026-05-12 | 8000 chars
+- **Coffee Development Report** | OIC Café | 2026-05-12 | 1602 chars
+- **The Coffee Public-Private Task Force** | OIC Café | 2026-05-12 | 4785 chars
+- **Coffee Market Report** | OIC Café | 2026-05-12 | 1596 chars
+- **Public Market Information** | OIC Café | 2026-05-12 | 1613 chars
+- **World Coffee Statistics Database** | OIC Café | 2026-05-12 | 3843 chars
+- **SCA News — Specialty Coffee Association** | SCA | 2026-05-12 | 5000 chars
+- **How Turkish coffee earned its place in specialty coffee** | Perfect Daily Grind | 2026-05-12 | 8000 chars
+- **Coffee grinders are evolving, but what do baristas actually need from them?** | Perfect Daily Grind | 2026-05-11 | 8000 chars
+- **Coffee News Recap, 8 May: EUDR set to include instant coffee, Honduras expected to produce** | Perfect Daily Grind | 2026-05-08 | 8000 chars
+- **Can cafés actually reduce costs by roasting their own coffee?** | Perfect Daily Grind | 2026-05-07 | 8000 chars
+- **Brazil has set the template for how to drive domestic coffee consumption** | Perfect Daily Grind | 2026-05-06 | 8000 chars
+- **What are the most valuable skills every barista needs?** | Perfect Daily Grind | 2026-05-04 | 8000 chars
+- **Coffee News Recap, 1 May: Nestlé confirms Blue Bottle sale to Luckin backer, China cuts ta** | Perfect Daily Grind | 2026-05-01 | 8000 chars
+- **It’s harder than ever to stand out at competitions: Baristas need to find an edge** | Perfect Daily Grind | 2026-04-30 | 8000 chars
+- **Homegrown coffee is fuelling Thailand’s specialty boom** | Perfect Daily Grind | 2026-04-29 | 8000 chars
+- **Portable electric coffee equipment is changing how people brew on the go** | Perfect Daily Grind | 2026-04-16 | 8000 chars
+- **Are we entering a new era for grinder technology?** | Perfect Daily Grind | 2026-04-08 | 8000 chars
+- **How can we improve grind consistency for espresso?** | Perfect Daily Grind | 2026-03-25 | 8000 chars
+- **Pre-batched espresso: Why it’s dividing opinion** | Perfect Daily Grind | 2026-03-10 | 8000 chars
+- **How to optimise espresso setup & workflow** | Perfect Daily Grind | 2026-02-18 | 8000 chars
+- **Why is Colombia producing so many co-fermented coffees?** | Perfect Daily Grind | 2026-02-04 | 8000 chars
+- **Co-ferments vs. yeast inoculation: What’s the difference?** | Perfect Daily Grind | 2025-11-05 | 8000 chars
+- **Producers are pushing for more innovation in coffee processing** | Perfect Daily Grind | 2025-09-29 | 8000 chars
+- **How Jamaica's coffee sector is evolving** | Perfect Daily Grind | 2025-09-10 | 8000 chars
+- **How Puerto Rican coffee has evolved & emerged** | Perfect Daily Grind | 2025-07-30 | 8000 chars
+- **Five years on, where does the industry stand on infused coffees?** | Perfect Daily Grind | 2025-07-29 | 8000 chars
+- **As coffee prices stay volatile, has sustainability become less of a priority for roasters?** | Perfect Daily Grind | 2025-07-08 | 8000 chars
+- **How Nepal is emerging as a specialty coffee origin** | Perfect Daily Grind | 2025-06-25 | 8000 chars
+- **For roasters looking for differentiation, Nigerian coffee could be the answer** | Perfect Daily Grind | 2025-04-01 | 8000 chars
+- **Producers are facing more challenges: Could processing innovation be a solution?** | Perfect Daily Grind | 2025-03-04 | 8000 chars
+- **Why coffee brands need to care about more than sustainability certifications** | Perfect Daily Grind | 2024-12-11 | 8000 chars
+- **Why succession and heritage are key to organic & regenerative coffee production** | Perfect Daily Grind | 2024-03-04 | 8000 chars
+- **A Puerto Rican coffee has broken the 90-point barrier – but is there a future for its spec** | Perfect Daily Grind | 2023-10-17 | 8000 chars
+- **Why is soil health so crucial to regenerative agriculture in coffee production?** | Perfect Daily Grind | 2023-08-14 | 8000 chars
+- **How do reusable coffee cups contribute to a circular economy?** | Perfect Daily Grind | 2023-07-04 | 8000 chars
+- **Área Nacional De Sanidad Acuícola** | SENASAG | 2021-07-23 | 4075 chars
+- **Área de Registros de Insumos Agrícolas** | SENASAG | 2021-07-20 | 4574 chars
+
+## 5. Fuentes Accesibles vs Bloqueadas
+
+### Accesibles (RSS/HTML directo)
+- Perfect Daily Grind: RSS, 30 articulos de 10 categorias
+- OIC Cafe: HTML, 8 paginas de datos
+- World Coffee Research: HTML, 0 relevantes
+- TradingView: HTML, 170 links, 0 cafe-specific
+
+### Bloqueadas (Cloudflare/bot protection)
+- Minuta de Cafe: RSS+HTML fail
+- Coffee Review: RSS+HTML fail
+- Investing.com: HTML fail, Z.ai rate-limited
+- Reuters: HTML fail
+- Sprudge: RSS+HTML fail
+- Coffee Universe: HTML fail
+
+## 6. Recomendaciones
+
+1. Ejecutar captura commodity con Z.ai SDK cuando rate limit se restablezca
+2. Intentar Z.ai page_reader para Minuta de Cafe y Coffee Review
+3. Limpiar menciones no-cafe de SENASAG
+4. Configurar fuentes cafeteras en FuenteEstado para captura continua
+5. Crear MencionTema para menciones retroactivas
+6. Programar captura semanal de PDG RSS
+
+## 7. Script
+
+- scripts/captura-retroactiva-cafe-v3.ts
+- RSS feeds + HTML fallback + scoring 70+ keywords + dedup URL
+- Filtros: Score >= 3, nav detection, texto >= 500 chars, titulo >= 20 chars
+- 3 medios nuevos: World Coffee Research, Coffee Universe, Sprudge Coffee
+---
