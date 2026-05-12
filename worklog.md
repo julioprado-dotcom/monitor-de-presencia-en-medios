@@ -229,3 +229,23 @@ Stage Summary:
 - .zscripts/dev.sh asegura instalación limpia + prisma + dev server
 - repo.tar actualizado en /home/sync/ para persistencia
 - USUARIO DEBE REINICIAR SANDBOX para que start.sh ejecute .zscripts/dev.sh
+
+---
+Task ID: 1
+Agent: main
+Task: Unificar rutas de DB — eliminar duplicado db/custom.db, corregir .env y documentación
+
+Work Log:
+- Descubierto que existían 2 DBs: db/custom.db (492KB, vacía, fantasma) y prisma/db/custom.db (7.1MB, 136 menciones, activa)
+- Confirmado que db.ts ya sobreescribe DATABASE_URL a prisma/db/custom.db (servidor usa la correcta)
+- Corregido .env: DATABASE_URL → file:/home/z/my-project/prisma/db/custom.db
+- Corregido PROCEDIMIENTO_ARRANQUE.md: eliminado override erróneo en 3 lugares (comando spawn + referencia .env)
+- Corregido CONTEXTO.md: eliminado override erróneo del comando spawn
+- Eliminados: db/custom.db, db/custom.db.recovered, directorio db/
+- Verificación: servidor 200, repo DB 7.1MB intacta, scraper activo, sin reinicio
+
+Stage Summary:
+- Una sola DB canónica: prisma/db/custom.db (trackeada en git, auto-push a GitHub)
+- Todas las rutas (.env, docs, scripts) ahora apuntan a la misma ruta
+- db.ts mantiene el override como safety net (defensa en profundidad)
+- Servidor nunca se reinició durante las correcciones
