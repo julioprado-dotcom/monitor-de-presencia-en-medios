@@ -315,3 +315,25 @@ Stage Summary:
 - Keywords: 196 en Lente 9 (cafe-economicas-regionales)
 - Fuentes: 46 medios (13 nuevas especializadas)
 - Pendiente: Puppeteer en producción, integración con scraper, clasificador LLM
+=== worklog update ===
+
+---
+Task ID: captura-retroactiva-cafe
+Agent: main
+Task: Captura retroactiva de fuentes especializadas de café para BOLETÍN_DEL_GRANO
+
+Work Log:
+- Verified 10 coffee sources registered in DB (all without FuenteEstado)
+- Created retroactive capture script v1 and v2
+- Executed capture: fetched homepages, extracted links, scored for coffee relevance
+- Processed 10 sources: OIC (8 menciones), PDG (2), SCA (1), 5 blocked by Cloudflare
+- Cleaned 31 junk mentions (orphans, navigation pages, false positives)
+- Final count: 11 clean coffee mentions (up from 3)
+- Generated report: download/REPORTE-CAPTURA-RETROACTIVA-CAFE.md
+- Committed and pushed: 2727350
+
+Stage Summary:
+- 11 coffee mentions captured (sufficient for boletín generation)
+- 5 sources blocked by Cloudflare (need Puppeteer for bypass)
+- OIC Café is the most productive source (statistical/market reports)
+- PASO 7 (boletín generation test) requires running server
