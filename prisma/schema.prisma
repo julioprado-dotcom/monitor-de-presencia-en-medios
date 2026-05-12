@@ -88,11 +88,15 @@ model EjeTematico {
   dimension     String   @default("")   // produccion, precio, conflicto, regulacion, infraestructura
   activo        Boolean  @default(true)
   orden         Int      @default(0)
+  /// Clasificación v2: "estructural" para los 9 ejes nuevos, "legacy" para los ejes originales
+  tipo          String   @default("legacy") // "estructural" | "legacy"
 
   parent        EjeTematico?  @relation("EjeTematicoHierarchy", fields: [parentId], references: [id])
   children      EjeTematico[] @relation("EjeTematicoHierarchy")
 
-  menciones MencionTema[]
+  menciones       MencionTema[]
+  mencionesV2     Mencion[]       @relation("MencionEjeEstructural")
+  keywordEjes     Keyword[]
 }
 
 // ─── OPERACIONAL: Menciones capturadas ─────────────────────
@@ -141,14 +145,64 @@ model Mencion {
   /// Intención del medio al publicar la nota: informativa, opinion, critica, elogiosa, reactiva, sin_intencion
   intencionMedio        String?
 
+  /// v2: Eje estructural principal (clasificación nueva)
+  ejeEstructuralId String?
+
   persona       Persona?          @relation(fields: [personaId], references: [id])
   medio         Medio            @relation(fields: [medioId], references: [id])
   comentarios   Comentario[]
   ejesTematicos MencionTema[]
   ejesCliente     MencionClienteEje[]
+  ejeEstructural EjeTematico?     @relation("MencionEjeEstructural", fields: [ejeEstructuralId], references: [id])
+  @@index([ejeEstructuralId])
+  lentes        MencionLente[]
 }
 
-// ─── OPERACIONAL: Relación Mención↔Eje ─────────────────────
+// ─── CONFIG: Lentes transversales v2 ───────────────────────
+
+model Lente {
+  id          String   @id @default(cuid())
+  nombre      String
+  slug        String   @unique
+  descripcion String   @default("")
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  menciones     MencionLente[]
+  keywordLentes Keyword[]
+}
+
+// ─── CONFIG: Keywords para ejes y lentes v2 ──────────────────
+
+model Keyword {
+  id        String   @id @default(cuid())
+  termino   String
+  lenteId   String?
+  ejeId     String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lente Lente?         @relation(fields: [lenteId], references: [id])
+  eje   EjeTematico?   @relation(fields: [ejeId], references: [id])
+}
+
+// ─── OPERACIONAL: Relación Mención↔Lente v2 ─────────────────
+
+model MencionLente {
+  id        String   @id @default(cuid())
+  mencionId String
+  lenteId   String
+  createdAt DateTime @default(now())
+
+  mencion Mencion @relation(fields: [mencionId], references: [id], onDelete: Cascade)
+  lente   Lente    @relation(fields: [lenteId], references: [id], onDelete: Cascade)
+
+  @@unique([mencionId, lenteId])
+}
+
+// ─── OPERACIONAL: Relación Mención↔Eje (legacy) ─────────────
 
 model MencionTema {
   id            String   @id @default(cuid())
