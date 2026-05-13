@@ -1,0 +1,365 @@
+'use client';
+
+import React, { useState, useCallback } from 'react';
+import { Radio, Pause, Play, RefreshCw, Pencil, Plus, Loader2, Inbox, X } from 'lucide-react';
+import { PanelShell } from './PanelShell';
+import { fetchWithTimeout } from '@/lib/fetch-utils';
+import { usePolling } from '../hooks/usePolling';
+
+// ─── Types ────────────────────────────────────────────────────
+
+interface FuenteItem {
+  id: string;
+  medioId: string;
+  medioNombre: string;
+  medioUrl: string;
+  estado: string;
+  ultimaCaptura: string | null;
+  ultimaCapturaHace: string;
+  mencionesSemana: number;
+  nivel: string | null;
+}
+
+interface CapturaJob {
+  id: string;
+  medioNombre: string;
+  timestamp: string;
+  resultado: 'ok' | 'error';
+  duracion: number;
+  enProgreso?: boolean;
+}
+
+interface FuentesData {
+  total: number;
+  filter: string;
+  fuentes: FuenteItem[];
+  resumen: {
+    activas: number;
+    caidas: number;
+    degradadas: number;
+    bloqueadas: number;
+    pausadas: number;
+    sinEstado: number;
+  };
+}
+
+type FilterType = 'todas' | 'activas' | 'caidas' | 'bloqueadas';
+
+const FILTERS: { key: FilterType; label: string }[] = [
+  { key: 'todas', label: 'Todas' },
+  { key: 'activas', label: 'Activas' },
+  { key: 'caidas', label: 'Caídas' },
+  { key: 'bloqueadas', label: 'Bloqueadas' },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────
+
+function timeAgoHuman(dateStr: string | null): string {
+  if (!dateStr) return 'nunca';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'ahora mismo';
+  if (mins < 60) return `hace ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `hace ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `hace ${days}d`;
+}
+
+function statusDotColor(estado: string): string {
+  switch (estado) {
+    case 'activa': return '#00ff88';
+    case 'degradada': return '#ffaa00';
+    case 'caida': return '#ff3355';
+    case 'bloqueada': return '#ff3355';
+    case 'pausada': return '#ffaa00';
+    case 'sin_estado': return '#6b7280';
+    default: return '#6b7280';
+  }
+}
+
+function formatDuracion(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+// ─── Mock jobs for demo (API would provide this) ──────────────
+
+function generateMockJobs(fuentes: FuenteItem[]): CapturaJob[] {
+  return fuentes.slice(0, 5).map((f, i) => ({
+    id: `job-${f.id}`,
+    medioNombre: f.medioNombre,
+    timestamp: f.ultimaCaptura || new Date(Date.now() - i * 3600000).toISOString(),
+    resultado: i === 1 ? 'error' : 'ok',
+    duracion: 1200 + Math.floor(Math.random() * 3000),
+    enProgreso: i === 0,
+  }));
+}
+
+// ─── Component ────────────────────────────────────────────────
+
+export function CapturaPanel({ onClose }: { onClose?: () => void }) {
+  const [data, setData] = useState<FuentesData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<FilterType>('todas');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newSource, setNewSource] = useState({ nombre: '', url: '', tipo: 'RSS', categoria: '' });
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetchWithTimeout(`/api/dashboard/fuentes?filter=${filter}`, { timeoutMs: 10_000 });
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+      }
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
+
+  usePolling(fetchData, 30_000);
+
+  const fuentes = data?.fuentes ?? [];
+  const jobs = data ? generateMockJobs(fuentes) : [];
+
+  return (
+    <PanelShell title="Gestión de Captura" icon={<Radio className="w-4 h-4" />} onClose={onClose}>
+      <div className="p-4 space-y-4">
+        {/* ── Filter bar ──────────────────────────────────── */}
+        <div className="flex gap-1.5">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className="px-2.5 py-1 text-[11px] font-medium rounded-md transition-all"
+              style={{
+                background: filter === f.key ? 'rgba(0,255,136,0.1)' : 'transparent',
+                border: `1px solid ${filter === f.key ? '#00ff88' : '#1a1a2e'}`,
+                color: filter === f.key ? '#00ff88' : '#6b7280',
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+          {data && (
+            <span className="ml-auto text-[10px] self-center" style={{ color: '#6b7280' }}>
+              {fuentes.length} fuentes
+            </span>
+          )}
+        </div>
+
+        {/* ── Source list ─────────────────────────────────── */}
+        {loading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#00ff88' }} />
+          </div>
+        ) : fuentes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10" style={{ color: '#6b7280' }}>
+            <Inbox className="w-5 h-5 mb-1.5 opacity-40" />
+            <span className="text-xs">Sin fuentes para este filtro</span>
+          </div>
+        ) : (
+          <div className="space-y-1 max-h-[280px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+            {fuentes.slice(0, 8).map((fuente) => (
+              <div
+                key={fuente.id}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors"
+                style={{ background: 'rgba(255,255,255,0.02)' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.02)'; }}
+              >
+                {/* Status dot */}
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: statusDotColor(fuente.estado) }}
+                />
+
+                {/* Name + meta */}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold truncate" style={{ color: '#ffffff' }}>
+                    {fuente.medioNombre}
+                  </p>
+                  <div className="flex gap-2 mt-0.5">
+                    <span className="text-[11px]" style={{ color: '#6b7280' }}>
+                      {fuente.ultimaCapturaHace || timeAgoHuman(fuente.ultimaCaptura)}
+                    </span>
+                    <span className="text-[11px]" style={{ color: '#6b7280' }}>
+                      {fuente.mencionesSemana} menc/semana
+                    </span>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    className="flex items-center justify-center rounded transition-colors"
+                    style={{ width: 24, height: 24, color: '#6b7280' }}
+                    title={fuente.estado === 'pausada' ? 'Reanudar' : 'Pausar'}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#00ff88'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#6b7280'; }}
+                  >
+                    {fuente.estado === 'pausada' ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                  </button>
+                  <button
+                    className="flex items-center justify-center rounded transition-colors"
+                    style={{ width: 24, height: 24, color: '#6b7280' }}
+                    title="Reintentar"
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#ffaa00'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#6b7280'; }}
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                  <button
+                    className="flex items-center justify-center rounded transition-colors"
+                    style={{ width: 24, height: 24, color: '#6b7280' }}
+                    title="Editar URL"
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#ffffff'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#6b7280'; }}
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Add source button / form ────────────────────── */}
+        {!showAddForm ? (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="flex items-center gap-1.5 w-full justify-center px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+            style={{ border: '1px dashed #1a1a2e', color: '#6b7280' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#00ff88'; (e.currentTarget as HTMLButtonElement).style.color = '#00ff88'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#1a1a2e'; (e.currentTarget as HTMLButtonElement).style.color = '#6b7280'; }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Añadir fuente
+          </button>
+        ) : (
+          <div className="rounded-lg p-3 space-y-2.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #1a1a2e' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium" style={{ color: '#ffffff' }}>Nueva fuente</span>
+              <button onClick={() => setShowAddForm(false)} style={{ color: '#6b7280' }}>
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <input
+              placeholder="Nombre del medio"
+              className="w-full px-2.5 py-1.5 rounded-md text-xs outline-none"
+              style={{ background: '#0a0a0f', border: '1px solid #1a1a2e', color: '#ffffff' }}
+              value={newSource.nombre}
+              onChange={(e) => setNewSource({ ...newSource, nombre: e.target.value })}
+            />
+            <input
+              placeholder="URL"
+              className="w-full px-2.5 py-1.5 rounded-md text-xs outline-none"
+              style={{ background: '#0a0a0f', border: '1px solid #1a1a2e', color: '#ffffff' }}
+              value={newSource.url}
+              onChange={(e) => setNewSource({ ...newSource, url: e.target.value })}
+            />
+            <div className="flex gap-2">
+              <select
+                className="flex-1 px-2.5 py-1.5 rounded-md text-xs outline-none"
+                style={{ background: '#0a0a0f', border: '1px solid #1a1a2e', color: '#ffffff' }}
+                value={newSource.tipo}
+                onChange={(e) => setNewSource({ ...newSource, tipo: e.target.value })}
+              >
+                <option value="RSS">RSS</option>
+                <option value="HTML">HTML</option>
+              </select>
+              <input
+                placeholder="Categoría"
+                className="flex-1 px-2.5 py-1.5 rounded-md text-xs outline-none"
+                style={{ background: '#0a0a0f', border: '1px solid #1a1a2e', color: '#ffffff' }}
+                value={newSource.categoria}
+                onChange={(e) => setNewSource({ ...newSource, categoria: e.target.value })}
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                className="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                style={{ background: 'rgba(0,255,136,0.1)', color: '#00ff88', border: '1px solid rgba(0,255,136,0.3)' }}
+                onClick={() => {
+                  setShowAddForm(false);
+                  setNewSource({ nombre: '', url: '', tipo: 'RSS', categoria: '' });
+                }}
+              >
+                Guardar
+              </button>
+              <button
+                className="flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                style={{ background: 'transparent', color: '#6b7280', border: '1px solid #1a1a2e' }}
+                onClick={() => {
+                  setShowAddForm(false);
+                  setNewSource({ nombre: '', url: '', tipo: 'RSS', categoria: '' });
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Últimos jobs de captura ─────────────────────── */}
+        <div className="pt-2" style={{ borderTop: '1px solid #1a1a2e' }}>
+          <p className="text-[11px] font-medium mb-2" style={{ color: '#6b7280' }}>
+            Últimos jobs de captura
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+              <thead>
+                <tr style={{ color: '#6b7280' }}>
+                  <th className="text-left py-1 font-medium">Medio</th>
+                  <th className="text-left py-1 font-medium">Timestamp</th>
+                  <th className="text-left py-1 font-medium">Resultado</th>
+                  <th className="text-left py-1 font-medium">Duración</th>
+                  <th className="text-right py-1 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.slice(0, 5).map((job) => (
+                  <tr key={job.id} style={{ borderTop: '1px solid rgba(26,26,46,0.5)' }}>
+                    <td className="py-1.5 pr-3" style={{ color: '#ffffff', maxWidth: 140 }}>
+                      <span className="truncate block">{job.medioNombre}</span>
+                    </td>
+                    <td className="py-1.5 pr-3" style={{ color: '#6b7280' }}>
+                      {timeAgoHuman(job.timestamp)}
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      {job.enProgreso ? (
+                        <span className="flex items-center gap-1" style={{ color: '#ffaa00' }}>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          en curso
+                        </span>
+                      ) : job.resultado === 'ok' ? (
+                        <span style={{ color: '#00ff88' }}>OK</span>
+                      ) : (
+                        <span style={{ color: '#ff3355' }}>error</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 pr-3" style={{ color: '#6b7280' }}>
+                      {job.enProgreso ? '—' : formatDuracion(job.duracion)}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {job.enProgreso && (
+                        <button
+                          className="text-[10px] px-1.5 py-0.5 rounded"
+                          style={{ color: '#ff3355', border: '1px solid rgba(255,51,85,0.3)' }}
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </PanelShell>
+  );
+}
