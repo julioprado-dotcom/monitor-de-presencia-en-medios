@@ -12,8 +12,8 @@ export async function GET(
     const mencion = await db.mencion.findUnique({
       where: { id },
       include: {
-        persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
-        medio: { select: { id: true, nombre: true, tipo: true } },
+        Persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
+        Medio: { select: { id: true, nombre: true, tipo: true } },
       },
     });
 

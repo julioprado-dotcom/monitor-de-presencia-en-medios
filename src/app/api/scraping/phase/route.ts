@@ -105,13 +105,13 @@ export async function GET() {
       if (faseConfig.fuentesEspecificas && faseConfig.fuentesEspecificas.length > 0) {
         fuentesRaw = await db.fuenteEstado.findMany({
           where: {
-            medio: { nombre: { in: faseConfig.fuentesEspecificas } }
+            Medio: { nombre: { in: faseConfig.fuentesEspecificas } }
           },
-          orderBy: { medio: { nombre: 'asc' } },
+          orderBy: { Medio: { nombre: 'asc' } },
           select: {
             id: true,
             activo: true,
-            medio: { select: { nombre: true, nivel: true } },
+            Medio: { select: { nombre: true, nivel: true } },
             tipoCheck: true,
             ultimoCheck: true,
             totalCambios: true,
@@ -120,16 +120,16 @@ export async function GET() {
       } else {
         const whereClause: Record<string, unknown> = {}
         if (faseConfig.filtros.nivel?.length) {
-          whereClause.medio = { nivel: { in: faseConfig.filtros.nivel } }
+          whereClause.Medio = { nivel: { in: faseConfig.filtros.nivel } }
         }
         fuentesRaw = await db.fuenteEstado.findMany({
           where: whereClause,
-          orderBy: { medio: { nombre: 'asc' } },
+          orderBy: { Medio: { nombre: 'asc' } },
           take: faseConfig.maxFuentes || 999,
           select: {
             id: true,
             activo: true,
-            medio: { select: { nombre: true, nivel: true } },
+            Medio: { select: { nombre: true, nivel: true } },
             tipoCheck: true,
             ultimoCheck: true,
             totalCambios: true,
@@ -139,8 +139,8 @@ export async function GET() {
 
       fuentesIncluidas = fuentesRaw.map(f => ({
         id: f.id,
-        nombre: f.medio.nombre,
-        nivel: f.medio.nivel,
+        nombre: f.Medio.nombre,
+        nivel: f.Medio.nivel,
         tipoCheck: f.tipoCheck,
         ultimoCheck: f.ultimoCheck ? String(f.ultimoCheck) : null,
         totalCambios: f.totalCambios,
@@ -209,22 +209,22 @@ export async function POST(request: NextRequest) {
           // Modo explícito: seleccionar medios por nombre exacto (solo activas)
           fuentes = await db.fuenteEstado.findMany({
             where: {
-              medio: { nombre: { in: faseConfig.fuentesEspecificas } },
+              Medio: { nombre: { in: faseConfig.fuentesEspecificas } },
               estado: 'activa',
             },
-            include: { medio: { select: { nombre: true, nivel: true } } },
-            orderBy: { medio: { nombre: 'asc' } },
+            include: { Medio: { select: { nombre: true, nivel: true } } },
+            orderBy: { Medio: { nombre: 'asc' } },
           })
         } else {
           // Modo filtro: seleccionar por nivel, solo fuentes activas (lifecycle)
           const whereClause: Record<string, unknown> = { estado: 'activa' }
           if (faseConfig.filtros.nivel?.length) {
-            whereClause.medio = { nivel: { in: faseConfig.filtros.nivel } }
+            whereClause.Medio = { nivel: { in: faseConfig.filtros.nivel } }
           }
           fuentes = await db.fuenteEstado.findMany({
             where: whereClause,
-            include: { medio: { select: { nombre: true, nivel: true } } },
-            orderBy: { medio: { nombre: 'asc' } },
+            include: { Medio: { select: { nombre: true, nivel: true } } },
+            orderBy: { Medio: { nombre: 'asc' } },
             take: faseConfig.maxFuentes || 999,
           })
         }
@@ -235,14 +235,14 @@ export async function POST(request: NextRequest) {
         if (faseConfig.fuentesEspecificas && faseConfig.fuentesEspecificas.length > 0) {
           fuentesPendientes = await db.fuenteEstado.count({
             where: {
-              medio: { nombre: { in: faseConfig.fuentesEspecificas } },
+              Medio: { nombre: { in: faseConfig.fuentesEspecificas } },
               estado: { in: ['validando', 'creada'] },
             },
           })
         } else if (faseConfig.filtros.nivel?.length) {
           fuentesPendientes = await db.fuenteEstado.count({
             where: {
-              medio: { nivel: { in: faseConfig.filtros.nivel } },
+              Medio: { nivel: { in: faseConfig.filtros.nivel } },
               estado: { in: ['validando', 'creada'] },
             },
           })
@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
         scrapingState.scrapeFuentes = fuentes.map(f => ({
           id: f.id,
           medioId: f.medioId,
-          nombre: f.medio.nombre,
+          nombre: f.Medio.nombre,
         }))
         scrapingState.fuentesSeleccionadasIds = new Set(fuentes.map(f => f.id))
         scrapingState.scrapeEnProgreso = false
@@ -290,7 +290,7 @@ export async function POST(request: NextRequest) {
           `[ScrapingPhase] Fase ${targetFase} iniciada: ${fuentes.length} fuentes activadas`,
         )
         console.log(
-          `[ScrapingPhase] Fuentes: ${fuentes.map(f => f.medio.nombre).join(', ')}`,
+          `[ScrapingPhase] Fuentes: ${fuentes.map(f => f.Medio.nombre).join(', ')}`,
         )
 
         // Actualizar scheduler con las nuevas fuentes activas
@@ -301,7 +301,7 @@ export async function POST(request: NextRequest) {
           exito: true,
           mensaje: `Fase ${targetFase} "${faseConfig.nombre}" activada — ${fuentes.length} fuentes`,
           fuentesActivadas: fuentes.length,
-          fuentes: fuentes.map(f => f.medio.nombre),
+          fuentes: fuentes.map(f => f.Medio.nombre),
         })
       }
 
@@ -488,7 +488,7 @@ export async function POST(request: NextRequest) {
 
         const fuentesValidas = await db.fuenteEstado.findMany({
           where: { id: { in: fuenteIds } },
-          include: { medio: { select: { nombre: true } } },
+          include: { Medio: { select: { nombre: true } } },
         })
 
         if (fuentesValidas.length === 0) {
@@ -506,7 +506,7 @@ export async function POST(request: NextRequest) {
         scrapingState.scrapeFuentes = fuentesValidas.map(f => ({
           id: f.id,
           medioId: f.medioId,
-          nombre: f.medio.nombre,
+          nombre: f.Medio.nombre,
         }))
         scrapingState.fuentesSeleccionadasIds = new Set(fuenteIds)
         scrapingState.estadoFase = 'listo'
@@ -515,13 +515,13 @@ export async function POST(request: NextRequest) {
         scrapeTotalFuentes = 0
 
         console.log(
-          `[ScrapingPhase] Fuentes seleccionadas manualmente: ${fuentesValidas.map(f => f.medio.nombre).join(', ')}`,
+          `[ScrapingPhase] Fuentes seleccionadas manualmente: ${fuentesValidas.map(f => f.Medio.nombre).join(', ')}`,
         )
 
         return NextResponse.json({
           exito: true,
           mensaje: `${fuentesValidas.length} fuentes seleccionadas`,
-          fuentes: fuentesValidas.map(f => ({ id: f.id, nombre: f.medio.nombre })),
+          fuentes: fuentesValidas.map(f => ({ id: f.id, nombre: f.Medio.nombre })),
         })
       }
 
@@ -537,7 +537,7 @@ export async function POST(request: NextRequest) {
 
         const fuente = await db.fuenteEstado.findUnique({
           where: { id: fuenteId },
-          include: { medio: true },
+          include: { Medio: true },
         })
 
         if (!fuente) {
@@ -557,8 +557,8 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           exito: true,
-          mensaje: `Check encolado para "${fuente.medio.nombre}" (P0)`,
-          fuente: { id: fuente.id, nombre: fuente.medio.nombre },
+          mensaje: `Check encolado para "${fuente.Medio.nombre}" (P0)`,
+          fuente: { id: fuente.id, nombre: fuente.Medio.nombre },
         })
       }
 
@@ -596,7 +596,7 @@ export async function POST(request: NextRequest) {
       case 'ejecutar_uno_all': {
         const fuentesActivas = await db.fuenteEstado.findMany({
           where: { estado: 'activa' },
-          include: { medio: true },
+          include: { Medio: true },
         })
 
         if (fuentesActivas.length === 0) {
@@ -612,7 +612,7 @@ export async function POST(request: NextRequest) {
             prioridad: 0,
             payload: { fuenteId: fuente.id, medioId: fuente.medioId },
           }).catch(err => {
-            console.warn(`[ScrapingPhase] Error encolando check para ${fuente.medio.nombre}:`, err)
+            console.warn(`[ScrapingPhase] Error encolando check para ${fuente.Medio.nombre}:`, err)
           })
           encolados++
         }
@@ -622,7 +622,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           exito: true,
           mensaje: `${encolados} checks encolados (P0) para fuentes activas`,
-          fuentes: fuentesActivas.map(f => f.medio.nombre),
+          fuentes: fuentesActivas.map(f => f.Medio.nombre),
         })
       }
 
@@ -635,7 +635,7 @@ export async function POST(request: NextRequest) {
 
         const fuente = await db.fuenteEstado.findUnique({
           where: { id: fuenteId },
-          include: { medio: true },
+          include: { Medio: true },
         })
 
         if (!fuente) {
@@ -652,7 +652,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           exito: true,
-          mensaje: `Forzado check para "${fuente.medio.nombre}"`,
+          mensaje: `Forzado check para "${fuente.Medio.nombre}"`,
         })
       }
 

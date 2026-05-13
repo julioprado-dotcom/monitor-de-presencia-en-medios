@@ -232,8 +232,8 @@ export async function GET() {
     // Fuentes activas por fase
     const todasFuentes = await db.fuenteEstado.findMany({
       where: { activo: true },
-      include: { medio: { select: { nombre: true, nivel: true, departamento: true } } },
-      orderBy: { medio: { nivel: 'asc' } },
+      include: { Medio: { select: { nombre: true, nivel: true, departamento: true } } },
+      orderBy: { Medio: { nivel: 'asc' } },
     })
 
     // Conteo de jobs
@@ -256,7 +256,7 @@ export async function GET() {
     const fuentesConError = todasFuentes.filter(f => f.error && f.error.length > 0)
 
     // Determinar fase activa basada en las fuentes configuradas
-    const fuentesNombres = new Set(todasFuentes.map(f => f.medio.nombre))
+    const fuentesNombres = new Set(todasFuentes.map(f => f.Medio.nombre))
     let faseActiva: FaseKey = 'test'
 
     if (todasFuentes.length >= 7) {
@@ -300,9 +300,9 @@ export async function GET() {
       },
       fuentes: todasFuentes.map(f => ({
         id: f.id,
-        nombre: f.medio.nombre,
-        nivel: f.medio.nivel,
-        departamento: f.medio.departamento,
+        nombre: f.Medio.nombre,
+        nivel: f.Medio.nivel,
+        departamento: f.Medio.departamento,
         tipoCheck: f.tipoCheck,
         frecuenciaBase: f.frecuenciaBase,
         totalChecks: f.totalChecks,

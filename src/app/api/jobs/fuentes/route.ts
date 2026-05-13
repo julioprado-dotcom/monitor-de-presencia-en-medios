@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const fuentes = await db.fuenteEstado.findMany({
       include: {
-        medio: {
+        Medio: {
           select: {
             id: true,
             nombre: true,

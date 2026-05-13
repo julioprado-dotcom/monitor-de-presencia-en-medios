@@ -222,7 +222,7 @@ interface MencionWithRelations {
   personaId: string | null;
   medioId: string;
   esDuplicado: boolean;
-  medio: { id: string; nombre: string; tipo: string; nivel: string };
+  Medio: { id: string; nombre: string; tipo: string; nivel: string };
   persona: { id: string; nombre: string; partidoSigla: string; camara: string; departamento: string } | null;
   ejesCliente: { id: number; ejeClienteId: number; mencionId: string; ejeCliente: { id: number; nombre: string; keywords: string } }[];
 }
@@ -245,7 +245,7 @@ async function fetchMencionesMineras(
       },
     },
     include: {
-      medio: { select: { id: true, nombre: true, tipo: true, nivel: true } },
+      Medio: { select: { id: true, nombre: true, tipo: true, nivel: true } },
       persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
       ejesCliente: {
         include: { ejeCliente: { select: { id: true, nombre: true, keywords: true } } },
@@ -298,7 +298,7 @@ function aggregateByEje(
     agg.tratamientoDist[trat] = (agg.tratamientoDist[trat] || 0) + 1;
 
     // Medio top (el más frecuente se resolverá al final)
-    agg.medioTop = m.medio.nombre; // se sobrescribirá con el top al final
+    agg.medioTop = m.Medio.nombre; // se sobrescribirá con el top al final
   }
 
   // Calcular tratamientoTop por frecuencia para cada eje
@@ -326,7 +326,7 @@ function getTopMedioForEje(
   for (const m of menciones) {
     const isThisEje = m.ejesCliente.some((e) => e.ejeClienteId === ejeClienteId);
     if (isThisEje) {
-      const name = m.medio.nombre;
+      const name = m.Medio.nombre;
       counts.set(name, (counts.get(name) || 0) + 1);
     }
   }
@@ -403,7 +403,7 @@ async function fetchFactoresExternos(
       id: true,
       titulo: true,
       fechaPublicacion: true,
-      medio: { select: { nombre: true } },
+      Medio: { select: { nombre: true } },
     },
     orderBy: { fechaPublicacion: 'desc' },
   });
@@ -420,7 +420,7 @@ async function fetchFactoresExternos(
       if (tituloLower.includes(keyword)) {
         factores.push({
           titulo: m.titulo,
-          medio: m.medio.nombre,
+          medio: m.Medio.nombre,
           fecha: m.fechaPublicacion
             ? m.fechaPublicacion.toLocaleDateString('es-BO')
             : 'N/D',

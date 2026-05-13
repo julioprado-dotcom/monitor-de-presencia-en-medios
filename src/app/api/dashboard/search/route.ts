@@ -38,8 +38,12 @@ interface SearchResult {
     id: string;
     titulo: string;
     medioNombre: string;
+    medio: string;
     fechaCaptura: string;
+    fecha: string | null;
     snippet: string;
+    ejes: Array<{ id: string; nombre: string }>;
+    lentes: Array<{ id: string; nombre: string }>;
   }>;
   fuentes: Array<{
     id: string;
@@ -191,7 +195,18 @@ export async function GET(request: NextRequest) {
           titulo: true,
           textoCompleto: true,
           fechaCaptura: true,
-          medio: { select: { nombre: true } },
+          fechaPublicacion: true,
+          Medio: { select: { nombre: true } },
+          MencionTema: {
+            select: {
+              EjeTematico: { select: { id: true, nombre: true } },
+            },
+          },
+          MencionLente: {
+            select: {
+              Lente: { select: { id: true, nombre: true } },
+            },
+          },
         },
         orderBy: { fechaCaptura: 'desc' },
         take: 10,
@@ -288,9 +303,19 @@ export async function GET(request: NextRequest) {
     const menciones = mencionesResult.map(m => ({
       id: m.id,
       titulo: m.titulo,
-      medioNombre: m.medio?.nombre ?? 'Sin fuente',
+      medioNombre: m.Medio?.nombre ?? 'Sin fuente',
+      medio: m.Medio?.nombre ?? 'Sin fuente',
       fechaCaptura: m.fechaCaptura.toISOString(),
+      fecha: m.fechaPublicacion ? m.fechaPublicacion.toISOString() : null,
       snippet: makeSnippet(m.textoCompleto, mainTerm),
+      ejes: (m.MencionTema ?? []).map(mt => ({
+        id: mt.EjeTematico.id,
+        nombre: mt.EjeTematico.nombre,
+      })),
+      lentes: (m.MencionLente ?? []).map(ml => ({
+        id: ml.Lente.id,
+        nombre: ml.Lente.nombre,
+      })),
     }));
 
     // Obtener estados de fuentes via FuenteEstado

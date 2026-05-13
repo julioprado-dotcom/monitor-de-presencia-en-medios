@@ -79,8 +79,8 @@ export async function POST(request: NextRequest) {
           },
         },
         include: {
-          medio: { select: { nombre: true } },
-          persona: { select: { nombre: true } },
+          Medio: { select: { nombre: true } },
+          Persona: { select: { nombre: true } },
         },
         orderBy: { fechaPublicacion: 'desc' },
         take: 10,
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
 
       mencionesPorEje[slug] = menciones.map((m) => ({
         titulo: m.titulo,
-        medio: m.medio?.nombre ?? null,
+        medio: m.Medio?.nombre ?? null,
         persona: m.persona?.nombre ?? null,
         sentimiento: m.sentimiento,
       }));

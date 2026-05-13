@@ -80,7 +80,7 @@ export async function GET() {
           fechaFin: { gte: hoy, lte: en30Dias },
         },
         include: {
-          cliente: { select: { id: true, nombre: true, email: true } },
+          Cliente: { select: { id: true, nombre: true, email: true } },
         },
         orderBy: { fechaFin: 'asc' },
         take: 10,
@@ -196,7 +196,7 @@ export async function GET() {
       return {
         id: c.id,
         clienteId: c.clienteId,
-        clienteNombre: c.cliente.nombre,
+        clienteNombre: c.Cliente.nombre,
         tipoProducto: c.tipoProducto,
         frecuencia: c.frecuencia,
         fechaFin: c.fechaFin!.toISOString(),

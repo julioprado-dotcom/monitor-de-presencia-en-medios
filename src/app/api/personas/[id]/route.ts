@@ -80,7 +80,7 @@ export async function GET(
       take: limit,
       orderBy: { fechaCaptura: 'desc' },
       include: {
-        medio: { select: { id: true, nombre: true, tipo: true } },
+        Medio: { select: { id: true, nombre: true, tipo: true } },
       },
     });
 

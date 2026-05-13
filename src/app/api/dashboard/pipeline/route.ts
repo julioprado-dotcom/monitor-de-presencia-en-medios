@@ -116,7 +116,7 @@ export async function GET() {
       // Entregas de hoy (todas)
       db.entrega.findMany({
         where: { fechaCreacion: { gte: start } },
-        include: { contrato: { include: { cliente: { select: { nombre: true } } } } },
+        include: { Contrato: { include: { Cliente: { select: { nombre: true } } } } },
         orderBy: { fechaCreacion: 'desc' },
         take: 30,
       }),
@@ -131,14 +131,14 @@ export async function GET() {
 
       // Todas las fuentes con estado
       db.fuenteEstado.findMany({
-        include: { medio: { select: { id: true, nombre: true, url: true, tipo: true, categoria: true } } },
+        include: { Medio: { select: { id: true, nombre: true, url: true, tipo: true, categoria: true } } },
         orderBy: { ultimoCheck: 'desc' },
       }),
 
       // Entregas programadas (pendientes con fecha programada futura)
       db.entrega.findMany({
         where: { estado: 'pendiente', fechaProgramada: { gte: start } },
-        include: { contrato: { include: { cliente: { select: { nombre: true } } } } },
+        include: { Contrato: { include: { Cliente: { select: { nombre: true } } } } },
         orderBy: { fechaProgramada: 'asc' },
         take: 15,
       }),
@@ -250,10 +250,10 @@ export async function GET() {
       return {
         id: f.id,
         medioId: f.medioId,
-        nombre: f.medio.nombre,
-        url: f.medio.url,
-        tipo: f.medio.tipo,
-        categoria: f.medio.categoria,
+        nombre: f.Medio.nombre,
+        url: f.Medio.url,
+        tipo: f.Medio.tipo,
+        categoria: f.Medio.categoria,
         activo: f.activo,
         tipoCheck: f.tipoCheck,
         frecuenciaBase: f.frecuenciaBase,
@@ -320,9 +320,9 @@ export async function GET() {
 
         return {
           medioId: f.medioId,
-          nombre: f.medio.nombre,
-          url: f.medio.url,
-          tipo: f.medio.tipo,
+          nombre: f.Medio.nombre,
+          url: f.Medio.url,
+          tipo: f.Medio.tipo,
           tipoCheck: f.tipoCheck,
           frecuenciaLabel: FRECUENCIA_MAP[f.frecuenciaActual]?.label ?? f.frecuenciaActual,
           proximoCheck: nextH,
@@ -385,7 +385,7 @@ export async function GET() {
       id: e.id,
       tipoBoletin: e.tipoBoletin,
       canal: e.canal,
-      clienteNombre: e.contrato?.cliente?.nombre ?? 'Sin cliente',
+      clienteNombre: e.Contrato?.Cliente?.nombre ?? 'Sin cliente',
       fechaProgramada: e.fechaProgramada?.toISOString() ?? null,
       minutosHasta: e.fechaProgramada
         ? Math.round((e.fechaProgramada.getTime() - now.getTime()) / 60000)

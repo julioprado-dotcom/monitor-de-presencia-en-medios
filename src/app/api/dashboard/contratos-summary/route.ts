@@ -37,7 +37,7 @@ export async function GET() {
           fechaFin: { gte: now, lte: in15Days },
         },
         include: {
-          cliente: { select: { nombre: true, organizacion: true } },
+          Cliente: { select: { nombre: true, organizacion: true } },
         },
         orderBy: { fechaFin: 'asc' },
       }),
@@ -63,8 +63,8 @@ export async function GET() {
       montoMensual: c.montoMensual ?? 0,
       moneda: c.moneda || 'Bs',
       cliente: {
-        nombre: c.cliente.nombre,
-        organizacion: c.cliente.organizacion,
+        nombre: c.Cliente.nombre,
+        organizacion: c.Cliente.organizacion,
       },
     }));
 

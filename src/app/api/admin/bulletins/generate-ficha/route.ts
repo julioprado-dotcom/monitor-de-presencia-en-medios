@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         },
       },
       include: {
-        medio: { select: { nombre: true, tipo: true } },
+        Medio: { select: { nombre: true, tipo: true } },
         ejesTematicos: {
           include: {
             ejeTematico: { select: { slug: true, nombre: true } },
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       id: m.id,
       titulo: m.titulo,
       resumen: m.texto ? m.texto.slice(0, 200) : null,
-      medio: m.medio?.nombre ?? null,
+      medio: m.Medio?.nombre ?? null,
       persona: persona.nombre,
       fechaPublicacion: formatFechaBolivia(m.fechaPublicacion ?? m.fechaCaptura),
       sentimiento: m.sentimiento,

@@ -5,7 +5,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { withAuth } from '@/lib/auth-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,10 +13,6 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  // Auth check
-  const { error: authError } = await withAuth();
-  if (authError) return authError;
-
   try {
     const { id } = await params;
 

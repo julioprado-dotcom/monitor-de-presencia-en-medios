@@ -180,7 +180,7 @@ export async function GET() {
     const entregasSemana = await db.entrega.findMany({
       where: { fechaCreacion: { gte: weekS } },
       include: {
-        contrato: { select: { cliente: { select: { nombre: true } } } },
+        Contrato: { select: { Cliente: { select: { nombre: true } } } },
       },
       orderBy: { fechaCreacion: 'desc' },
       take: 100,
@@ -251,9 +251,9 @@ export async function GET() {
     const ultimasEntregas = await db.entrega.findMany({
       where: { fechaEnvio: { not: null } },
       include: {
-        contrato: {
+        Contrato: {
           select: {
-            cliente: { select: { nombre: true } },
+            Cliente: { select: { nombre: true } },
           },
         },
       },
@@ -265,9 +265,9 @@ export async function GET() {
     const ultimasFallidas = await db.entrega.findMany({
       where: { estado: 'fallido' },
       include: {
-        contrato: {
+        Contrato: {
           select: {
-            cliente: { select: { nombre: true } },
+            Cliente: { select: { nombre: true } },
           },
         },
       },
@@ -288,7 +288,7 @@ export async function GET() {
     const ultimos = allEntregas.map(e => ({
       id: e.id,
       producto: PRODUCT_NAMES[e.tipoBoletin] || e.tipoBoletin || 'Desconocido',
-      destinatario: e.contrato?.cliente?.nombre || 'Sin cliente',
+      destinatario: e.Contrato?.Cliente?.nombre || 'Sin cliente',
       canal: e.canal || 'email',
       timestamp: (e.fechaEnvio || e.fechaCreacion).toISOString(),
       estado: e.estado,

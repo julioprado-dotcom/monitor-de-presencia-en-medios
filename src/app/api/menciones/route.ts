@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
         take: limit,
         orderBy: { fechaCaptura: 'desc' },
         include: {
-          persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true } },
-          medio: { select: { id: true, nombre: true, tipo: true } },
+          Persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true } },
+          Medio: { select: { id: true, nombre: true, tipo: true } },
         },
       }),
       db.mencion.count({ where }),

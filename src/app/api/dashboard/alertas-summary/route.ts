@@ -35,8 +35,8 @@ export async function GET() {
           tratamientoPeriodistico: { in: ['tratamiento_critico', 'tratamiento_agresivo'] },
         },
         include: {
-          persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true } },
-          medio: { select: { id: true, nombre: true } },
+          Persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true } },
+          Medio: { select: { id: true, nombre: true }},
         },
         orderBy: { fechaCaptura: 'desc' },
         take: 10,
@@ -61,7 +61,7 @@ export async function GET() {
           partidoSigla: m.persona.partidoSigla,
           camara: m.persona.camara,
         } : null,
-        medio: { nombre: m.medio.nombre },
+        medio: { nombre: m.Medio.nombre },
       })),
     });
   } catch (error: unknown) {

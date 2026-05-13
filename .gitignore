@@ -27,8 +27,11 @@ prisma/migrations/
 
 # Database
 db/*.db
+prisma/db/*.bak
 *.db-journal
 *.db-wal
+nohup.out
+start-*.sh
 
 # Z.ai skills (managed externally)
 skills/
@@ -52,6 +55,7 @@ build_final_json.py
 tmp/
 CLAUDE.md
 AGENTS.md
+*.disabled
 
 # Temporary data files from web scraping
 data/*.pdf

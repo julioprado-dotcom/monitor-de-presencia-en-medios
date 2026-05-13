@@ -327,7 +327,7 @@ export async function evaluarDegradacionMasiva(): Promise<{
     where: {
       estado: { not: 'deprecada' },
     },
-    include: { medio: { select: { nombre: true } } },
+    include: { Medio: { select: { nombre: true } } },
   })
 
   let degradadas = 0
@@ -357,7 +357,7 @@ export async function evaluarDegradacionMasiva(): Promise<{
       degradadas++
       detalles.push({
         fuenteId: fuente.id,
-        nombre: fuente.medio.nombre,
+        nombre: fuente.Medio.nombre,
         accion: degradacion.accion || 'Degradada',
       })
     }

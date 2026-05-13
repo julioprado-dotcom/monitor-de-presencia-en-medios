@@ -6,7 +6,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { enqueue } from '@/lib/jobs/queue';
-import { withAuth } from '@/lib/auth-helpers';
 import { PRODUCTOS } from '@/constants/products';
 import type { TipoBoletin } from '@/types/bulletin';
 
@@ -33,10 +32,6 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ tipo: string }> },
 ) {
-  // Auth check
-  const { error: authError } = await withAuth();
-  if (authError) return authError;
-
   try {
     const { tipo } = await params;
     const tipoUpper = tipo?.toUpperCase() as TipoBoletin;

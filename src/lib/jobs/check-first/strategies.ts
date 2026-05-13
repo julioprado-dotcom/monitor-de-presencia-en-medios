@@ -212,7 +212,7 @@ export async function checkFuente(fuenteId: string): Promise<CheckResult & {
   // Obtener estado de la fuente
   const fuente = await db.fuenteEstado.findUnique({
     where: { id: fuenteId },
-    include: { medio: true },
+    include: { Medio: true },
   })
 
   if (!fuente) {
@@ -229,7 +229,7 @@ export async function checkFuente(fuenteId: string): Promise<CheckResult & {
     return {
       cambiado: false,
       tecnica: 'none',
-      detalle: `Fuente ${fuente.medio.nombre} inactiva`,
+      detalle: `Fuente ${fuente.Medio.nombre} inactiva`,
       tipoCheckUsado: fuente.tipoCheck as TipoCheck,
     }
   }
@@ -252,7 +252,7 @@ export async function checkFuente(fuenteId: string): Promise<CheckResult & {
   const estrategiasProbadas: Array<{ estrategia: TipoCheck; exito: boolean; detalle: string }> = []
 
   // ─── 1. Intentar estrategia configurada ────────────────────────
-  console.log(`[CheckFirst] ${fuente.medio.nombre}: intentando "${tipoCheckActual}" en ${url}`)
+  console.log(`[CheckFirst] ${fuente.Medio.nombre}: intentando "${tipoCheckActual}" en ${url}`)
 
   let intento = await ejecutarEstrategia(tipoCheckActual, url, fuente)
   estrategiasProbadas.push({
@@ -268,14 +268,14 @@ export async function checkFuente(fuenteId: string): Promise<CheckResult & {
 
   if (intento.result.error) {
     console.warn(
-      `[CheckFirst] ${fuente.medio.nombre}: "${tipoCheckActual}" FALLÓ → ${intento.result.detalle}`,
+      `[CheckFirst] ${fuente.Medio.nombre}: "${tipoCheckActual}" FALLÓ → ${intento.result.detalle}`,
     )
-    console.log(`[CheckFirst] ${fuente.medio.nombre}: rotando estrategias...`)
+    console.log(`[CheckFirst] ${fuente.Medio.nombre}: rotando estrategias...`)
 
     const fallbacks = getFallbackStrategies(tipoCheckActual)
 
     for (const fallback of fallbacks) {
-      console.log(`[CheckFirst] ${fuente.medio.nombre}: intentando fallback "${fallback}"...`)
+      console.log(`[CheckFirst] ${fuente.Medio.nombre}: intentando fallback "${fallback}"...`)
 
       intento = await ejecutarEstrategia(fallback, url, fuente)
       estrategiasProbadas.push({
@@ -286,7 +286,7 @@ export async function checkFuente(fuenteId: string): Promise<CheckResult & {
 
       if (!intento.result.error) {
         console.log(
-          `[CheckFirst] ${fuente.medio.nombre}: "${fallback}" EXITOSA → nueva estrategia default`,
+          `[CheckFirst] ${fuente.Medio.nombre}: "${fallback}" EXITOSA → nueva estrategia default`,
         )
         estrategiaExitosa = fallback
         resultadoFinal = intento
@@ -294,7 +294,7 @@ export async function checkFuente(fuenteId: string): Promise<CheckResult & {
         break
       } else {
         console.warn(
-          `[CheckFirst] ${fuente.medio.nombre}: "${fallback}" también falló → ${intento.result.detalle}`,
+          `[CheckFirst] ${fuente.Medio.nombre}: "${fallback}" también falló → ${intento.result.detalle}`,
         )
       }
     }
@@ -305,7 +305,7 @@ export async function checkFuente(fuenteId: string): Promise<CheckResult & {
   // ─── 3. Si una estrategia diferente funcionó, actualizar default ─
   if (estrategiaExitosa && estrategiaExitosa !== tipoCheckActual) {
     console.log(
-      `[CheckFirst] ${fuente.medio.nombre}: actualizando tipoCheck "${tipoCheckActual}" → "${estrategiaExitosa}"`,
+      `[CheckFirst] ${fuente.Medio.nombre}: actualizando tipoCheck "${tipoCheckActual}" → "${estrategiaExitosa}"`,
     )
     datosActualizacionFinal.tipoCheck = estrategiaExitosa
   }
@@ -332,17 +332,17 @@ export async function checkFuente(fuenteId: string): Promise<CheckResult & {
   const lifecycleResult = await registrarResultadoCheck(fuenteId, checkExitoso)
   if (lifecycleResult.degradacion) {
     console.warn(
-      `[CheckFirst] ${fuente.medio.nombre}: lifecycle degradación → ${lifecycleResult.degradacion.accion}`,
+      `[CheckFirst] ${fuente.Medio.nombre}: lifecycle degradación → ${lifecycleResult.degradacion.accion}`,
     )
   }
   if (lifecycleResult.promovida) {
-    console.log(`[CheckFirst] ${fuente.medio.nombre}: lifecycle promoción a "activa" (capa ${lifecycleResult.capa})`)
+    console.log(`[CheckFirst] ${fuente.Medio.nombre}: lifecycle promoción a "activa" (capa ${lifecycleResult.capa})`)
   }
 
   // Si TODAS fallaron, marcar error
   if (!checkExitoso) {
     console.error(
-      `[CheckFirst] ${fuente.medio.nombre}: TODAS las estrategias fallaron (capa ${lifecycleResult.capa}, ${fuente.fallosConsecutivos + 1} fallos consecutivos):`,
+      `[CheckFirst] ${fuente.Medio.nombre}: TODAS las estrategias fallaron (capa ${lifecycleResult.capa}, ${fuente.fallosConsecutivos + 1} fallos consecutivos):`,
       estrategiasProbadas.map(e => `${e.estrategia}(${e.exito ? 'OK' : 'FAIL'})`).join(', '),
     )
   }

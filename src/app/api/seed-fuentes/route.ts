@@ -143,17 +143,17 @@ export async function GET() {
 
     // Distribucion por nivel
     const fuentesPorNivel = await db.fuenteEstado.findMany({
-      include: { medio: { select: { nombre: true, nivel: true } } },
+      include: { Medio: { select: { nombre: true, nivel: true } } },
       where: { activo: true },
-      orderBy: { medio: { nivel: 'asc' } },
+      orderBy: { Medio: { nivel: 'asc' } },
     })
 
     const porNivel: Record<string, { count: number; fuentes: string[] }> = {}
     for (const f of fuentesPorNivel) {
-      const nivel = f.medio.nivel || '?'
+      const nivel = f.Medio.nivel || '?'
       if (!porNivel[nivel]) porNivel[nivel] = { count: 0, fuentes: [] }
       porNivel[nivel].count++
-      porNivel[nivel].fuentes.push(f.medio.nombre)
+      porNivel[nivel].fuentes.push(f.Medio.nombre)
     }
 
     return NextResponse.json({

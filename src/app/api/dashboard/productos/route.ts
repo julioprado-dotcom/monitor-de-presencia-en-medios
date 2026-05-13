@@ -52,9 +52,9 @@ export async function GET() {
     const entregas = await db.entrega.findMany({
       orderBy: { fechaCreacion: 'desc' },
       include: {
-        contrato: {
+        Contrato: {
           include: {
-            cliente: {
+            Cliente: {
               select: { nombre: true },
             },
           },

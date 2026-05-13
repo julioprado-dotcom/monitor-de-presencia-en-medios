@@ -8,17 +8,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { withAuth } from '@/lib/auth-helpers';
 import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
-  // Auth check
-  const { error: authError } = await withAuth();
-  if (authError) return authError;
-
   try {
     const body = await request.json();
     const { mencionIds, lenteId, ejeTematicoId } = body as {

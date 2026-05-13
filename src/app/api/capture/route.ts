@@ -310,7 +310,7 @@ export async function GET() {
   try {
     const lastLog = await db.capturaLog.findFirst({
       orderBy: { fecha: 'desc' },
-      include: { medio: { select: { nombre: true } } },
+      include: { Medio: { select: { nombre: true } } },
     });
 
     if (!lastLog) {

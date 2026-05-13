@@ -167,9 +167,9 @@ export async function GET() {
     const fallidasRows = await db.entrega.findMany({
       where: { fechaCreacion: { gte: start }, estado: 'fallido' },
       include: {
-        contrato: {
+        Contrato: {
           include: {
-            cliente: { select: { nombre: true } },
+            Cliente: { select: { nombre: true } },
           },
         },
       },
@@ -185,8 +185,8 @@ export async function GET() {
         canal: e.canal,
         fechaEnvio: e.fechaEnvio?.toISOString() ?? null,
         error: e.error ?? null,
-        contrato: e.contrato?.id ?? '',
-        clienteNombre: e.contrato?.cliente?.nombre ?? 'Sin cliente',
+        contrato: e.Contrato?.id ?? '',
+        clienteNombre: e.Contrato?.Cliente?.nombre ?? 'Sin cliente',
         diagnostico: diag,
       };
     });
@@ -195,9 +195,9 @@ export async function GET() {
     const enProcesoRows = await db.entrega.findMany({
       where: { fechaCreacion: { gte: start }, estado: 'pendiente' },
       include: {
-        contrato: {
+        Contrato: {
           include: {
-            cliente: { select: { nombre: true } },
+            Cliente: { select: { nombre: true } },
           },
         },
       },
@@ -210,8 +210,8 @@ export async function GET() {
       tipoBoletin: e.tipoBoletin,
       canal: e.canal,
       fechaCreacion: e.fechaCreacion.toISOString(),
-      contrato: e.contrato?.id ?? '',
-      clienteNombre: e.contrato?.cliente?.nombre ?? 'Sin cliente',
+      contrato: e.Contrato?.id ?? '',
+      clienteNombre: e.Contrato?.Cliente?.nombre ?? 'Sin cliente',
       fechaProgramada: e.fechaProgramada?.toISOString() ?? null,
     }));
 

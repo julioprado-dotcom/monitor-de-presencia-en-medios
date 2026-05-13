@@ -45,7 +45,7 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
     // 0. Obtener datos de la fuente
     const fuente = await db.fuenteEstado.findUnique({
       where: { id: fuenteId },
-      include: { medio: true },
+      include: { Medio: true },
     })
 
     if (!fuente) {
@@ -54,12 +54,12 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
 
     // ─── CASO A: URLs específicas (viene de RSS con links de notas) ───
     if (urls && urls.length > 0) {
-      console.log(`[scrape-fuente] Modo RSS: ${urls.length} URLs directas para ${fuente.medio.nombre}`)
-      return await procesarUrlsDirectas(urls, medioId, fuenteId, fuente.medio.nivel)
+      console.log(`[scrape-fuente] Modo RSS: ${urls.length} URLs directas para ${fuente.Medio.nombre}`)
+      return await procesarUrlsDirectas(urls, medioId, fuenteId, fuente.Medio.nivel)
     }
 
     // ─── CASO B: Pipeline completo 3 fases (homepage) ───
-    console.log(`[scrape-fuente] Pipeline 3 fases para ${fuente.medio.nombre}`)
+    console.log(`[scrape-fuente] Pipeline 3 fases para ${fuente.Medio.nombre}`)
 
     // FASE 1: Obtener HTML de la homepage
     // Optimización: reutilizar HTML que check-first (Z.ai) ya descargó
@@ -79,7 +79,7 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
 
     // FASE 1: Extraer links de notas
     const notas = extraerLinksDeNoticias(html, fuente.url, MAX_LINKS)
-    console.log(`[scrape-fuente] FASE 1: ${notas.length} links de notas extraídos de ${fuente.medio.nombre}`)
+    console.log(`[scrape-fuente] FASE 1: ${notas.length} links de notas extraídos de ${fuente.Medio.nombre}`)
 
     // Update capacity: headline extraction succeeded
     await db.fuenteEstado.update({
@@ -94,7 +94,7 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
     if (notas.length === 0) {
       // Fallback: si no se pudieron extraer links, procesar la homepage como antes
       console.log(`[scrape-fuente] No se extrajeron links, fallback a procesamiento de homepage`)
-      return await procesarFallbackHomepage(html, medioId, fuenteId, fuente.medio.nivel, fuente.url)
+      return await procesarFallbackHomepage(html, medioId, fuenteId, fuente.Medio.nivel, fuente.url)
     }
 
     // Enriquecer con leads del HTML de la homepage
@@ -104,14 +104,14 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
 
     // FASE 2: Triaje por keywords (SIN IA, SIN descargas extra)
     const seleccionadas = await trijarNotas(notas)
-    console.log(`[scrape-fuente] FASE 2: ${seleccionadas.length} de ${notas.length} notas pasaron el triaje para ${fuente.medio.nombre}`)
+    console.log(`[scrape-fuente] FASE 2: ${seleccionadas.length} de ${notas.length} notas pasaron el triaje para ${fuente.Medio.nombre}`)
 
     if (seleccionadas.length === 0) {
       // Sin notas relevantes — registrar y salir sin gastar LLM
       await db.capturaLog.create({
         data: {
           medioId,
-          nivel: fuente.medio.nivel,
+          nivel: fuente.Medio.nivel,
           exitosa: true,
           totalArticulos: notas.length,
           mencionesEncontradas: 0,
@@ -127,7 +127,7 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
         data: {
           fuenteId,
           medioId,
-          medioNombre: fuente.medio.nombre,
+          medioNombre: fuente.Medio.nombre,
           fase1_links: notas.length,
           fase2_seleccionadas: 0,
           fase3_clasificadas: 0,
@@ -242,14 +242,14 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
     await db.capturaLog.create({
       data: {
         medioId,
-        nivel: fuente.medio.nivel,
+        nivel: fuente.Medio.nivel,
         exitosa: true,
         totalArticulos: notas.length,
         mencionesEncontradas: totalMencionesCreadas,
       },
     })
 
-    console.log(`[scrape-fuente] Completado ${fuente.medio.nombre}: ${notas.length} notas → ${seleccionadas.length} seleccionadas → ${totalMencionesCreadas} menciones [${responseTime}ms]`)
+    console.log(`[scrape-fuente] Completado ${fuente.Medio.nombre}: ${notas.length} notas → ${seleccionadas.length} seleccionadas → ${totalMencionesCreadas} menciones [${responseTime}ms]`)
 
     // Backup periódico de DB (cada 100 ciclos o 6h)
     const backup = checkAndBackupDB()
@@ -262,7 +262,7 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
       data: {
         fuenteId,
         medioId,
-        medioNombre: fuente.medio.nombre,
+        medioNombre: fuente.Medio.nombre,
         fase1_links: notas.length,
         fase2_seleccionadas: seleccionadas.length,
         fase3_clasificadas: aClasificar.length,

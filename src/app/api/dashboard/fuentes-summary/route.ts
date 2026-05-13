@@ -14,12 +14,12 @@ export async function GET() {
   try {
     const fuentes = await db.fuenteEstado.findMany({
       include: {
-        medio: { select: { id: true, nombre: true } },
+        Medio: { select: { id: true, nombre: true } },
       },
       orderBy: [
         { activo: 'desc' },
         { capaActual: 'desc' },
-        { medio: { nombre: 'asc' } },
+        { Medio: { nombre: 'asc' } },
       ],
     });
 
@@ -39,7 +39,7 @@ export async function GET() {
       return {
         id: f.id,
         medioId: f.medioId,
-        nombre: f.medio.nombre,
+        nombre: f.Medio.nombre,
         url: f.url,
         tipoCheck: f.tipoCheck,
         estado: f.estado || 'creada',

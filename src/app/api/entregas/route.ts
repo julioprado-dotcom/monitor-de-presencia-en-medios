@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
       db.entrega.findMany({
         where,
         include: {
-          contrato: {
-            include: { cliente: { select: { id: true, nombre: true, organizacion: true } } },
+          Contrato: {
+            include: { Cliente: { select: { id: true, nombre: true, organizacion: true } } },
           },
         },
         orderBy: { fechaCreacion: 'desc' },
@@ -93,8 +93,8 @@ export async function POST(req: NextRequest) {
         error: error || null,
       },
       include: {
-        contrato: {
-          include: { cliente: { select: { id: true, nombre: true, organizacion: true } } },
+        Contrato: {
+          include: { Cliente: { select: { id: true, nombre: true, organizacion: true } } },
         },
       },
     });

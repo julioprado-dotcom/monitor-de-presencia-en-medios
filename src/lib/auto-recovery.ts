@@ -6,6 +6,13 @@
 import db from '@/lib/db'
 import { readFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs'
 import { join } from 'path'
+import { randomBytes } from 'crypto'
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+function generatePersonaId(): string {
+  return 'per_' + randomBytes(12).toString('hex')
+}
 
 // ── Configuración ──────────────────────────────────────────────────────
 
@@ -454,6 +461,7 @@ export async function seedPersonas(): Promise<{ senadores: number; diputados: nu
       const partido = normalizarPartido(String(sen.partido_sigla || ''), String(sen.partido || ''))
       await db.persona.create({
         data: {
+          id: generatePersonaId(),
           nombre,
           camara: 'Senadores',
           departamento: normalizarDepto(String(sen.departamento || '')),
@@ -464,6 +472,7 @@ export async function seedPersonas(): Promise<{ senadores: number; diputados: nu
           email: sen.email ? String(sen.email) : null,
           fotoUrl: sen.foto_url ? String(sen.foto_url) : '',
           periodo: '2025-2030',
+          fechaActualizacion: new Date(),
         },
       })
       senadores++
@@ -493,6 +502,7 @@ export async function seedPersonas(): Promise<{ senadores: number; diputados: nu
       const partido = normalizarPartido(String(dip.partidoSigla || dip.partido_sigla || ''), String(dip.partido || ''))
       await db.persona.create({
         data: {
+          id: generatePersonaId(),
           nombre,
           camara: 'Diputados',
           departamento: normalizarDepto(String(dip.departamento || '')),
@@ -503,6 +513,7 @@ export async function seedPersonas(): Promise<{ senadores: number; diputados: nu
           email: null,
           fotoUrl: String(dip.foto_url || ''),
           periodo: '2025-2030',
+          fechaActualizacion: new Date(),
         },
       })
       diputados++

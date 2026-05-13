@@ -125,7 +125,7 @@ export async function GET() {
           esDuplicado: false,
         },
         include: {
-          medio: {
+          Medio: {
             select: { nombre: true },
           },
         },
@@ -135,14 +135,14 @@ export async function GET() {
           id: true,
           titulo: true,
           fechaCaptura: true,
-          medio: { select: { nombre: true } },
+          Medio: { select: { nombre: true } },
         },
       });
 
       pendientesList = pendientesData.map(m => ({
         id: m.id,
         titulo: m.titulo,
-        medioNombre: m.medio.nombre,
+        medioNombre: m.Medio.nombre,
         fechaCaptura: m.fechaCaptura.toISOString(),
       }));
     } catch {

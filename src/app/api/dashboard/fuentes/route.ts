@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     // Fetch all fuente estados
     const estados = await db.fuenteEstado.findMany({
       include: {
-        medio: {
+        Medio: {
           select: { id: true, nombre: true, url: true, tipo: true, categoria: true, nivel: true },
         },
       },

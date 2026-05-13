@@ -33,19 +33,19 @@ export async function evaluarFrecuencia(
 ): Promise<FrecuenciaEval | null> {
   const fuente = await db.fuenteEstado.findUnique({
     where: { id: fuenteId },
-    include: { medio: true },
+    include: { Medio: true },
   })
 
   if (!fuente) return null
 
-  const override = deserializeOverride(fuente.medio.frecuenciaOverride)
+  const override = deserializeOverride(fuente.Medio.frecuenciaOverride)
   const overrideActivo = override && isOverrideActive(override)
 
   // Obtener frecuencia efectiva
   const { efectiva, source } = getFrecuenciaEfectiva(
     fuente.frecuenciaBase,
     fuente.frecuenciaActual,
-    overrideActivo ? fuente.medio.frecuenciaOverride : null,
+    overrideActivo ? fuente.Medio.frecuenciaOverride : null,
   )
 
   let frecuenciaActualizada = fuente.frecuenciaActual
@@ -62,7 +62,7 @@ export async function evaluarFrecuencia(
         },
       })
       console.log(
-        `[Frecuencia] Restaurada ${fuente.medio.nombre}: ${fuente.frecuenciaActual} -> ${frecuenciaActualizada} (cambio detectado)`,
+        `[Frecuencia] Restaurada ${fuente.Medio.nombre}: ${fuente.frecuenciaActual} -> ${frecuenciaActualizada} (cambio detectado)`,
       )
     }
     // checksSinCambio ya se resetea a 0 en check-first/strategies.ts
@@ -82,7 +82,7 @@ export async function evaluarFrecuencia(
             },
           })
           console.log(
-            `[Frecuencia] Degradada ${fuente.medio.nombre}: ${fuente.frecuenciaActual} -> ${nuevaFreq} (${fuente.checksSinCambio} checks sin cambio)`,
+            `[Frecuencia] Degradada ${fuente.Medio.nombre}: ${fuente.frecuenciaActual} -> ${nuevaFreq} (${fuente.checksSinCambio} checks sin cambio)`,
           )
         }
       }
@@ -93,13 +93,13 @@ export async function evaluarFrecuencia(
   const { efectiva: efectivaFinal, source: sourceFinal } = getFrecuenciaEfectiva(
     fuente.frecuenciaBase,
     frecuenciaActualizada,
-    overrideActivo ? fuente.medio.frecuenciaOverride : null,
+    overrideActivo ? fuente.Medio.frecuenciaOverride : null,
   )
 
   return {
     fuenteId: fuente.id,
     medioId: fuente.medioId,
-    medioNombre: fuente.medio.nombre,
+    medioNombre: fuente.Medio.nombre,
     frecuenciaBase: fuente.frecuenciaBase,
     frecuenciaActual: frecuenciaActualizada,
     frecuenciaEfectiva: efectivaFinal,
@@ -114,14 +114,14 @@ export async function evaluarFrecuencia(
 export async function inicializarFrecuencia(fuenteId: string): Promise<string> {
   const fuente = await db.fuenteEstado.findUnique({
     where: { id: fuenteId },
-    include: { medio: true },
+    include: { Medio: true },
   })
 
   if (!fuente) throw new Error(`FuenteEstado ${fuenteId} no encontrada`)
 
   const base = getFrecuenciaBase(
-    fuente.medio.nombre,
-    fuente.medio.categoria,
+    fuente.Medio.nombre,
+    fuente.Medio.categoria,
     fuente.url,
   )
 
@@ -146,24 +146,24 @@ export async function inicializarFrecuencia(fuenteId: string): Promise<string> {
 export async function getFrecuenciaEval(fuenteId: string): Promise<FrecuenciaEval | null> {
   const fuente = await db.fuenteEstado.findUnique({
     where: { id: fuenteId },
-    include: { medio: true },
+    include: { Medio: true },
   })
 
   if (!fuente) return null
 
-  const override = deserializeOverride(fuente.medio.frecuenciaOverride)
+  const override = deserializeOverride(fuente.Medio.frecuenciaOverride)
   const overrideActivo = override && isOverrideActive(override)
 
   const { efectiva, source } = getFrecuenciaEfectiva(
     fuente.frecuenciaBase,
     fuente.frecuenciaActual,
-    overrideActivo ? fuente.medio.frecuenciaOverride : null,
+    overrideActivo ? fuente.Medio.frecuenciaOverride : null,
   )
 
   return {
     fuenteId: fuente.id,
     medioId: fuente.medioId,
-    medioNombre: fuente.medio.nombre,
+    medioNombre: fuente.Medio.nombre,
     frecuenciaBase: fuente.frecuenciaBase,
     frecuenciaActual: fuente.frecuenciaActual,
     frecuenciaEfectiva: efectiva,
@@ -180,23 +180,23 @@ export async function getFuentesDegradadas(): Promise<FrecuenciaEval[]> {
     where: {
       activo: true,
     },
-    include: { medio: true },
+    include: { Medio: true },
   })
 
   const degradadas: FrecuenciaEval[] = []
   for (const fuente of fuentes) {
     if (fuente.frecuenciaActual !== fuente.frecuenciaBase) {
-      const override = deserializeOverride(fuente.medio.frecuenciaOverride)
+      const override = deserializeOverride(fuente.Medio.frecuenciaOverride)
       const overrideActivo = override && isOverrideActive(override)
       const { efectiva, source } = getFrecuenciaEfectiva(
         fuente.frecuenciaBase,
         fuente.frecuenciaActual,
-        overrideActivo ? fuente.medio.frecuenciaOverride : null,
+        overrideActivo ? fuente.Medio.frecuenciaOverride : null,
       )
       degradadas.push({
         fuenteId: fuente.id,
         medioId: fuente.medioId,
-        medioNombre: fuente.medio.nombre,
+        medioNombre: fuente.Medio.nombre,
         frecuenciaBase: fuente.frecuenciaBase,
         frecuenciaActual: fuente.frecuenciaActual,
         frecuenciaEfectiva: efectiva,
@@ -219,13 +219,13 @@ export async function batchDegradar(): Promise<number> {
       activo: true,
       checksSinCambio: { gte: UMBRAL },
     },
-    include: { medio: true },
+    include: { Medio: true },
   })
 
   let count = 0
   for (const fuente of fuentes) {
     // No degradar si tiene override activo
-    const override = deserializeOverride(fuente.medio.frecuenciaOverride)
+    const override = deserializeOverride(fuente.Medio.frecuenciaOverride)
     if (override && isOverrideActive(override)) continue
 
     // No degradar si ya esta en el minimo
@@ -241,7 +241,7 @@ export async function batchDegradar(): Promise<number> {
         },
       })
       console.log(
-        `[Frecuencia] Batch degradada ${fuente.medio.nombre}: ${fuente.frecuenciaActual} -> ${nuevaFreq}`,
+        `[Frecuencia] Batch degradada ${fuente.Medio.nombre}: ${fuente.frecuenciaActual} -> ${nuevaFreq}`,
       )
       count++
     }

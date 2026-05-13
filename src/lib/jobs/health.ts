@@ -146,7 +146,7 @@ export async function getFullStats(): Promise<{
       totalChecks: true,
       totalCambios: true,
       checksSinCambio: true,
-      medio: { select: { nombre: true } },
+      Medio: { select: { nombre: true } },
     },
   })
 
@@ -158,7 +158,7 @@ export async function getFullStats(): Promise<{
     if (f.totalCambios > 0) {
       conCambios++
       topProductoras.push({
-        medio: f.medio.nombre,
+        medio: f.Medio.nombre,
         cambios: f.totalCambios,
       })
     } else {

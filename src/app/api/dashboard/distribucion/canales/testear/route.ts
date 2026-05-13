@@ -4,7 +4,6 @@
 // Retorna resultados simulados de conexión.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/auth-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -100,10 +99,6 @@ const CANAL_TESTERS: Record<string, () => CanalTestResult> = {
 };
 
 export async function POST(request: NextRequest) {
-  // Auth check
-  const { error: authError } = await withAuth();
-  if (authError) return authError;
-
   try {
     const body = await request.json();
     const { canal } = body as { canal?: string };

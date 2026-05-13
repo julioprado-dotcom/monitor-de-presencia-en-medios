@@ -49,7 +49,7 @@ export interface MencionConRelaciones {
     departamento: string
     partidoSigla: string
   } | null
-  medio: {
+  Medio: {
     id: string
     nombre: string
     tipo: string
@@ -287,10 +287,10 @@ export function calculateTopMedios(
 ): TopMedioItem[] {
   const counts: Record<string, { nombre: string; tipo: string; nivel: string; count: number }> = {}
   for (const m of menciones) {
-    if (m.medio) {
-      const key = m.medio.id
+    if (m.Medio) {
+      const key = m.Medio.id
       if (!counts[key]) {
-        counts[key] = { nombre: m.medio.nombre, tipo: m.medio.tipo, nivel: m.medio.nivel, count: 0 }
+        counts[key] = { nombre: m.Medio.nombre, tipo: m.Medio.tipo, nivel: m.Medio.nivel, count: 0 }
       }
       counts[key].count++
     }

@@ -318,8 +318,8 @@ async function handleResumirPeriodo(
       sentimiento: true,
       temas: true,
       fechaCaptura: true,
-      persona: { select: { nombre: true } },
-      medio: { select: { nombre: true } },
+      Persona: { select: { nombre: true } },
+      Medio: { select: { nombre: true } },
     },
   });
 
@@ -329,7 +329,7 @@ async function handleResumirPeriodo(
     try {
       const zai = await ZAI.create();
       const mencionesText = menciones.slice(0, 20).map((m, i) =>
-        `${i + 1}. [${m.medio?.nombre || 'N/A'}] ${m.titulo} — ${m.persona?.nombre || 'N/A'} (${m.sentimiento})`
+        `${i + 1}. [${m.Medio?.nombre || 'N/A'}] ${m.titulo} — ${m.persona?.nombre || 'N/A'} (${m.sentimiento})`
       ).join('\n');
 
       const completion = await zai.chat.completions.create({

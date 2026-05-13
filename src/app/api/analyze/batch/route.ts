@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const menciones = await db.mencion.findMany({
       where: { sentimiento: 'no_clasificado' },
       take: limit,
-      include: { persona: { select: { nombre: true } }, medio: { select: { nombre: true } } },
+      include: { Persona: { select: { nombre: true } }, Medio: { select: { nombre: true } } },
     });
 
     if (menciones.length === 0) {

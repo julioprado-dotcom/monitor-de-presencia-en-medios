@@ -58,14 +58,14 @@ export async function run(_payload: Record<string, unknown>): Promise<RunnerResu
   // Obtener URLs de fuentes activas para testear (max 5)
   const fuentes = await db.fuenteEstado.findMany({
     where: { activo: true, url: { not: '' } },
-    select: { url: true, medio: { select: { nombre: true } } },
+    select: { url: true, Medio: { select: { nombre: true } } },
     take: 5,
-    orderBy: { medio: { nombre: 'asc' } },
+    orderBy: { Medio: { nombre: 'asc' } },
   })
 
   const targets: TestTarget[] = fuentes.map(f => ({
     url: f.url,
-    nombre: f.medio.nombre,
+    nombre: f.Medio.nombre,
   }))
 
   // Si no hay fuentes, testear URLs de referencia

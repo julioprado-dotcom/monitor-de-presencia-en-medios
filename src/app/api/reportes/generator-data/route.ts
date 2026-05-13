@@ -61,9 +61,9 @@ async function handleTermometroSaldo(fecha: string, _ejeSlug: string, tipo: stri
   const menciones = await db.mencion.findMany({
     where: { fechaCaptura: { gte: fechaInicio, lte: fechaFin } },
     include: {
-      persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
-      medio: { select: { nombre: true, tipo: true, nivel: true } },
-      ejesTematicos: { include: { ejeTematico: { select: { id: true, nombre: true, slug: true, color: true, activo: true } } } },
+      Persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
+      Medio: { select: { nombre: true, tipo: true, nivel: true } },
+      MencionTema: { include: { ejeTematico: { select: { id: true, nombre: true, slug: true, color: true, activo: true } } } },
     },
     orderBy: { fechaCaptura: 'desc' },
   });
@@ -80,8 +80,8 @@ async function handleTermometroSaldo(fecha: string, _ejeSlug: string, tipo: stri
 
   const ejesCount: Record<string, { id: string; nombre: string; slug: string; color: string; count: number }> = {};
   for (const m of menciones) {
-    if (m.ejesTematicos) {
-      for (const mt of m.ejesTematicos) {
+    if (m.MencionTema) {
+      for (const mt of m.MencionTema) {
         const eje = mt.ejeTematico;
         if (eje && eje.activo) {
           if (!ejesCount[eje.slug]) {
@@ -112,7 +112,7 @@ async function handleTermometroSaldo(fecha: string, _ejeSlug: string, tipo: stri
       fechaCaptura: m.fechaCaptura,
       sentimiento: m.sentimiento,
       persona: m.persona ? { nombre: m.persona.nombre, partidoSigla: m.persona.partidoSigla } : null,
-      medio: { nombre: m.medio?.nombre },
+      medio: { nombre: m.Medio?.nombre },
     })),
     ejesTematicos,
     ejesConMenciones,
@@ -147,8 +147,8 @@ async function handleElFoco(fecha: string, ejeSlug: string, tipo: string) {
 
     const ejesCount: Record<string, number> = {};
     for (const m of mencionesAll) {
-      if (m.ejesTematicos) {
-        for (const mt of m.ejesTematicos) {
+      if (m.MencionTema) {
+        for (const mt of m.MencionTema) {
           if (mt.ejeTematico && mt.ejeTematico.activo) {
             ejesCount[mt.ejeTematico.slug] = (ejesCount[mt.ejeTematico.slug] || 0) + 1;
           }
@@ -185,8 +185,8 @@ async function handleElFoco(fecha: string, ejeSlug: string, tipo: string) {
       ejesTematicos: { some: { ejeTematicoId: ejeTematico.id } },
     },
     include: {
-      persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
-      medio: { select: { id: true, nombre: true, tipo: true, nivel: true } },
+      Persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
+      Medio: { select: { id: true, nombre: true, tipo: true, nivel: true } },
       ejesTematicos: { include: { ejeTematico: { select: { id: true, nombre: true, slug: true, color: true } } } },
     },
     orderBy: { fechaCaptura: 'desc' },
@@ -206,7 +206,7 @@ async function handleElFoco(fecha: string, ejeSlug: string, tipo: string) {
   const mencionesPreview = menciones.slice(0, 20).map(m => ({
     id: m.id, titulo: m.titulo, fechaCaptura: m.fechaCaptura, sentimiento: m.sentimiento,
     persona: m.persona ? { nombre: m.persona.nombre, partidoSigla: m.persona.partidoSigla } : null,
-    medio: { nombre: m.medio?.nombre },
+    medio: { nombre: m.Medio?.nombre },
   }));
 
   return NextResponse.json({
@@ -231,9 +231,9 @@ async function handleElRadar(fecha: string, _ejeSlug: string, tipo: string) {
   const menciones = await db.mencion.findMany({
     where: { fechaCaptura: { gte: fechaInicio, lte: fechaFin } },
     include: {
-      persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
-      medio: { select: { id: true, nombre: true, tipo: true, nivel: true } },
-      ejesTematicos: { include: { ejeTematico: { select: { id: true, nombre: true, slug: true, color: true, activo: true } } } },
+      Persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
+      Medio: { select: { id: true, nombre: true, tipo: true, nivel: true } },
+      MencionTema: { include: { ejeTematico: { select: { id: true, nombre: true, slug: true, color: true, activo: true } } } },
     },
     orderBy: { fechaCaptura: 'desc' },
   });
@@ -256,7 +256,7 @@ async function handleElRadar(fecha: string, _ejeSlug: string, tipo: string) {
 
   for (const eje of ejesTematicos) {
     const mencionesEje = menciones.filter(m =>
-      m.ejesTematicos?.some(mt => mt.ejeTematico?.id === eje.id && mt.ejeTematico?.activo)
+      m.MencionTema?.some(mt => mt.ejeTematico?.id === eje.id && mt.ejeTematico?.activo)
     );
 
     const sentimientoEje = calculateSentimiento(mencionesEje);
@@ -318,8 +318,8 @@ async function handleElRadar(fecha: string, _ejeSlug: string, tipo: string) {
         actoresSemana[pKey] = { nombre: m.persona.nombre, partidoSigla: m.persona.partidoSigla, camara: m.persona.camara, count: 0, ejes: new Set() };
       }
       actoresSemana[pKey].count++;
-      if (m.ejesTematicos) {
-        for (const mt of m.ejesTematicos) {
+      if (m.MencionTema) {
+        for (const mt of m.MencionTema) {
           if (mt.ejeTematico?.activo) actoresSemana[pKey].ejes.add(mt.ejeTematico.slug);
         }
       }
@@ -351,8 +351,8 @@ async function handleElRadar(fecha: string, _ejeSlug: string, tipo: string) {
   const mencionesPreview = menciones.slice(0, 15).map(m => ({
     id: m.id, titulo: m.titulo, fechaCaptura: m.fechaCaptura, sentimiento: m.sentimiento,
     persona: m.persona ? { nombre: m.persona.nombre, partidoSigla: m.persona.partidoSigla } : null,
-    medio: { nombre: m.medio?.nombre },
-    ejes: m.ejesTematicos?.filter(mt => mt.ejeTematico?.activo).map(mt => ({ nombre: mt.ejeTematico.nombre, color: mt.ejeTematico.color })) || [],
+    medio: { nombre: m.Medio?.nombre },
+    ejes: m.MencionTema?.filter(mt => mt.ejeTematico?.activo).map(mt => ({ nombre: mt.ejeTematico.nombre, color: mt.ejeTematico.color })) || [],
   }));
 
   // Hallazgo clave de la semana

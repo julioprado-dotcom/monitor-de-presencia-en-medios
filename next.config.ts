@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   typescript: { ignoreBuildErrors: true },
+  outputFileTracingRoot: '/home/z/my-project/connect',
   // output: 'standalone', // Disabled: use next start directly
 
   // Permitir preview en iframe cross-origin (Z.ai)

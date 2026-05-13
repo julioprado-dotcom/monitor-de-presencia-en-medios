@@ -71,7 +71,7 @@ export function stopScheduler(): void {
 async function scheduleCheckJobs(): Promise<void> {
   const fuentes = await db.fuenteEstado.findMany({
     where: { estado: 'activa' },
-    include: { medio: true },
+    include: { Medio: true },
   })
 
   if (fuentes.length === 0) {
@@ -99,7 +99,7 @@ async function scheduleCheckJobs(): Promise<void> {
         // Capa 0: fuente sin check OK reciente — no programar
         omitidasPorCapa++
         console.log(
-          `[Scheduler] ${fuente.medio.nombre}: omitida (capa ${capa} — sin check OK reciente). ` +
+          `[Scheduler] ${fuente.Medio.nombre}: omitida (capa ${capa} — sin check OK reciente). ` +
           `El scheduler la intentará de nuevo en el próximo ciclo de mantenimiento.`
         )
         continue
@@ -109,7 +109,7 @@ async function scheduleCheckJobs(): Promise<void> {
       scheduledCount += count
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      console.warn(`[Scheduler] Error programando ${fuente.medio.nombre}: ${msg}`)
+      console.warn(`[Scheduler] Error programando ${fuente.Medio.nombre}: ${msg}`)
     }
   }
 
@@ -124,7 +124,7 @@ function scheduleFuente(
   fuente: {
     id: string
     medioId: string
-    medio: {
+    Medio: {
       nombre: string
       categoria: string
       nivel: string
@@ -140,7 +140,7 @@ function scheduleFuente(
   const { efectiva } = getFrecuenciaEfectiva(
     fuente.frecuenciaBase,
     fuente.frecuenciaActual,
-    fuente.medio.frecuenciaOverride || null,
+    fuente.Medio.frecuenciaOverride || null,
   )
 
   // 2. Numero de chequeos por dia segun frecuencia
@@ -159,7 +159,7 @@ function scheduleFuente(
     horarios = calcularHorariosOptimos(histograma, numChecks)
   } catch {
     // Histograma corrupto, usar horarios por defecto
-    const defaults = getHorariosDefault(fuente.medio.nombre, '')
+    const defaults = getHorariosDefault(fuente.Medio.nombre, '')
     horarios = defaults || distribuirFallback(numChecks)
   }
 
@@ -171,8 +171,8 @@ function scheduleFuente(
 
   // 5. Programar tareas con node-cron
   // Los Tiempos = P0 (prioridad absoluta), resto nivel 1 = P1, otros = P3
-  const domain = (fuente.medio.nombre || '').toLowerCase().includes('tiempos') ? 'lostiempos.com' : ''
-  const prioridad = domain === 'lostiempos.com' ? 0 : (fuente.medio.nivel === '1' ? 1 : 3)
+  const domain = (fuente.Medio.nombre || '').toLowerCase().includes('tiempos') ? 'lostiempos.com' : ''
+  const prioridad = domain === 'lostiempos.com' ? 0 : (fuente.Medio.nivel === '1' ? 1 : 3)
 
   for (const hora of horarios) {
     scheduleSingleCheck(fuente, prioridad, hora)
@@ -183,14 +183,14 @@ function scheduleFuente(
 
 // Programar un check individual con proteccion contra duplicados
 function scheduleSingleCheck(
-  fuente: { id: string; medioId: string; medio: { nombre: string } },
+  fuente: { id: string; medioId: string; Medio: { nombre: string } },
   prioridad: number,
   hora: number,
 ): void {
   const expresion = `0 ${hora} * * *`
 
   if (!cron.validate(expresion)) {
-    console.warn(`[Scheduler] Expresion cron invalida: ${expresion} para ${fuente.medio.nombre}`)
+    console.warn(`[Scheduler] Expresion cron invalida: ${expresion} para ${fuente.Medio.nombre}`)
     return
   }
 
@@ -238,10 +238,10 @@ function scheduleSingleCheck(
         },
       })
 
-      console.log(`[Scheduler] Check encolado para ${fuente.medio.nombre} (${formatCronHuman(expresion)})`)
+      console.log(`[Scheduler] Check encolado para ${fuente.Medio.nombre} (${formatCronHuman(expresion)})`)
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      console.error(`[Scheduler] Error en tarea ${fuente.medio.nombre}: ${msg}`)
+      console.error(`[Scheduler] Error en tarea ${fuente.Medio.nombre}: ${msg}`)
     }
   })
 

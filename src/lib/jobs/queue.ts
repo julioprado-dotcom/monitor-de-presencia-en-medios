@@ -4,11 +4,19 @@
 import db from '@/lib/db'
 import type { JobCreate, JobEstado } from './types'
 import { RETRY_CONFIG, QUEUE_LIMITS } from './constants'
+import { randomBytes } from 'crypto'
+
+// Generar ID único para jobs (schema usa @id String sin @default)
+function generateJobId(): string {
+  return 'job_' + randomBytes(12).toString('hex')
+}
 
 // Encolar un nuevo job
 export async function enqueue(params: JobCreate): Promise<string> {
+  const jobId = generateJobId()
   const job = await db.job.create({
     data: {
+      id: jobId,
       tipo: params.tipo,
       prioridad: params.prioridad ?? 5,
       payload: JSON.stringify(params.payload ?? {}),
@@ -25,6 +33,7 @@ export async function enqueue(params: JobCreate): Promise<string> {
 export async function enqueueMany(jobs: JobCreate[]): Promise<string[]> {
   const results = await db.job.createMany({
     data: jobs.map(j => ({
+      id: 'job_' + randomBytes(12).toString('hex'),
       tipo: j.tipo,
       prioridad: j.prioridad ?? 5,
       payload: JSON.stringify(j.payload ?? {}),

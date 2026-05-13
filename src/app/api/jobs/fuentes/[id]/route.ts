@@ -15,7 +15,7 @@ export async function GET(
 
     const fuente = await db.fuenteEstado.findUnique({
       where: { id },
-      include: { medio: true },
+      include: { Medio: true },
     })
 
     if (!fuente) {
@@ -56,7 +56,7 @@ export async function PUT(
     const fuente = await db.fuenteEstado.update({
       where: { id },
       data,
-      include: { medio: true },
+      include: { Medio: true },
     })
 
     return NextResponse.json({ exito: true, fuente })
@@ -105,7 +105,7 @@ export async function PATCH(
     const fuente = await db.fuenteEstado.update({
       where: { id },
       data,
-      include: { medio: true },
+      include: { Medio: true },
     })
 
     return NextResponse.json({ exito: true, fuente })

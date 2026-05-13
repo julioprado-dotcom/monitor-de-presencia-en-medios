@@ -34,8 +34,8 @@ export async function GET() {
         }),
         db.entrega.findMany({
           include: {
-            contrato: {
-              include: { cliente: { select: { nombre: true } } },
+            Contrato: {
+              include: { Cliente: { select: { nombre: true } } },
             },
           },
           orderBy: { fechaCreacion: 'desc' },
@@ -66,7 +66,7 @@ export async function GET() {
         estado: e.estado,
         canal: e.canal,
         fechaEnvio: e.fechaEnvio?.toISOString() ?? null,
-        cliente: e.contrato?.cliente?.nombre ?? 'Sin cliente',
+        cliente: e.Contrato?.Cliente?.nombre ?? 'Sin cliente',
       })),
     });
   } catch (error: unknown) {

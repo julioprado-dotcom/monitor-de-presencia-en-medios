@@ -95,9 +95,9 @@ export async function GET() {
           fechaEnvio: { not: null },
         },
         include: {
-          contrato: {
+          Contrato: {
             include: {
-              cliente: { select: { nombre: true } },
+              Cliente: { select: { nombre: true } },
             },
           },
         },
@@ -108,7 +108,7 @@ export async function GET() {
       ultimosEnvios = entregas.map(e => ({
         id: e.id,
         producto: e.tipoBoletin,
-        destinatario: e.contrato?.cliente?.nombre || 'Sin cliente',
+        destinatario: e.Contrato?.Cliente?.nombre || 'Sin cliente',
         canal: e.canal,
         timestamp: e.fechaEnvio?.toISOString() || e.fechaCreacion.toISOString(),
         estado: e.estado,

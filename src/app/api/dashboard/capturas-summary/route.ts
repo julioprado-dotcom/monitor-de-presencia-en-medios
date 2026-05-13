@@ -30,7 +30,7 @@ export async function GET() {
           orderBy: { fecha: 'desc' },
           take: 10,
           include: {
-            medio: { select: { id: true, nombre: true, tipo: true } },
+            Medio: { select: { id: true, nombre: true, tipo: true } },
           },
         }),
       ]);
@@ -46,7 +46,7 @@ export async function GET() {
       mencionesEncontradas: c.mencionesEncontradas,
       exitosa: c.exitosa,
       errores: c.errores,
-      medio: { nombre: c.medio.nombre, tipo: c.medio.tipo },
+      medio: { nombre: c.Medio.nombre, tipo: c.Medio.tipo },
     }));
 
     return NextResponse.json({
