@@ -17,6 +17,7 @@ import { PRODUCTOS } from '@/constants/products';
 import { guardedParse, RATE } from '@/lib/rate-guard';
 import { generateTermometroSchema } from '@/lib/validations';
 import { safeError } from '@/lib/safe-error';
+import { verifyProduct } from '@/lib/verification/verify-product';
 
 // ============================================
 // Ejes para indicadores generales del clima
@@ -105,7 +106,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 8. Registrar en base de datos
+    // 8. Verificacion post-generacion anti-alucinacion
+    const textoVerificado = await verifyProduct(
+      contenido,
+      resultado.menciones.map(m => ({
+        texto: (m.texto as string) ?? '',
+        titulo: (m.titulo as string) ?? '',
+        medio: (m.medio as string) ?? '',
+        persona: (m.persona as string) ?? null,
+      })),
+      'EL_TERMOMETRO'
+    );
+    if (!textoVerificado.verified) {
+      console.log('[generate-termometro] ALERTA: Se elimino contenido no verificado:', textoVerificado.eliminados.length, 'items');
+    }
+
+    // 9. Registrar en base de datos
     const titulo = generarTituloProducto('EL_TERMOMETRO');
     const resumen = await getDedicatedResumen('EL_TERMOMETRO', {
       menciones: resultado.menciones,
@@ -115,14 +131,21 @@ export async function POST(request: NextRequest) {
     const reporteId = await registrarReporte({
       tipoProducto: 'EL_TERMOMETRO',
       titulo,
-      contenido,
+      contenido: textoVerificado.textoLimpio,
       resumen,
       fechaInicio: range.fechaInicio,
       fechaFin: range.fechaFin,
       temperatura,
       tokensUsados,
       modeloIA: modelo,
-      metadata: JSON.stringify({ totalMenciones: resultado.totalMenciones }),
+      metadata: JSON.stringify({
+        totalMenciones: resultado.totalMenciones,
+        verificacion: {
+          verified: textoVerificado.verified,
+          eliminados: textoVerificado.eliminados.length,
+          alertas: textoVerificado.alertas,
+        },
+      }),
     });
 
     // 9. Retornar resultado
@@ -130,7 +153,7 @@ export async function POST(request: NextRequest) {
       exito: true,
       reporteId,
       titulo,
-      contenido,
+      contenido: textoVerificado.textoLimpio,
       resumen,
       metadata: {
         tipo: 'EL_TERMOMETRO',
@@ -139,6 +162,12 @@ export async function POST(request: NextRequest) {
         modelo,
         totalMenciones: resultado.totalMenciones,
         ventana: ventanaLabel,
+        verificacion: {
+          verified: textoVerificado.verified,
+          eliminados: textoVerificado.eliminados.length,
+          alertas: textoVerificado.alertas,
+          estadisticas: textoVerificado.estadisticas,
+        },
       },
     });
   } catch (error) {

@@ -20,6 +20,7 @@ import { type TipoBoletin } from '@/types/bulletin';
 import { guardedParse, RATE } from '@/lib/rate-guard';
 import { generateGenericSchema } from '@/lib/validations';
 import { safeError } from '@/lib/safe-error';
+import { verifyProduct } from '@/lib/verification/verify-product';
 
 // ============================================
 // Mapa de ejes tematicos sugeridos por tipo de producto.
@@ -138,8 +139,23 @@ export async function POST(request: NextRequest) {
     const tokensUsados = genResult.tokensUsados;
     const modelo = genResult.modelo;
 
-    // 8. Validacion final de calidad
-    const validation = validateContent(contenido, { tipo });
+    // 8. Verificacion post-generacion anti-alucinacion
+    const textoVerificado = await verifyProduct(
+      contenido,
+      resultado.menciones.map(m => ({
+        texto: (m.texto as string) ?? '',
+        titulo: (m.titulo as string) ?? '',
+        medio: (m.medio as string) ?? '',
+        persona: (m.persona as string) ?? null,
+      })),
+      tipo
+    );
+    if (!textoVerificado.verified) {
+      console.log('[generate-generic] ALERTA: Se elimino contenido no verificado:', textoVerificado.eliminados.length, 'items');
+    }
+
+    // 9. Validacion final de calidad
+    const validation = validateContent(textoVerificado.textoLimpio, { tipo });
 
     // 9. Registrar en BD
     const titulo = generarTituloProducto(tipo, undefined, ejeSlug);
@@ -152,7 +168,7 @@ export async function POST(request: NextRequest) {
     const reporteId = await registrarReporte({
       tipoProducto: tipo,
       titulo,
-      contenido,
+      contenido: textoVerificado.textoLimpio,
       resumen,
       fechaInicio: inicio,
       fechaFin: fin,
@@ -173,7 +189,7 @@ export async function POST(request: NextRequest) {
       exito: true,
       reporteId,
       titulo,
-      contenido,
+      contenido: textoVerificado.textoLimpio,
       resumen,
       metadata: {
         tipo,

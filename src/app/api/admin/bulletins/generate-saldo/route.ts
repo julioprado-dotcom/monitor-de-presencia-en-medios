@@ -15,6 +15,7 @@ import { getIndicadoresParaEjes, formatearIndicadoresPrompt } from '@/lib/indica
 import { guardedParse, RATE } from '@/lib/rate-guard'
 import { generateSaldoSchema } from '@/lib/validations'
 import { safeError } from '@/lib/safe-error'
+import { verifyProduct } from '@/lib/verification/verify-product'
 
 // ─── Endpoint POST ────────────────────────────────────────────────
 
@@ -103,16 +104,36 @@ REGLA: Compara la evolución del día. Si hay datos del Termómetro (apertura), 
     const contenido = completion.choices[0]?.message?.content ?? 'Error: no se generó contenido'
     const duracion = Date.now() - inicio
 
+    // Verificacion post-generacion anti-alucinacion
+    const textoVerificado = await verifyProduct(
+      contenido,
+      menciones.map(m => ({
+        texto: (m.texto as string) ?? '',
+        titulo: (m.titulo as string) ?? '',
+        medio: (m.medio as Record<string, unknown>)?.nombre as string ?? '',
+        persona: (m.persona as string) ?? null,
+      })),
+      'SALDO_DEL_DIA'
+    )
+    if (!textoVerificado.verified) {
+      console.log('[generate-saldo] ALERTA: Se elimino contenido no verificado:', textoVerificado.eliminados.length, 'items')
+    }
+
     return NextResponse.json({
       exito: true,
       tipo: 'SALDO_DEL_DIA',
-      contenido,
-      resumen: contenido.slice(0, 200) + '...',
+      contenido: textoVerificado.textoLimpio,
+      resumen: textoVerificado.textoLimpio.slice(0, 200) + '...',
       fechaInicio: fechaInicio.toISOString(),
       fechaFin: fechaFin.toISOString(),
       totalMenciones,
       nombreCliente,
       generadoEn: duracion,
+      verificacion: {
+        verified: textoVerificado.verified,
+        eliminados: textoVerificado.eliminados.length,
+        alertas: textoVerificado.alertas,
+      },
     })
   } catch (error) {
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {

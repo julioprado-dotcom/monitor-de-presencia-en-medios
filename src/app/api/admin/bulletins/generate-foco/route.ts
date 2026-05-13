@@ -19,6 +19,7 @@ import { formatearMencionesPrompt, construirPrompt, registrarReporte, generarTit
 import { guardedParse, RATE } from '@/lib/rate-guard';
 import { generateFocoSchema } from '@/lib/validations';
 import { safeError } from '@/lib/safe-error';
+import { verifyProduct } from '@/lib/verification/verify-product';
 
 // ============================================
 // POST Handler
@@ -108,7 +109,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 10. Registrar en base de datos
+    // 10. Verificacion post-generacion anti-alucinacion
+    const textoVerificado = await verifyProduct(
+      contenido,
+      resultado.menciones.map(m => ({
+        texto: (m.texto as string) ?? '',
+        titulo: (m.titulo as string) ?? '',
+        medio: (m.medio as string) ?? '',
+        persona: (m.persona as string) ?? null,
+      })),
+      'EL_FOCO'
+    );
+    if (!textoVerificado.verified) {
+      console.log('[generate-foco] ALERTA: Se elimino contenido no verificado:', textoVerificado.eliminados.length, 'items');
+    }
+
+    // 11. Registrar en base de datos
     const titulo = generarTituloProducto('EL_FOCO', undefined, eje.nombre);
     const resumen = await getDedicatedResumen('EL_FOCO', {
       ejeSlug,
@@ -119,7 +135,7 @@ export async function POST(request: NextRequest) {
     const reporteId = await registrarReporte({
       tipoProducto: 'EL_FOCO',
       titulo,
-      contenido,
+      contenido: textoVerificado.textoLimpio,
       resumen,
       fechaInicio: range.fechaInicio,
       fechaFin: range.fechaFin,
@@ -139,7 +155,7 @@ export async function POST(request: NextRequest) {
       exito: true,
       reporteId,
       titulo,
-      contenido,
+      contenido: textoVerificado.textoLimpio,
       resumen,
       metadata: {
         tipo: 'EL_FOCO',

@@ -18,6 +18,7 @@ import { formatearMencionesPorEje, construirPrompt, registrarReporte, generarTit
 import { guardedParse, RATE } from '@/lib/rate-guard';
 import { generateRadarSchema } from '@/lib/validations';
 import { safeError } from '@/lib/safe-error';
+import { verifyProduct } from '@/lib/verification/verify-product';
 
 // ============================================
 // Los 11 Ejes Tematicos de DECODEX
@@ -151,7 +152,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 8. Registrar en BD
+    // 8. Verificacion post-generacion anti-alucinacion
+    const mencionesAllEjes = Object.values(mencionesPorEje).flat();
+    const textoVerificado = await verifyProduct(
+      contenido,
+      mencionesAllEjes.map(m => ({
+        texto: '',
+        titulo: (m.titulo as string) ?? '',
+        medio: (m.medio as string) ?? '',
+        persona: (m.persona as string) ?? null,
+      })),
+      'EL_RADAR'
+    );
+    if (!textoVerificado.verified) {
+      console.log('[generate-radar] ALERTA: Se elimino contenido no verificado:', textoVerificado.eliminados.length, 'items');
+    }
+
+    // 9. Registrar en BD
     const titulo = generarTituloProducto('EL_RADAR');
     const resumen = await getDedicatedResumen('EL_RADAR', {
       ejes: totalMencionesPorEje,
@@ -161,7 +178,7 @@ export async function POST(request: NextRequest) {
     const reporteId = await registrarReporte({
       tipoProducto: 'EL_RADAR',
       titulo,
-      contenido,
+      contenido: textoVerificado.textoLimpio,
       resumen,
       fechaInicio: range.fechaInicio,
       fechaFin: range.fechaFin,
@@ -181,7 +198,7 @@ export async function POST(request: NextRequest) {
       exito: true,
       reporteId,
       titulo,
-      contenido,
+      contenido: textoVerificado.textoLimpio,
       resumen,
       metadata: {
         tipo: 'EL_RADAR',
