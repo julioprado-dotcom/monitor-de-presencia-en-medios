@@ -29,7 +29,7 @@ export async function GET() {
     const semanaISO = inicioSemana.toISOString();
 
     // Use $queryRawUnsafe to bypass Prisma type conversion issues with DateTime columns
-    const [hoyResult, ayerResult, semanaResult, totalResult, ultimasResult] = await Promise.all([
+    const [hoyResult, ayerResult, semanaResult, totalResult] = await Promise.all([
       db.mencion.count({ where: { fechaCaptura: { gte: hoy, lt: manana } } }).catch(() => ({ _raw: 0 })),
       db.mencion.count({ where: { fechaCaptura: { gte: ayer, lt: hoy } } }).catch(() => ({ _raw: 0 })),
       db.mencion.count({ where: { fechaCaptura: { gte: inicioSemana } } }).catch(() => ({ _raw: 0 })),
