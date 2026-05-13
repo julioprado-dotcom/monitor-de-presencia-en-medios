@@ -452,3 +452,28 @@ Stage Summary:
 - Filtros: Score >= 3, nav detection, texto >= 500 chars, titulo >= 20 chars
 - 3 medios nuevos: World Coffee Research, Coffee Universe, Sprudge Coffee
 ---
+
+---
+Task ID: paso2f-medios
+Agent: Main Agent
+Task: Captura retroactiva de 6 nuevos medios bolivianos + re-clasificación
+
+Work Log:
+- Investigación completa del codebase: 29 scripts, 2 sistemas de scraping (manual paso scripts + automated pipeline)
+- Encontrado bug crítico: keyword filter `if (n.length < 3)` en scripts de captura solo guardaba keywords de 0-2 chars
+- Bug corregido: `if (n.length < 3) continue` (guarda keywords >= 3 chars)
+- Z.ai page_reader funciona como fallback para Cloudflare pero retorna HTML limpio (Jina reader)
+- Sondaje de 9 fuentes: RTP ✅, El Alteño ⚠️(Drupal), ERBOL ✅, Urgente ✅, Brújula ✅, Kawsachun ✅, Fides ❌(403), Senado ⚠️(SPA), Diputados ❌
+- Captura ejecutada: ERBOL +8, RTP +8, Urgente +2, El Alteño +8 = +26 menciones
+- Re-clasificación: 101 lentes + 102 ejes nuevos (keyword scoring corregido)
+
+Stage Summary:
+- DB: 362 → 399 menciones (+37 neto)
+- Lentes: 9/9 🟢 (Movilización Social 233, Medio Ambiente 151)
+- Ejes: 8/9 🟢 (Justicia 🟠12)
+- Sin lentes: 143 → 42 (-101)
+- Sin ejes: 104 → 2 (-102)
+- Z.ai rate-limited (429): Fides, Senado, Diputados pendientes
+- Commits: c40ef62 (batch), 77d0c26 (reclassify fix)
+- Patrones de URL documentados para cada fuente
+- Brújula Digital, Urgente, RTP ya tenían menciones previas (sessiones anteriores)
