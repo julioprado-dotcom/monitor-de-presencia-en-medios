@@ -86,8 +86,14 @@ export async function GET() {
       let mencionesUsadas = 0;
       let ultimaEdicion: string | null = null;
 
-      if (latest && (latest.totalMenciones || 0) > 0) {
+      if (latest && (latest.totalMenciones || 0) > 0 && latest.enviado) {
+        // Solo está "generado" si tiene datos Y fue entregado (push)
         estado = 'generado';
+        mencionesUsadas = latest.totalMenciones || 0;
+        ultimaEdicion = formatDateTimeShort(latest.fechaCreacion?.toISOString() ?? null);
+      } else if (latest && (latest.totalMenciones || 0) > 0 && !latest.enviado) {
+        // Tiene datos pero no se ha entregado aún = pendiente de push
+        estado = 'pendiente';
         mencionesUsadas = latest.totalMenciones || 0;
         ultimaEdicion = formatDateTimeShort(latest.fechaCreacion?.toISOString() ?? null);
       } else if (latest) {
