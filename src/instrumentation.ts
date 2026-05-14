@@ -67,9 +67,12 @@ export async function register() {
     await sleep(WARMUP_CONFIG.delayMs)
     console.log('[Instrumentation] Warmup completado')
 
-    // 5. Activar modo productivo (scheduler + worker ejecutando jobs)
-    const { activateProductiveMode } = await import('@/lib/jobs')
-    await activateProductiveMode()
+    // 5. Modo productivo — DESACTIVADO temporalmente
+    // El worker en modo productivo consume memoria y causa OOM en este entorno.
+    // Reactivar cuando se tengan suficientes jobs pendientes y el entorno esté estable.
+    // const { activateProductiveMode } = await import('@/lib/jobs')
+    // await activateProductiveMode()
+    console.log('[Instrumentation] Worker en modo IDLE (productivo desactivado)')
 
     // 6. GeneratorScheduler — DESACTIVADO temporalmente
     // El scheduler hace peticiones internas que crashean el servidor en este entorno.
