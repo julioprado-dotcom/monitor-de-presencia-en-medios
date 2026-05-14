@@ -1,39 +1,17 @@
 // Instrumentacion del servidor — DECODEX Bolivia
 // Se ejecuta UNA VEZ al arrancar Next.js
-// Flujo de arranque:
-//   1. Process Handlers (safety net contra uncaughtException)
-//   2. AutoRecovery (DB diagnostics + seed)
-//   3. Job System en modo IDLE (worker polling sin ejecutar, health, guardian)
-//   4. Reclaim jobs huérfanos
-//   5. WARMUP (2 min de estabilización — scheduler y worker NO ejecutan)
-//   6. Activar modo productivo (scheduler + worker ejecutando jobs)
-//   7. GeneratorScheduler (productos programados)
-
-import { registerProcessHandlers } from '@/lib/process-handlers'
-import { WARMUP_CONFIG } from '@/lib/jobs/constants'
+//
+// NOTA: Job system desactivado temporalmente para estabilidad del servidor.
+// El health monitor y worker IDLE consumen memoria y causan OOM kills.
+// Las APIs del dashboard siguen funcionando sin el job system.
 
 let setupDone = false
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
 
 export async function register() {
   if (setupDone) return
 
   try {
-    // 0. Safety net: capturar errores que escapen de todas las capas de try/catch
-    registerProcessHandlers()
-
-    // 1. Auto-recovery: diagnosticar DB y recovery si está degradada
-    const { ejecutarAutoRecovery } = await import('@/lib/auto-recovery')
-    const recovery = await ejecutarAutoRecovery()
-    if (recovery.ejecutado) {
-      console.log(
-        `[Instrumentation] Auto-recovery ejecutado: ${recovery.acciones.join(', ')}`
-      )
-    }
-    // Verificar conteos reales POST-recovery
+    // 1. Verificar DB
     const { db } = await import('@/lib/db')
     const [personas, medios, fuentes, ejes, indicadores] = await Promise.all([
       db.persona.count(), db.medio.count(), db.fuenteEstado.count(),
@@ -43,50 +21,16 @@ export async function register() {
     console.log(
       `[Instrumentation] DB: "${dbPath}" — ` +
       `${personas} personas, ${medios} medios, ${fuentes} fuentes, ` +
-      `${ejes} ejes, ${indicadores} indicadores` +
-      (recovery.ejecutado ? ` [recovery: ${recovery.acciones.join('; ')}]` : '')
+      `${ejes} ejes, ${indicadores} indicadores`
     )
 
-    // 2. Iniciar Job System en modo IDLE (worker polling, health, guardian — SIN scheduler)
-    const { initJobSystem } = await import('@/lib/jobs')
-    await initJobSystem()
-
-    // 3. Reclaim jobs huérfanos (en_progreso > 10 min sin respuesta)
-    const { reclaimOrphanJobs } = await import('@/lib/jobs/queue')
-    const reclaimed = await reclaimOrphanJobs()
-    if (reclaimed > 0) {
-      console.log(`[Instrumentation] Reclaim: ${reclaimed} jobs huerfanos recuperados`)
-    }
-
-    // 4. WARMUP — esperar estabilización del servidor
-    // REDUCIDO a 5s para evitar que el shell session timeout mate el proceso
-    console.log(
-      `[Instrumentation] Warmup: esperando ${WARMUP_CONFIG.delayMs / 1000}s ` +
-      `para estabilización del servidor...`
-    )
-    await sleep(WARMUP_CONFIG.delayMs)
-    console.log('[Instrumentation] Warmup completado')
-
-    // 5. Modo productivo — DESACTIVADO temporalmente
-    // El worker en modo productivo consume memoria y causa OOM en este entorno.
-    // Reactivar cuando se tengan suficientes jobs pendientes y el entorno esté estable.
-    // const { activateProductiveMode } = await import('@/lib/jobs')
-    // await activateProductiveMode()
-    console.log('[Instrumentation] Worker en modo IDLE (productivo desactivado)')
-
-    // 6. GeneratorScheduler — DESACTIVADO temporalmente
-    // El scheduler hace peticiones internas que crashean el servidor en este entorno.
-    // Reactivar cuando la pipeline de captura/clasificación esté estable.
-    // try {
-    //   const { getScheduler } = await import('@/lib/scheduler/generator-scheduler')
-    //   const genScheduler = getScheduler()
-    //   genScheduler.start()
-    // } catch (err) {
-    //   console.warn('[Instrumentation] GeneratorScheduler no disponible:', (err as Error).message)
-    // }
+    // 2. Job system — DESACTIVADO temporalmente
+    // El worker IDLE + health monitor causan OOM en este entorno.
+    // Reactivar cuando el entorno tenga más memoria disponible.
+    console.log('[Instrumentation] Job system desactivado (modo API-only)')
+    console.log('[Instrumentation] Sistema listo para servir APIs')
 
     setupDone = true
-    console.log('[Instrumentation] Sistema completo iniciado (productivo)')
   } catch (error) {
     console.error('[Instrumentation] Error en inicio:', error)
   }

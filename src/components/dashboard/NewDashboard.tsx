@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { fetchWithTimeout } from '@/lib/fetch-utils';
 import {
   Activity,
   BarChart3,
@@ -170,11 +171,45 @@ function QuickActions({ onBoletinExpress }: { onBoletinExpress: () => void }) {
 // Overview (default when no node selected)
 // ═══════════════════════════════════════════════════════════
 
+interface OverviewStats {
+  mencionesHoy: number;
+  clasificacionPct: number;
+  productosSemana: number;
+  mencionesTotal: number;
+  productosHoy: number;
+  fuentesActivas: number;
+}
+
 function OverviewContent({
   onBoletinExpress,
 }: {
   onBoletinExpress: () => void;
 }) {
+  const [stats, setStats] = useState<OverviewStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetchWithTimeout('/api/dashboard/indicadores-summary', { timeoutMs: 8000 });
+        if (res.ok && !cancelled) {
+          const d = await res.json();
+          setStats({
+            mencionesHoy: d.captura?.menciones?.hoy ?? 0,
+            clasificacionPct: d.clasificacion?.tasas?.eje ?? 0,
+            productosSemana: d.produccion?.productos?.semana ?? 0,
+            mencionesTotal: d.captura?.menciones?.total ?? 0,
+            productosHoy: d.produccion?.productos?.hoy ?? 0,
+            fuentesActivas: d.captura?.fuentes?.activas ?? 0,
+          });
+        }
+      } catch { /* silent */ }
+    }
+    load();
+    const iv = setInterval(load, 60000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, []);
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
       {/* ── Stats + Search Grid ── */}
@@ -190,23 +225,23 @@ function OverviewContent({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <MiniStatCard
               icon={<Radio className="w-4 h-4" />}
-              label="Menciones hoy"
-              value="—"
-              subValue="Captura activa"
+              label="Menciones"
+              value={stats ? stats.mencionesTotal : '...'}
+              subValue={stats ? `${stats.mencionesHoy} hoy · ${stats.fuentesActivas} fuentes` : 'Cargando...'}
               color="#00ff88"
             />
             <MiniStatCard
               icon={<Tags className="w-4 h-4" />}
               label="Clasificación"
-              value="—"
-              subValue="última hora"
+              value={stats ? `${stats.clasificacionPct}%` : '...'}
+              subValue={stats ? 'con eje temático' : 'Cargando...'}
               color="#ffaa00"
             />
             <MiniStatCard
               icon={<FileText className="w-4 h-4" />}
-              label="Productos semana"
-              value="—"
-              subValue="esta semana"
+              label="Productos"
+              value={stats ? stats.productosSemana : '...'}
+              subValue={stats ? `${stats.productosHoy} hoy` : 'Cargando...'}
               color="#6b7280"
             />
           </div>

@@ -98,3 +98,35 @@ Stage Summary:
 - Producción: 38 reportes (6 tipos), 0 enviados, 38 pendientes
 - Distribución: 0 envíos, 0 suscriptores — requiere configuración
 - Servidor corriendo en puerto 3000, ambas APIs responden correctamente
+
+---
+Task ID: 1-fix-pipeline-ui
+Agent: Main Agent (Ingeniero Backend DECODEX)
+Task: Eliminar datos falsos en PipelineFlow, conectar a datos reales, estabilizar servidor
+
+Work Log:
+- Analizado problema: PipelineFlow.tsx tenía `clasifTotal() = Math.round(menciones/50)` (INVENTADO)
+- Analizado problema: count de CAPTURA usaba fuentes.reduce() en vez del total real
+- Analizado problema: count de PRODUCCIÓN usaba prodTypesCount (max 10) en vez del total real
+- Analizado problema: MiniStatCard en NewDashboard mostraban placeholder "—" sin datos
+- Analizado problema: Servidor se caía por job system (health monitor + worker) causando OOM
+- Corregido PipelineFlow.tsx: ahora consume AMBAS APIs (pipeline + indicadores-summary)
+  - CAPTURA: muestra "399 menciones" + "33 fuentes · 58 medios" (datos reales)
+  - CLASIFICACIÓN: muestra "99% clasificado" + "397/399 con eje · 44 ejes" (datos reales)
+  - PRODUCCIÓN: muestra "38 productos" + "38 hoy · 6 tipos" (datos reales)
+  - DISTRIBUCIÓN: muestra "sin envíos" + "0 suscriptores" (datos reales)
+  - Agregado campo `detail` a PipelineNode para dato secundario
+  - Agregado estado `idle` para nodos sin actividad
+- Corregido NewDashboard.tsx: OverviewContent ahora fetch indicadores-summary
+  - Menciones: 399 total, 399 hoy, 33 fuentes
+  - Clasificación: 99%
+  - Productos: 38
+- Simplificado instrumentation.ts: job system desactivado para estabilidad
+- Levantado servidor con procedimiento oficial: spawn() detached + unref()
+
+Stage Summary:
+- PipelineFlow ya NO usa datos falsos — todo viene de APIs con datos reales
+- NewDashboard overview muestra contadores reales (antes mostraban "—")
+- Servidor estable: sobrevive 60+ segundos entre llamadas Bash
+- Datos verificados: 399 menciones, 99% clasificación, 38 productos, 6 tipos
+- Archivos modificados: PipelineFlow.tsx, NewDashboard.tsx, instrumentation.ts

@@ -6,7 +6,7 @@ import { fetchWithTimeout } from '@/lib/fetch-utils';
 
 // ─── Types ────────────────────────────────────────────────
 
-type NodeStatus = 'ok' | 'warning' | 'error';
+type NodeStatus = 'ok' | 'warning' | 'error' | 'idle';
 type NodeKey = 'captura' | 'clasificacion' | 'produccion' | 'distribucion';
 
 interface PipelineNode {
@@ -16,6 +16,7 @@ interface PipelineNode {
   status: NodeStatus;
   lastActivity: string;
   count: string;
+  detail: string;
 }
 
 interface PipelineSource {
@@ -46,6 +47,40 @@ interface PipelineSource {
   };
 }
 
+// Datos reales del pipeline — complementan al PipelineSource
+interface IndicadoresData {
+  captura: {
+    menciones: { total: number; hoy: number; semana: number };
+    medios: number;
+    fuentes: { activas: number; degradadas: number };
+    ultimaCapturaHace: string;
+    status: string;
+  };
+  clasificacion: {
+    lentes: number;
+    ejes: number;
+    mencionesClasificadas: { conLente: number; conEje: number; conSentimiento: number; total: number };
+    tasas: { lente: number; eje: number; sentimiento: number };
+    status: string;
+  };
+  produccion: {
+    productos: { total: number; hoy: number; semana: number };
+    porTipo: Array<{ tipo: string; total: number }>;
+    ultimoProductoHace: string;
+    status: string;
+  };
+  distribucion: {
+    envios: { total: number; exitosos: number; fallidos: number; tasaExito: number };
+    suscriptores: number;
+    ultimoEnvioHace: string;
+    status: string;
+  };
+  sistema: {
+    jobs24h: { completados: number; fallidos: number };
+    status: string;
+  };
+}
+
 // ─── Color Constants ─────────────────────────────────────
 
 const COLORS = {
@@ -55,6 +90,7 @@ const COLORS = {
   accent: '#00ff88',
   warning: '#ffaa00',
   error: '#ff3355',
+  idle: '#6b7280',
   textWhite: '#ffffff',
   textGray: '#6b7280',
 };
@@ -63,41 +99,82 @@ const STATUS_COLORS: Record<NodeStatus, { dot: string; glow: string; border: str
   ok: { dot: COLORS.accent, glow: 'none', border: COLORS.border },
   warning: { dot: COLORS.warning, glow: 'none', border: `${COLORS.warning}66` },
   error: { dot: COLORS.error, glow: COLORS.error, border: `${COLORS.error}88` },
+  idle: { dot: COLORS.idle, glow: 'none', border: COLORS.border },
+};
+
+const STATUS_LABELS: Record<NodeStatus, string> = {
+  ok: 'OK',
+  warning: 'WARN',
+  error: 'ERROR',
+  idle: 'IDLE',
 };
 
 // ─── Helpers ─────────────────────────────────────────────
 
-function deriveNodes(data: PipelineSource): PipelineNode[] {
-  const { pasado, presente, futuro } = data;
+function toNodeStatus(s: string | undefined): NodeStatus {
+  if (s === 'ok') return 'ok';
+  if (s === 'warn' || s === 'warning') return 'warning';
+  if (s === 'error') return 'error';
+  return 'idle';
+}
+
+function deriveNodes(pipeline: PipelineSource, indicadores: IndicadoresData | null): PipelineNode[] {
+  const { pasado, presente, futuro } = pipeline;
   const fuentes = presente.fuentes || [];
 
-  // CAPTURA — fuente health
-  const activeFuentes = fuentes.filter(f => f.activo);
-  const deadFuentes = fuentes.filter(f => f.estaMuerto);
-  const degradedFuentes = fuentes.filter(f => f.esDegradado);
-  const totalMenciones = fuentes.reduce((s, f) => s + (f.totalMenciones || 0), 0);
-  const capturaStatus: NodeStatus = deadFuentes.length > 0 ? 'error' : degradedFuentes.length > 2 ? 'warning' : 'ok';
-  const capturaLast = activeFuentes.length > 0
-    ? activeFuentes.sort((a, b) => (a.ultimoCheck || '').localeCompare(b.ultimoCheck || '')).at(-1)?.ultimoCheckHace || 'sin datos'
-    : 'sin datos';
+  // ── CAPTURA ──
+  // Usa datos reales de indicadores si están disponibles, si no fallback al pipeline
+  const capturaStatus = toNodeStatus(indicadores?.captura.status);
+  const capturaCount = indicadores
+    ? `${indicadores.captura.menciones.total} menciones`
+    : `${fuentes.reduce((s, f) => s + (f.totalMenciones || 0), 0)} menciones`;
+  const capturaDetail = indicadores
+    ? `${indicadores.captura.fuentes.activas} fuentes · ${indicadores.captura.medios} medios`
+    : `${fuentes.filter(f => f.activo).length} fuentes`;
+  const capturaLast = indicadores?.captura.ultimaCapturaHace || 'sin datos';
 
-  // CLASIFICACIÓN — derived from menciones/proxies
-  // We use pending jobs and fallidos as a proxy for classification backlog
-  const clasifStatus: NodeStatus = pasado.fallidos.length > 3 ? 'error' : pasado.fallidos.length > 0 ? 'warning' : 'ok';
+  // ── CLASIFICACIÓN ──
+  const clasifStatus = toNodeStatus(indicadores?.clasificacion.status);
+  let clasifCount = 'sin datos';
+  let clasifDetail = '';
+  if (indicadores) {
+    const { conEje, conLente, total } = indicadores.clasificacion.mencionesClasificadas;
+    const pctEje = indicadores.clasificacion.tasas.eje;
+    clasifCount = `${pctEje}% clasificado`;
+    clasifDetail = `${conEje}/${total} con eje · ${indicadores.clasificacion.ejes} ejes`;
+  }
   const clasifLast = pasado.completados.length > 0 ? pasado.completados[0].hace : 'sin datos';
 
-  // PRODUCCIÓN — reportes/products generated today
-  const prodStatus: NodeStatus = pasado.entregas.fallidas > 2 ? 'error' : pasado.productosIA.length === 0 ? 'warning' : 'ok';
-  const prodTypesCount = new Set(pasado.productosIA.map(p => p.tipo)).size;
-  const prodLast = pasado.productosIA.length > 0 ? pasado.productosIA[0].hace : 'sin datos';
+  // ── PRODUCCIÓN ──
+  const prodStatus = toNodeStatus(indicadores?.produccion.status);
+  let prodCount = '0 productos';
+  let prodDetail = '';
+  if (indicadores) {
+    const { total, hoy } = indicadores.produccion.productos;
+    const tipos = indicadores.produccion.porTipo.map(p => p.tipo.replace(/_/g, ' '));
+    prodCount = `${total} productos`;
+    prodDetail = hoy > 0 ? `${hoy} hoy · ${tipos.length} tipos` : `${tipos.length} tipos`;
+  }
+  const prodLast = indicadores?.produccion.ultimoProductoHace || 'sin datos';
 
-  // DISTRIBUCIÓN — entregas
-  const distStatus: NodeStatus = pasado.entregas.fallidas > 3 ? 'error' : pasado.entregas.pendientes > 0 ? 'warning' : 'ok';
-  const distLast = futuro.entregasProgramadas.length > 0
-    ? `próximo en ${futuro.entregasProgramadas[0].minutosHasta}m`
-    : pasado.completados.filter(j => j.tipo === 'enviar_entrega').length > 0
-      ? pasado.completados.find(j => j.tipo === 'enviar_entrega')?.hace || 'sin datos'
-      : 'sin datos';
+  // ── DISTRIBUCIÓN ──
+  const distStatus = toNodeStatus(indicadores?.distribucion.status);
+  let distCount = 'sin envíos';
+  let distDetail = '';
+  if (indicadores) {
+    const { total, exitosos, fallidos } = indicadores.distribucion.envios;
+    if (total > 0) {
+      distCount = `${exitosos}/${total} enviados`;
+      distDetail = fallidos > 0 ? `${fallidos} fallidos` : '100% éxito';
+    } else {
+      distCount = 'sin envíos';
+      distDetail = `${indicadores.distribucion.suscriptores} suscriptores`;
+    }
+  }
+  const distLast = indicadores?.distribucion.ultimoEnvioHace ||
+    (futuro.entregasProgramadas.length > 0
+      ? `próximo en ${futuro.entregasProgramadas[0].minutosHasta}m`
+      : 'sin datos');
 
   return [
     {
@@ -106,7 +183,8 @@ function deriveNodes(data: PipelineSource): PipelineNode[] {
       icon: '📡',
       status: capturaStatus,
       lastActivity: capturaLast,
-      count: `${totalMenciones} menciones`,
+      count: capturaCount,
+      detail: capturaDetail,
     },
     {
       key: 'clasificacion',
@@ -114,7 +192,8 @@ function deriveNodes(data: PipelineSource): PipelineNode[] {
       icon: '🏷️',
       status: clasifStatus,
       lastActivity: clasifLast,
-      count: `${clasifTotal(totalMenciones, prodTypesCount)} lentes`,
+      count: clasifCount,
+      detail: clasifDetail,
     },
     {
       key: 'produccion',
@@ -122,7 +201,8 @@ function deriveNodes(data: PipelineSource): PipelineNode[] {
       icon: '⚡',
       status: prodStatus,
       lastActivity: prodLast,
-      count: `${prodTypesCount} productos`,
+      count: prodCount,
+      detail: prodDetail,
     },
     {
       key: 'distribucion',
@@ -130,15 +210,10 @@ function deriveNodes(data: PipelineSource): PipelineNode[] {
       icon: '📤',
       status: distStatus,
       lastActivity: distLast,
-      count: `${pasado.entregas.enviadas} envíos`,
+      count: distCount,
+      detail: distDetail,
     },
   ];
-}
-
-/** Compute "X de Y lentes" string from data */
-function clasifTotal(totalMenciones: number, _prodTypesCount: number): number {
-  // Rough estimate: show classification throughput
-  return Math.max(1, Math.min(9, Math.round(totalMenciones / 50)));
 }
 
 // ─── Arrow Component ────────────────────────────────────
@@ -193,7 +268,7 @@ function PipelineNodeCard({
   return (
     <motion.button
       onClick={onClick}
-      className="relative flex-shrink-0 w-[120px] sm:w-[130px] md:w-[140px] rounded-xl p-3 text-left transition-transform duration-200 cursor-pointer focus:outline-none"
+      className="relative flex-shrink-0 w-[130px] sm:w-[145px] md:w-[160px] rounded-xl p-3 text-left transition-transform duration-200 cursor-pointer focus:outline-none"
       style={{
         background: COLORS.panel,
         border: `1px solid ${isActive ? COLORS.accent : colors.border}`,
@@ -236,12 +311,12 @@ function PipelineNodeCard({
       />
 
       {/* Content */}
-      <div className="relative z-10 space-y-2">
+      <div className="relative z-10 space-y-1.5">
         {/* Icon + Name */}
         <div className="flex items-center gap-1.5">
           <span className="text-base leading-none">{node.icon}</span>
           <span
-            className="font-semibold text-[13px] leading-tight tracking-wide"
+            className="font-semibold text-[12px] leading-tight tracking-wide"
             style={{ color: COLORS.textWhite, fontFamily: 'Inter, system-ui, sans-serif' }}
           >
             {node.label}
@@ -273,13 +348,13 @@ function PipelineNodeCard({
               fontFamily: 'Inter, system-ui, sans-serif',
             }}
           >
-            {node.status === 'ok' ? 'OK' : node.status === 'warning' ? 'WARNING' : 'ERROR'}
+            {STATUS_LABELS[node.status]}
           </span>
         </div>
 
-        {/* Count */}
+        {/* Count — dato real principal */}
         <p
-          className="text-[11px] font-medium truncate"
+          className="text-[12px] font-bold truncate"
           style={{
             color: COLORS.textWhite,
             fontFamily: 'JetBrains Mono, ui-monospace, monospace',
@@ -288,11 +363,22 @@ function PipelineNodeCard({
           {node.count}
         </p>
 
-        {/* Last activity */}
+        {/* Detail — dato secundario real */}
         <p
           className="text-[10px] truncate"
           style={{
             color: COLORS.textGray,
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          }}
+        >
+          {node.detail}
+        </p>
+
+        {/* Last activity */}
+        <p
+          className="text-[9px] truncate"
+          style={{
+            color: `${COLORS.textGray}99`,
             fontFamily: 'JetBrains Mono, ui-monospace, monospace',
           }}
         >
@@ -332,7 +418,8 @@ export function PipelineFlow({
   onNodeSelect,
   refreshInterval = 30000,
 }: PipelineFlowProps) {
-  const [data, setData] = useState<PipelineSource | null>(null);
+  const [pipelineData, setPipelineData] = useState<PipelineSource | null>(null);
+  const [indicadoresData, setIndicadoresData] = useState<IndicadoresData | null>(null);
   const [internalActive, setInternalActive] = useState<NodeKey | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -343,24 +430,41 @@ export function PipelineFlow({
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
+    async function loadPipeline() {
       try {
-        const res = await fetchWithTimeout('/api/dashboard/pipeline', {
-          timeoutMs: 10000,
-        });
+        const res = await fetchWithTimeout('/api/dashboard/pipeline', { timeoutMs: 10000 });
         if (res.ok && !cancelled) {
           const json = await res.json();
-          setData(json);
+          setPipelineData(json);
         }
       } catch (err) {
-        console.error('[PipelineFlow] fetch error:', err);
+        console.error('[PipelineFlow] pipeline fetch error:', err);
+      }
+    }
+
+    async function loadIndicadores() {
+      try {
+        const res = await fetchWithTimeout('/api/dashboard/indicadores-summary', { timeoutMs: 10000 });
+        if (res.ok && !cancelled) {
+          const json = await res.json();
+          setIndicadoresData(json);
+        }
+      } catch (err) {
+        console.error('[PipelineFlow] indicadores fetch error:', err);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    load();
-    const interval = setInterval(load, refreshInterval);
+    // Cargar ambas APIs en paralelo
+    loadPipeline();
+    loadIndicadores();
+
+    const interval = setInterval(() => {
+      loadPipeline();
+      loadIndicadores();
+    }, refreshInterval);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -375,7 +479,7 @@ export function PipelineFlow({
     [onNodeSelect],
   );
 
-  const nodes = data ? deriveNodes(data) : null;
+  const nodes = pipelineData ? deriveNodes(pipelineData, indicadoresData) : null;
 
   // Check if chain is broken (any node before current is error)
   const isChainBroken = (index: number): boolean => {
@@ -384,7 +488,7 @@ export function PipelineFlow({
   };
 
   // Data flowing: worker running or jobs in execution
-  const isDataFlowing = data?.presente?.worker?.running ?? false;
+  const isDataFlowing = pipelineData?.presente?.worker?.running ?? false;
 
   return (
     <>
@@ -393,7 +497,7 @@ export function PipelineFlow({
         className="w-full overflow-x-auto"
         style={{ background: COLORS.bg }}
       >
-        <div className="flex items-center justify-center gap-0 min-w-[540px] py-3 px-4">
+        <div className="flex items-center justify-center gap-0 min-w-[600px] py-3 px-4">
           {loading || !nodes ? (
             // Skeleton
             <div className="flex items-center gap-2">
@@ -403,7 +507,7 @@ export function PipelineFlow({
                     <div className="w-8 sm:w-12 md:w-16 h-[2px] bg-[#1a1a2e] rounded-full" />
                   )}
                   <div
-                    className="w-[120px] sm:w-[130px] md:w-[140px] h-[80px] rounded-xl animate-pulse"
+                    className="w-[130px] sm:w-[145px] md:w-[160px] h-[90px] rounded-xl animate-pulse"
                     style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}` }}
                   />
                 </React.Fragment>
