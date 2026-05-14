@@ -96,7 +96,11 @@ export async function GET() {
       db.mencion.count({ where: { fechaCaptura: { gte: semanaAgoBo } } }),
       db.medio.count(),
       db.fuenteEstado.count({ where: { activo: true } }),
-      db.fuenteEstado.count({ where: { fallosConsecutivos: { gte: 1 } } }),
+      // Degradada: 3+ fallos consecutivos O 7+ checks sin cambio (alineado con pipeline API)
+      db.fuenteEstado.count({ where: { OR: [
+        { fallosConsecutivos: { gte: 3 } },
+        { checksSinCambio: { gte: 7 } },
+      ] } }),
       db.mencion.findFirst({ orderBy: { fechaCaptura: 'desc' }, select: { fechaCaptura: true } }),
       // Menciones por nivel de medio (cast BigInt to Number)
       db.$queryRaw`
@@ -174,7 +178,9 @@ export async function GET() {
         porNivel,
         status: fuentesDegradadas > fuentesActivas * 0.5 ? 'error'
           : fuentesDegradadas > 0 ? 'warn'
-          : mencionesTotal > 0 ? 'ok' : 'idle',
+          : fuentesActivas > 0 && mencionesTotal > 0 ? 'ok'
+          : fuentesActivas > 0 ? 'warn'
+          : 'idle',
       },
 
       // ── Clasificación ──
