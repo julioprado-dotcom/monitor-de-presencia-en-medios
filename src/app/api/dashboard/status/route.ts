@@ -33,6 +33,14 @@ function weekStart(): Date {
 }
 
 // ═══════════════════════════════════════════════════════════
+// NaN guard
+// ═══════════════════════════════════════════════════════════
+
+function safeNum(n: unknown, fallback = 0): number {
+  return typeof n === 'number' && Number.isFinite(n) ? n : fallback;
+}
+
+// ═══════════════════════════════════════════════════════════
 // Helpers: tiempo relativo en espanol
 // ═══════════════════════════════════════════════════════════
 
@@ -68,6 +76,12 @@ const PRODUCT_NAMES: Record<string, string> = {
   BOLETIN_DEL_GRANO: 'Boletin del Grano',
 };
 
+const STANDARD_PRODUCTS = [
+  'EL_TERMOMETRO', 'SALDO_DEL_DIA', 'EL_FOCO', 'EL_ESPECIALIZADO',
+  'EL_INFORME_CERRADO', 'FICHA_LEGISLADOR', 'EL_RADAR', 'EL_HILO',
+  'BOLETIN_DEL_GRANO', 'VOZ_Y_VOTO',
+];
+
 // ═══════════════════════════════════════════════════════════
 // Endpoint
 // ═══════════════════════════════════════════════════════════
@@ -78,18 +92,23 @@ export async function GET() {
     const weekS = weekStart();
 
     // ════════════════════════════════════════════════════
-    // 1. CAPTURA
+    // 1. CAPTURA — data from Mencion table (real data)
     // ════════════════════════════════════════════════════
-    const mencionesHoy = await db.mencion.count({
+
+    // Menciones capturadas hoy (Bolivia time, by fechaCaptura)
+    const mencionesHoy = safeNum(await db.mencion.count({
       where: { fechaCaptura: { gte: start } },
-    });
+    }));
+
+    // Menciones totales
+    const totalMenciones = safeNum(await db.mencion.count());
 
     // Promedio diario: ultimos 7 dias
     const sieteDiasAtras = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const totalSemanaPasada = await db.mencion.count({
+    const totalSemanaPasada = safeNum(await db.mencion.count({
       where: { fechaCaptura: { gte: sieteDiasAtras, lt: start } },
-    });
-    const promedioDiario = totalSemanaPasada > 0 ? Math.round(totalSemanaPasada / 7) : 0;
+    }));
+    const promedioDiario = totalSemanaPasada > 0 ? Math.round(totalSemanaPasada / 7) : safeNum(mencionesHoy);
 
     // Ultima captura (para saber horas sin captura)
     const ultimaMencion = await db.mencion.findFirst({
@@ -127,18 +146,19 @@ export async function GET() {
         nombre: f.Medio?.nombre || f.url,
         estado,
         ultimaCaptura: tiempoRelativo(f.ultimoCheck),
-        mencionesSemana: mencionesPorMedio.get(f.medioId) || 0,
+        mencionesSemana: safeNum(mencionesPorMedio.get(f.medioId)),
       };
     });
 
     // ════════════════════════════════════════════════════
     // 2. CLASIFICACION
     // ════════════════════════════════════════════════════
-    const totalMenciones = await db.mencion.count();
-    const clasificadas = await db.mencion.count({
+    const clasificadas = safeNum(await db.mencion.count({
       where: { tratamientoPeriodistico: { not: null } },
-    });
-    const porcentaje = totalMenciones > 0 ? Math.round((clasificadas / totalMenciones) * 100) : 0;
+    }));
+    const porcentaje = totalMenciones > 0
+      ? safeNum(Math.round((clasificadas / totalMenciones) * 100))
+      : 0;
 
     // Lentes con coverage
     let lentes: Array<{ nombre: string; total: number; clasificadas: number; porcentaje: number }> = [];
@@ -160,10 +180,10 @@ export async function GET() {
         const clasificadasLente = l.MencionLente.filter(ml => ml.Mencion.tratamientoPeriodistico !== null).length;
         return {
           nombre: l.nombre,
-          total: l.MencionLente.length,
-          clasificadas: clasificadasLente,
+          total: safeNum(l.MencionLente.length),
+          clasificadas: safeNum(clasificadasLente),
           porcentaje: l.MencionLente.length > 0
-            ? Math.round((clasificadasLente / l.MencionLente.length) * 100)
+            ? safeNum(Math.round((clasificadasLente / l.MencionLente.length) * 100))
             : 0,
         };
       });
@@ -172,76 +192,107 @@ export async function GET() {
       lentes = [];
     }
 
-    const pendientes = totalMenciones - clasificadas;
+    const pendientes = safeNum(totalMenciones - clasificadas);
 
     // ════════════════════════════════════════════════════
-    // 3. PRODUCCION (Entregas grouped by tipo this week)
+    // 3. PRODUCCION — from Reporte table (generated products)
+    //    + Entrega table (delivered products)
     // ════════════════════════════════════════════════════
+
+    // Get reportes generated this week (by creation date, not fechaInicio which is the product date range)
+    const reportesSemana = await db.reporte.findMany({
+      where: { fechaCreacion: { gte: weekS } },
+      orderBy: { fechaCreacion: 'desc' },
+      take: 200,
+      select: {
+        id: true,
+        tipo: true,
+        fechaInicio: true,
+        fechaCreacion: true,
+        totalMenciones: true,
+        resumen: true,
+      },
+    }).catch(() => []);
+
+    // Get entregas this week
     const entregasSemana = await db.entrega.findMany({
       where: { fechaCreacion: { gte: weekS } },
-      include: {
-        Contrato: { select: { Cliente: { select: { nombre: true } } } },
-      },
       orderBy: { fechaCreacion: 'desc' },
-      take: 100,
-    });
+      take: 200,
+      select: {
+        tipoBoletin: true,
+        estado: true,
+        fechaCreacion: true,
+      },
+    }).catch(() => []);
 
-    // Group by tipo
-    const productoMap = new Map<string, {
-      nombre: string;
-      tipo: string;
+    // Build product status from reportes + entregas
+    const reporteMap = new Map<string, {
       total: number;
-      enviadas: number;
-      fallidas: number;
-      pendientes: number;
+      totalMenciones: number;
       ultimaEdicion: string;
-      mencionesUsadas: number;
     }>();
 
-    for (const e of entregasSemana) {
-      const tipo = e.tipoBoletin || 'otro';
-      const nombre = PRODUCT_NAMES[tipo] || tipo;
-      const existing = productoMap.get(tipo);
+    for (const r of reportesSemana) {
+      const tipo = r.tipo;
+      const existing = reporteMap.get(tipo);
       if (existing) {
         existing.total++;
-        if (e.estado === 'enviado') existing.enviadas++;
-        else if (e.estado === 'fallido') existing.fallidas++;
-        else existing.pendientes++;
-        if (!existing.ultimaEdicion || e.fechaCreacion > new Date(existing.ultimaEdicion)) {
-          existing.ultimaEdicion = e.fechaCreacion.toISOString();
+        existing.totalMenciones += safeNum(r.totalMenciones);
+        if (!existing.ultimaEdicion || r.fechaCreacion > new Date(existing.ultimaEdicion)) {
+          existing.ultimaEdicion = r.fechaCreacion.toISOString();
         }
       } else {
-        productoMap.set(tipo, {
-          nombre,
-          tipo,
+        reporteMap.set(tipo, {
           total: 1,
-          enviadas: e.estado === 'enviado' ? 1 : 0,
-          fallidas: e.estado === 'fallido' ? 1 : 0,
-          pendientes: e.estado !== 'enviado' && e.estado !== 'fallido' ? 1 : 0,
-          ultimaEdicion: e.fechaCreacion.toISOString(),
-          mencionesUsadas: 0, // We can't easily get this from Entrega alone
+          totalMenciones: safeNum(r.totalMenciones),
+          ultimaEdicion: r.fechaCreacion.toISOString(),
         });
       }
     }
 
-    // Always include all 10 standard products even if no entregas
-    const standardProducts = [
-      'EL_TERMOMETRO', 'SALDO_DEL_DIA', 'EL_FOCO', 'EL_ESPECIALIZADO',
-      'EL_INFORME_CERRADO', 'FICHA_LEGISLADOR', 'EL_RADAR', 'EL_HILO',
-      'BOLETIN_DEL_GRANO', 'VOZ_Y_VOTO',
-    ];
+    const entregaMap = new Map<string, {
+      enviadas: number;
+      fallidas: number;
+      pendientes: number;
+    }>();
 
-    const semana = standardProducts.map(tipo => {
-      const existing = productoMap.get(tipo);
+    for (const e of entregasSemana) {
+      const tipo = e.tipoBoletin || 'otro';
+      const existing = entregaMap.get(tipo);
+      if (existing) {
+        if (e.estado === 'enviado') existing.enviadas++;
+        else if (e.estado === 'fallido') existing.fallidas++;
+        else existing.pendientes++;
+      } else {
+        entregaMap.set(tipo, {
+          enviadas: e.estado === 'enviado' ? 1 : 0,
+          fallidas: e.estado === 'fallido' ? 1 : 0,
+          pendientes: e.estado !== 'enviado' && e.estado !== 'fallido' ? 1 : 0,
+        });
+      }
+    }
+
+    const semana = STANDARD_PRODUCTS.map(tipo => {
+      const reporte = reporteMap.get(tipo);
+      const entrega = entregaMap.get(tipo);
+      const hasReporte = reporte && reporte.total > 0;
+      const hasFallidas = entrega && entrega.fallidas > 0;
+      const hasPendientes = entrega && entrega.pendientes > 0;
+
       return {
         nombre: PRODUCT_NAMES[tipo] || tipo,
         tipo,
-        estado: existing
-          ? (existing.fallidas > 0 ? 'error' : existing.pendientes > 0 ? 'pending' : 'ok')
-          : 'pending',
-        ultimaEdicion: existing?.ultimaEdicion || null,
-        mencionesUsadas: existing?.mencionesUsadas || 0,
-        total: existing?.total || 0,
+        estado: hasFallidas
+          ? 'error'
+          : hasReporte
+            ? 'ok'
+            : hasPendientes
+              ? 'pending'
+              : 'pending',
+        ultimaEdicion: reporte?.ultimaEdicion || null,
+        mencionesUsadas: reporte?.totalMenciones || 0,
+        total: reporte?.total || 0,
       };
     });
 
@@ -259,7 +310,7 @@ export async function GET() {
       },
       orderBy: { fechaEnvio: 'desc' },
       take: 5,
-    });
+    }).catch(() => []);
 
     // Also check failed ones
     const ultimasFallidas = await db.entrega.findMany({
@@ -273,7 +324,7 @@ export async function GET() {
       },
       orderBy: { fechaCreacion: 'desc' },
       take: 5,
-    });
+    }).catch(() => []);
 
     // Merge: take last 5 unique
     const allEntregas = [...ultimasEntregas, ...ultimasFallidas]
@@ -295,31 +346,31 @@ export async function GET() {
       error: e.error || undefined,
     }));
 
-    const errores = await db.entrega.count({
+    const errores = safeNum(await db.entrega.count({
       where: {
         estado: 'fallido',
         fechaCreacion: { gte: weekS },
       },
-    });
+    }).catch(() => 0));
 
     return NextResponse.json({
       captura: {
-        hoy: mencionesHoy,
-        promedioDiario,
+        hoy: safeNum(mencionesHoy),
+        promedioDiario: safeNum(promedioDiario),
         sinCapturaHoras,
         fuentes,
       },
       clasificacion: {
-        total: totalMenciones,
-        clasificadas,
-        porcentaje,
+        total: safeNum(totalMenciones),
+        clasificadas: safeNum(clasificadas),
+        porcentaje: safeNum(porcentaje),
         lentes,
-        pendientes,
+        pendientes: safeNum(pendientes),
       },
       produccion: { semana },
       distribucion: {
         ultimos,
-        errores,
+        errores: safeNum(errores),
       },
     });
   } catch (error) {

@@ -136,7 +136,7 @@ export const WORKER_CONFIG = {
 // establezca baseline de memoria antes de que los jobs comiencen a consumir recursos.
 
 export const WARMUP_CONFIG = {
-  delayMs: 30_000,          // 30 segundos de estabilización antes de activar jobs (reducido de 2min)
+  delayMs: 5_000,           // 5 segundos — reducido para evitar shell session timeout
 }
 
 // ── Configuracion del Container Guardian ──────────────────────────────

@@ -59,6 +59,7 @@ export async function register() {
     }
 
     // 4. WARMUP — esperar estabilización del servidor
+    // REDUCIDO a 5s para evitar que el shell session timeout mate el proceso
     console.log(
       `[Instrumentation] Warmup: esperando ${WARMUP_CONFIG.delayMs / 1000}s ` +
       `para estabilización del servidor...`
@@ -70,13 +71,16 @@ export async function register() {
     const { activateProductiveMode } = await import('@/lib/jobs')
     await activateProductiveMode()
 
-    // 6. Esperar antes de iniciar el generator scheduler (evitar pico al arrancar)
-    await sleep(10_000)
-
-    // 7. Iniciar GeneratorScheduler (productos programados: Termometro, Saldo, Foco, Radar, Especializado)
-    const { getScheduler } = await import('@/lib/scheduler/generator-scheduler')
-    const genScheduler = getScheduler()
-    genScheduler.start()
+    // 6. GeneratorScheduler — DESACTIVADO temporalmente
+    // El scheduler hace peticiones internas que crashean el servidor en este entorno.
+    // Reactivar cuando la pipeline de captura/clasificación esté estable.
+    // try {
+    //   const { getScheduler } = await import('@/lib/scheduler/generator-scheduler')
+    //   const genScheduler = getScheduler()
+    //   genScheduler.start()
+    // } catch (err) {
+    //   console.warn('[Instrumentation] GeneratorScheduler no disponible:', (err as Error).message)
+    // }
 
     setupDone = true
     console.log('[Instrumentation] Sistema completo iniciado (productivo)')
