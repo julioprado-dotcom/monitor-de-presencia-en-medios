@@ -188,7 +188,7 @@ export const FLOW_CONTROL = {
   // Límites de concurrencia
   maxCheckFuenteBatch: 3,          // máx checks por batch (endpoint /api/jobs)
   maxScrapePending: 1,             // máx scrape_fuente en cola al mismo tiempo — UNO A LA VEZ
-  captureEndpointCooldownMs: 30000, // cooldown entre llamadas a /api/capture
+  captureEndpointCooldownMs: 180000, // cooldown de 3 min entre capturas
   // Protección de memoria
   heapWarnMb: 350,                 // warn si heapUsed supera esto
   heapCriticalMb: 450,             // pausar worker si heapUsed supera esto

@@ -8,14 +8,16 @@ import { buildDeliveryPayload } from '@/lib/bulletin/delivery'
 import { PRODUCTOS } from '@/constants/products'
 import type { TipoBoletin } from '@/types/bulletin'
 import type { JobPayload, RunnerResult } from '../types'
+import { randomBytes } from 'crypto'
 
 export async function run(payload: JobPayload): Promise<RunnerResult> {
-  const tipoBoletin = payload.tipoBoletin as TipoBoletin
+  // Aceptar tanto tipoBoletin (scheduler) como tipoProducto (dashboard manual)
+  const tipoBoletin = (payload.tipoBoletin || payload.tipoProducto) as TipoBoletin
   const personaId = payload.personaId as string | undefined
   const contratoId = payload.contratoId as string | undefined
 
   if (!tipoBoletin) {
-    return { success: false, error: 'generar_boletin requiere tipoBoletin en el payload' }
+    return { success: false, error: 'generar_boletin requiere tipoBoletin o tipoProducto en el payload' }
   }
 
   const startTime = Date.now()
@@ -62,8 +64,10 @@ export async function run(payload: JobPayload): Promise<RunnerResult> {
     )
 
     // 5. Guardar como Reporte
+    const reporteId = 'rpt_' + randomBytes(12).toString('hex')
     const reporte = await db.reporte.create({
       data: {
+        id: reporteId,
         tipo: tipoBoletin,
         personaId: personaId || null,
         fechaInicio,
