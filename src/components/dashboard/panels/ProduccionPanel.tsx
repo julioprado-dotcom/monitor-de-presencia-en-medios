@@ -14,17 +14,18 @@ import { usePolling } from '../hooks/usePolling';
 
 interface ProductoItem {
   tipo: string;
+  tipoBoletin: string | null;
   nombre: string;
   tipoProducto: 'premium' | 'gratuito';
+  frecuencia: 'diario' | 'semanal' | 'bajo_demanda';
   estado: 'generado' | 'pendiente' | 'error' | 'sin_datos';
   ultimaEdicion: string | null;
   mencionesUsadas: number;
-  destinatarios: number;
-}
-
-interface EditionHistory {
-  fecha: string;
-  estado: string;
+  totalEdiciones: number;
+  edicionesConMenciones: number;
+  edicionesSinMenciones: number;
+  previewContenido: string | null;
+  historial: { fecha: string; estado: string; menciones: number }[];
 }
 
 interface ProductosData {
@@ -55,20 +56,12 @@ function EstadoIcon({ estado }: { estado: string }) {
   }
 }
 
-function generateMockHistory(): EditionHistory[] {
-  const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-  const now = Date.now();
-  const estados = ['generado', 'generado', 'generado', 'pendiente', 'error'];
-  return Array.from({ length: 5 }, (_, i) => {
-    const d = new Date(now - (i + 1) * 86400000);
-    const dia = DIAS[d.getDay()];
-    const h = d.getHours().toString().padStart(2, '0');
-    const m = d.getMinutes().toString().padStart(2, '0');
-    return {
-      fecha: `${dia} ${h}:${m}`,
-      estado: estados[i % estados.length],
-    };
-  });
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br/>');
 }
 
 // ─── Product Row ──────────────────────────────────────────────
@@ -76,12 +69,21 @@ function generateMockHistory(): EditionHistory[] {
 function ProductRow({ product }: { product: ProductoItem }) {
   const [expanded, setExpanded] = useState(false);
   const [generando, setGenerando] = useState(false);
-  const history = generateMockHistory();
 
   const handleGenerate = () => {
     setGenerando(true);
     setTimeout(() => setGenerando(false), 3000);
   };
+
+  // Construir contenido del iframe preview con datos reales
+  const previewSrcDoc = product.previewContenido
+    ? `<!DOCTYPE html><html><body style="margin:0;padding:10px;font-family:'Inter',system-ui,sans-serif;background:#0a0a0f;color:#e0e0e0;font-size:11px;line-height:1.6;">
+        <p style="color:#00ff88;font-weight:bold;font-size:12px;margin:0 0 6px 0;">${product.nombre}</p>
+        ${escapeHtml(product.previewContenido)}
+      </body></html>`
+    : `<!DOCTYPE html><html><body style="margin:0;padding:10px;font-family:'Inter',system-ui,sans-serif;background:#0a0a0f;color:#6b7280;font-size:11px;display:flex;align-items:center;justify-content:center;height:100%;box-sizing:border-box;">
+        <p>Sin contenido generado para este producto.</p>
+      </body></html>`;
 
   return (
     <div style={{ borderBottom: '1px solid rgba(26,26,46,0.5)' }}>
@@ -139,7 +141,7 @@ function ProductRow({ product }: { product: ProductoItem }) {
           ) : (
             <Play className="w-3 h-3" />
           )}
-          {generando ? 'Generando…' : 'Generar ahora'}
+          {generando ? 'Generando...' : 'Generar ahora'}
         </button>
 
         {/* Chevron */}
@@ -163,42 +165,55 @@ function ProductRow({ product }: { product: ProductoItem }) {
             className="overflow-hidden"
           >
             <div className="px-3 pb-3 pt-1 space-y-2.5" style={{ background: 'rgba(255,255,255,0.015)' }}>
-              {/* Edition history */}
+              {/* Edition history — REAL data */}
               <div>
                 <p className="text-[10px] font-medium mb-1.5" style={{ color: '#6b7280' }}>
                   Historial de ediciones
+                  {product.totalEdiciones > 0 && (
+                    <span style={{ color: '#4b5563' }}> ({product.totalEdiciones} total, {product.edicionesConMenciones} con datos)</span>
+                  )}
                 </p>
-                <div className="space-y-0.5">
-                  {history.map((ed, i) => (
-                    <div key={i} className="flex items-center gap-2 text-[10px]">
-                      <span style={{ color: '#6b7280', fontFamily: 'JetBrains Mono, monospace', minWidth: 100 }}>
-                        {ed.fecha}
-                      </span>
-                      <EstadoIcon estado={ed.estado} />
-                      <span style={{ color: ed.estado === 'generado' ? '#00ff88' : ed.estado === 'error' ? '#ff3355' : '#ffaa00' }}>
-                        {ed.estado}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                {product.historial.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {product.historial.map((ed, i) => (
+                      <div key={i} className="flex items-center gap-2 text-[10px]">
+                        <span style={{ color: '#6b7280', fontFamily: 'JetBrains Mono, monospace', minWidth: 100 }}>
+                          {ed.fecha}
+                        </span>
+                        <EstadoIcon estado={ed.estado} />
+                        <span style={{ color: ed.estado === 'generado' ? '#00ff88' : ed.estado === 'error' ? '#ff3355' : '#ffaa00' }}>
+                          {ed.estado}
+                        </span>
+                        <span style={{ color: '#4b5563' }}>
+                          {ed.menciones > 0 ? `${ed.menciones} menc.` : '0 menc.'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px]" style={{ color: '#4b5563' }}>Sin ediciones registradas</p>
+                )}
               </div>
 
-              {/* HTML preview */}
+              {/* HTML preview — REAL content */}
               <div>
                 <div className="flex items-center gap-1 mb-1.5">
                   <Eye className="w-3 h-3" style={{ color: '#6b7280' }} />
                   <p className="text-[10px] font-medium" style={{ color: '#6b7280' }}>
                     Vista previa
+                    {product.previewContenido && (
+                      <span style={{ color: '#00ff88', marginLeft: 4 }}>● con datos</span>
+                    )}
                   </p>
                 </div>
                 <div
                   className="rounded-md overflow-hidden"
-                  style={{ background: '#0a0a0f', border: '1px solid #1a1a2e', maxHeight: 200 }}
+                  style={{ background: '#0a0a0f', border: '1px solid #1a1a2e', maxHeight: 280 }}
                 >
                   <iframe
-                    srcDoc={`<!DOCTYPE html><html><body style="margin:0;padding:8px;font-family:sans-serif;background:#0a0a0f;color:#fff;font-size:11px;"><p style="color:#00ff88;font-weight:bold;">${product.nombre}</p><p style="color:#6b7280;margin-top:4px;">Vista previa del último contenido generado…</p><p style="color:#6b7280;">Contenido de ejemplo con datos del producto.</p></body></html>`}
+                    srcDoc={previewSrcDoc}
                     className="w-full"
-                    style={{ height: 160, border: 'none' }}
+                    style={{ height: product.previewContenido ? 260 : 80, border: 'none' }}
                     title={`Preview: ${product.nombre}`}
                   />
                 </div>
@@ -288,7 +303,7 @@ export function ProduccionPanel({ onClose }: { onClose?: () => void }) {
           </div>
         ) : (
           <div className="max-h-[400px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
-            {productos.slice(0, 8).map((p) => (
+            {productos.slice(0, 10).map((p) => (
               <ProductRow key={p.tipo} product={p} />
             ))}
           </div>

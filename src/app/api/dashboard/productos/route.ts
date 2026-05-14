@@ -102,6 +102,27 @@ export async function GET() {
         estado = 'sin_datos';
       }
 
+      // Parsear contenido del último reporte para la vista previa
+      let previewContenido: string | null = null;
+      if (latest?.contenido) {
+        try {
+          const parsed = typeof latest.contenido === 'string'
+            ? JSON.parse(latest.contenido)
+            : latest.contenido;
+          previewContenido = parsed.textoCompleto || parsed.texto || parsed.contenido || null;
+        } catch {
+          // contenido no es JSON, usar como texto plano
+          previewContenido = String(latest.contenido);
+        }
+      }
+
+      // Historial real de ediciones (últimas 5)
+      const historial = todos.slice(0, 5).map(r => ({
+        fecha: formatDateTimeShort(r.fechaCreacion?.toISOString() ?? null) || '—',
+        estado: (r.totalMenciones || 0) > 0 ? 'generado' : (r.enviado ? 'pendiente' : 'error'),
+        menciones: r.totalMenciones || 0,
+      }));
+
       return {
         tipo: def.tipo,
         tipoBoletin: def.tipoBoletin,
@@ -114,6 +135,8 @@ export async function GET() {
         totalEdiciones: todos.length,
         edicionesConMenciones: todos.filter(r => (r.totalMenciones || 0) > 0).length,
         edicionesSinMenciones: todos.filter(r => (r.totalMenciones || 0) === 0).length,
+        previewContenido,
+        historial,
       };
     });
 

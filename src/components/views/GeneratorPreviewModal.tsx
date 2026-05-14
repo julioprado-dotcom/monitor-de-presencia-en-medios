@@ -9,12 +9,32 @@ interface GeneratorPreviewModalProps {
   reporte: Record<string, unknown> | null;
 }
 
+function parseContenido(reporte: Record<string, unknown>): string | null {
+  const raw = reporte.contenido;
+  if (!raw) return null;
+
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return parsed.textoCompleto || parsed.texto || parsed.contenido || null;
+  } catch {
+    return typeof raw === 'string' ? raw : null;
+  }
+}
+
+function formatResumen(resumen: string): string {
+  return resumen.replace(/\\n/g, '\n');
+}
+
 export function GeneratorPreviewModal({ open, onClose, reporte }: GeneratorPreviewModalProps) {
   if (!open || !reporte) return null;
 
+  const resumen = (reporte.resumen as string) || '';
+  const contenidoCompleto = parseContenido(reporte);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-card rounded-xl shadow-xl border border-border max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card rounded-xl shadow-xl border border-border max-w-3xl w-full mx-4 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div>
             <h3 className="text-sm font-semibold text-foreground">
@@ -30,14 +50,36 @@ export function GeneratorPreviewModal({ open, onClose, reporte }: GeneratorPrevi
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-              {(reporte.resumen as string) || 'Sin contenido de resumen.'}
-            </p>
-          </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Contenido completo */}
+          {contenidoCompleto ? (
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <div className="rounded-lg p-4" style={{ background: 'rgba(0,255,136,0.03)', border: '1px solid rgba(0,255,136,0.1)' }}>
+                <p className="text-[10px] font-medium mb-2" style={{ color: '#00ff88' }}>
+                  Contenido del reporte
+                </p>
+                <pre className="text-xs text-foreground whitespace-pre-wrap leading-relaxed font-[inherit]" style={{ fontFamily: 'inherit' }}>
+                  {contenidoCompleto}
+                </pre>
+              </div>
+            </div>
+          ) : resumen ? (
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                {formatResumen(resumen)}
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-8" style={{ color: '#6b7280' }}>
+              <p className="text-xs">Sin contenido disponible para este reporte.</p>
+            </div>
+          )}
+
+          {/* Sentimiento */}
           {(reporte.sentimientoPromedio as number) > 0 && (
-            <div className="mt-4 p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-muted/50">
               <p className="text-[10px] font-medium text-muted-foreground mb-1">Sentimiento promedio</p>
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
@@ -51,6 +93,8 @@ export function GeneratorPreviewModal({ open, onClose, reporte }: GeneratorPrevi
             </div>
           )}
         </div>
+
+        {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
           <Button variant="ghost" size="sm" onClick={onClose} className="text-xs">Cerrar</Button>
         </div>

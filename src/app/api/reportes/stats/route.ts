@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
           sentimientoPromedio: true,
           resumen: true,
           enviado: true,
+          contenido: true,
         },
       }),
     ]);
