@@ -94,10 +94,8 @@ export class GeneratorScheduler {
     this.running = true;
     console.log('[scheduler] Iniciado — revision cada 5 minutos');
 
-    // Ejecucion inmediata al arrancar
-    this.tick().catch((err) => {
-      console.error('[scheduler] Error en tick inicial:', err);
-    });
+    // NO ejecutar tick inmediato al arrancar — esperar primer intervalo
+    // El tick inmediato puede causar fetch a si mismo y bloquear el event loop
 
     // Loop periodico
     this.intervalId = setInterval(() => {
@@ -237,6 +235,7 @@ export class GeneratorScheduler {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(120_000), // 2 min timeout (evita bloqueo infinito)
     });
 
     if (!response.ok) {

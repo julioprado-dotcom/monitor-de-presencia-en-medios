@@ -55,13 +55,14 @@ export async function initJobSystem(): Promise<void> {
   // 3. Iniciar health monitor (cada 60s)
   startHealthMonitor()
 
-  // 4. Iniciar Container Guardian (cada 30s — monitorea cgroup real)
-  try {
-    const { startContainerGuardian } = await import('./container-guardian')
-    startContainerGuardian()
-  } catch (err) {
-    console.warn('[Jobs] Container Guardian no disponible (Edge Runtime):', (err as Error).message)
-  }
+  // 4. Container Guardian — DESACTIVADO
+  // Escribe a /proc/sys/vm/drop_caches lo que causa OOM kills en este entorno
+  // try {
+  //   const { startContainerGuardian } = await import('./container-guardian')
+  //   startContainerGuardian()
+  // } catch (err) {
+  //   console.warn('[Jobs] Container Guardian no disponible (Edge Runtime):', (err as Error).message)
+  // }
 
   console.log('[Jobs] Sistema inicializado — worker IDLE, sin scheduler')
   console.log(`[Jobs] Warmup configurado: ${WARMUP_CONFIG.delayMs / 1000}s antes de activar modo productivo`)
@@ -81,13 +82,14 @@ export async function activateProductiveMode(): Promise<void> {
   // 1. Activar worker (sale de idle, comienza a ejecutar jobs)
   startWorker()
 
-  // 2. Iniciar scheduler (node-cron para fuentes y boletines)
-  await startScheduler()
+  // 2. NO iniciar scheduler automáticamente — consume memoria con 52+ cron tasks
+  //    El scheduler se inicia manualmente o por el primer API request que lo necesite
+  // await startScheduler()
 
   // 3. Iniciar backup scheduler (4x/día a GitHub — NUNCA se borran)
-  startBackupScheduler()
+  // startBackupScheduler()
 
-  console.log('[Jobs] Modo productivo activo — scheduler + worker ejecutando')
+  console.log('[Jobs] Modo productivo activo — worker ejecutando (scheduler manual)')
 }
 
 // Garantizar que el worker esté corriendo — llamado desde API routes

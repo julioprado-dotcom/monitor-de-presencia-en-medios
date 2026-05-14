@@ -70,7 +70,10 @@ export async function register() {
     const { activateProductiveMode } = await import('@/lib/jobs')
     await activateProductiveMode()
 
-    // 6. Iniciar GeneratorScheduler (productos programados: Termometro, Saldo, Foco, Radar, Especializado)
+    // 6. Esperar antes de iniciar el generator scheduler (evitar pico al arrancar)
+    await sleep(10_000)
+
+    // 7. Iniciar GeneratorScheduler (productos programados: Termometro, Saldo, Foco, Radar, Especializado)
     const { getScheduler } = await import('@/lib/scheduler/generator-scheduler')
     const genScheduler = getScheduler()
     genScheduler.start()

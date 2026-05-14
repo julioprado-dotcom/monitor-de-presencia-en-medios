@@ -191,8 +191,14 @@ async function workerLoop(): Promise<void> {
       }
 
       // Backpressure: esperar entre jobs con jitter anti-ban
-      const jitter = Math.floor(WORKER_CONFIG.delayMs * 0.3 * Math.random())
-      await sleep(WORKER_CONFIG.delayMs + jitter)
+      // Jobs pesados (scrape, generate) necesitan más tiempo de recuperación
+      const baseDelay = (tipo === 'scrape_fuente')
+        ? WORKER_CONFIG.delayScrapeMs
+        : (tipo === 'generar_boletin')
+          ? WORKER_CONFIG.delayGenerateMs
+          : WORKER_CONFIG.delayMs
+      const jitter = Math.floor(baseDelay * 0.3 * Math.random())
+      await sleep(baseDelay + jitter)
     } catch (error: unknown) {
       // Error del sistema (no del job)
       const msg = error instanceof Error ? error.message : String(error)

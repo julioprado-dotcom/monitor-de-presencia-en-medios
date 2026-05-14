@@ -87,8 +87,6 @@ function readCgroup(): { usageMB: number; limitMB: number; pct: number } | null 
 
 function dropPageCache(): boolean {
   try {
-    // sync antes de liberar para evitar data loss
-    require('child_process').execSync('sync')
     fs.writeFileSync('/proc/sys/vm/drop_caches', '3', 'utf-8')
     return true
   } catch {

@@ -122,9 +122,11 @@ export const BOLETINES_SCHEDULE: BoletinSchedule[] = [
 // ── Configuracion del Worker ───────────────────────────────────────────
 
 export const WORKER_CONFIG = {
-  delayMs: 2000,            // backpressure: espera entre jobs
-  pollIntervalMs: 5000,     // intervalo si no hay jobs pendientes
-  errorBackoffMs: 10000,    // espera si hay error del sistema
+  delayMs: 5000,            // backpressure: espera entre jobs (aumentado de 2s)
+  pollIntervalMs: 10000,    // intervalo si no hay jobs pendientes (aumentado de 5s)
+  errorBackoffMs: 30000,    // espera si hay error del sistema (aumentado de 10s)
+  delayScrapeMs: 15000,     // espera extra después de jobs pesados (scrape_fuente)
+  delayGenerateMs: 8000,    // espera extra después de generar_boletin
 }
 
 // ── Configuracion de Arranque Diferido ──────────────────────────────────
@@ -133,7 +135,7 @@ export const WORKER_CONFIG = {
 // establezca baseline de memoria antes de que los jobs comiencen a consumir recursos.
 
 export const WARMUP_CONFIG = {
-  delayMs: 120_000,         // 2 minutos de estabilización antes de activar jobs
+  delayMs: 30_000,          // 30 segundos de estabilización antes de activar jobs (reducido de 2min)
 }
 
 // ── Configuracion del Container Guardian ──────────────────────────────
