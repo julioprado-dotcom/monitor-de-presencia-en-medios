@@ -60,12 +60,12 @@ export async function POST(request: NextRequest) {
       menciones = await db.mencion.findMany({
         where: {
           ...where,
-          ejesTematicos: { some: { ejeTematicoId: { in: ejesIds } } },
+          MencionTema: { some: { ejeTematicoId: { in: ejesIds } } },
         },
         include: {
           Persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
           Medio: { select: { id: true, nombre: true, tipo: true, nivel: true } },
-          ejesTematicos: { include: { ejeTematico: { select: { id: true, nombre: true, slug: true, color: true } } } },
+          MencionTema: { include: { EjeTematico: { select: { id: true, nombre: true, slug: true, color: true } } } },
         },
         orderBy: { fechaCaptura: 'desc' },
       });
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         include: {
           Persona: { select: { id: true, nombre: true, partidoSigla: true, camara: true, departamento: true } },
           Medio: { select: { id: true, nombre: true, tipo: true, nivel: true } },
-          ejesTematicos: { include: { ejeTematico: { select: { id: true, nombre: true, slug: true, color: true } } } },
+          MencionTema: { include: { EjeTematico: { select: { id: true, nombre: true, slug: true, color: true } } } },
         },
         orderBy: { fechaCaptura: 'desc' },
       });

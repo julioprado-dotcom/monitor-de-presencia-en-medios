@@ -402,7 +402,7 @@ model Persona {
 }
 
 model Reporte {
-  id                     String    @id
+  id                     String    @id @default(cuid())
   tipo                   String
   personaId              String?
   fechaInicio            DateTime
