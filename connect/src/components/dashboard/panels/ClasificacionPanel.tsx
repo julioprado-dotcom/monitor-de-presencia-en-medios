@@ -98,7 +98,7 @@ function CoverageCard({ name, count, percentage }: { name: string; count: number
   return (
     <div
       className="rounded-lg p-3"
-      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1a1a2e' }}
+      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1a2744' }}
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold truncate" style={{ color: '#ffffff' }}>
@@ -108,7 +108,7 @@ function CoverageCard({ name, count, percentage }: { name: string; count: number
           {percentage}%
         </span>
       </div>
-      <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#1a1a2e' }}>
+      <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#1a2744' }}>
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${percentage}%`, background: color }}
@@ -215,7 +215,7 @@ export function ClasificacionPanel({ onClose }: { onClose?: () => void }) {
             </section>
 
             {/* ── Section C: Menciones sin clasificar ─────── */}
-            <section style={{ borderTop: '1px solid #1a1a2e' }} className="pt-4">
+            <section style={{ borderTop: '1px solid #1a2744' }} className="pt-4">
               <div className="flex items-center justify-between mb-2.5">
                 <h3 className="text-[11px] font-medium uppercase tracking-wider" style={{ color: '#6b7280' }}>
                   Menciones sin clasificar
@@ -264,7 +264,7 @@ export function ClasificacionPanel({ onClose }: { onClose?: () => void }) {
                         className="px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors disabled:opacity-30"
                         style={{
                           background: selectedPendientes.size > 0 ? 'rgba(0,255,136,0.1)' : 'transparent',
-                          border: `1px solid ${selectedPendientes.size > 0 ? 'rgba(0,255,136,0.3)' : '#1a1a2e'}`,
+                          border: `1px solid ${selectedPendientes.size > 0 ? 'rgba(0,255,136,0.3)' : '#1a2744'}`,
                           color: selectedPendientes.size > 0 ? '#00ff88' : '#6b7280',
                         }}
                         onClick={() => setShowAssignDropdown(!showAssignDropdown)}
@@ -274,11 +274,11 @@ export function ClasificacionPanel({ onClose }: { onClose?: () => void }) {
                       {showAssignDropdown && (
                         <div
                           className="absolute right-0 top-full mt-1 rounded-lg p-2 z-10 min-w-[180px]"
-                          style={{ background: '#1a1a2e', border: '1px solid #252540' }}
+                          style={{ background: '#1a2744', border: '1px solid #252540' }}
                         >
                           <select
                             className="w-full px-2 py-1 rounded text-[11px] mb-1.5 outline-none"
-                            style={{ background: '#0a0a0f', border: '1px solid #252540', color: '#ffffff' }}
+                            style={{ background: '#080c14', border: '1px solid #252540', color: '#ffffff' }}
                             defaultValue=""
                           >
                             <option value="" disabled>Seleccionar lente…</option>
@@ -286,7 +286,7 @@ export function ClasificacionPanel({ onClose }: { onClose?: () => void }) {
                           </select>
                           <select
                             className="w-full px-2 py-1 rounded text-[11px] mb-2 outline-none"
-                            style={{ background: '#0a0a0f', border: '1px solid #252540', color: '#ffffff' }}
+                            style={{ background: '#080c14', border: '1px solid #252540', color: '#ffffff' }}
                             defaultValue=""
                           >
                             <option value="" disabled>Seleccionar eje…</option>
@@ -311,12 +311,12 @@ export function ClasificacionPanel({ onClose }: { onClose?: () => void }) {
             </section>
 
             {/* ── Section D: Keywords ─────────────────────── */}
-            <section style={{ borderTop: '1px solid #1a1a2e' }} className="pt-4">
+            <section style={{ borderTop: '1px solid #1a2744' }} className="pt-4">
               <h3 className="text-[11px] font-medium mb-2.5 uppercase tracking-wider" style={{ color: '#6b7280' }}>
                 Keywords
               </h3>
               <div className="flex gap-2 mb-2.5">
-                <div className="flex-1 flex items-center gap-1.5 rounded-md px-2.5 py-1.5" style={{ background: '#0a0a0f', border: '1px solid #1a1a2e' }}>
+                <div className="flex-1 flex items-center gap-1.5 rounded-md px-2.5 py-1.5" style={{ background: '#080c14', border: '1px solid #1a2744' }}>
                   <Search className="w-3 h-3 shrink-0" style={{ color: '#6b7280' }} />
                   <input
                     placeholder="Buscar keyword…"
@@ -330,9 +330,9 @@ export function ClasificacionPanel({ onClose }: { onClose?: () => void }) {
                   <button
                     onClick={() => setShowNewKeyword(true)}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium shrink-0"
-                    style={{ border: '1px solid #1a1a2e', color: '#6b7280' }}
+                    style={{ border: '1px solid #1a2744', color: '#6b7280' }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#00ff88'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#00ff88'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#6b7280'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#1a1a2e'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#6b7280'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#1a2744'; }}
                   >
                     <Plus className="w-3 h-3" />
                     Crear
@@ -342,7 +342,7 @@ export function ClasificacionPanel({ onClose }: { onClose?: () => void }) {
                     <input
                       placeholder="nuevo term"
                       className="px-2 py-1.5 rounded-md text-[11px] outline-none w-28"
-                      style={{ background: '#0a0a0f', border: '1px solid #00ff88', color: '#ffffff' }}
+                      style={{ background: '#080c14', border: '1px solid #00ff88', color: '#ffffff' }}
                       autoFocus
                     />
                     <button
@@ -386,7 +386,7 @@ export function ClasificacionPanel({ onClose }: { onClose?: () => void }) {
                       step={0.1}
                       value={kw.weight.toFixed(1)}
                       className="w-10 text-center rounded px-1 py-0.5 text-[10px] outline-none"
-                      style={{ background: '#0a0a0f', border: '1px solid #1a1a2e', color: '#ffffff', fontFamily: 'JetBrains Mono, monospace' }}
+                      style={{ background: '#080c14', border: '1px solid #1a2744', color: '#ffffff', fontFamily: 'JetBrains Mono, monospace' }}
                     />
                     <button
                       className="flex items-center justify-center rounded transition-colors"

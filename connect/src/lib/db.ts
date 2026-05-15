@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { join } from 'path';
+import { join } from 'node:path';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

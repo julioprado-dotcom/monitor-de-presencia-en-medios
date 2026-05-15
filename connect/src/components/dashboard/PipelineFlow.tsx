@@ -84,15 +84,16 @@ interface IndicadoresData {
 // ─── Color Constants ─────────────────────────────────────
 
 const COLORS = {
-  bg: '#0a0a0f',
-  panel: '#12121a',
-  border: '#1a1a2e',
+  bg: '#080c14',
+  panel: '#0d1321',
+  border: '#1a2744',
   accent: '#00ff88',
+  accentCyan: '#06b6d4',
   warning: '#ffaa00',
   error: '#ff3355',
-  idle: '#6b7280',
-  textWhite: '#ffffff',
-  textGray: '#6b7280',
+  idle: '#334155',
+  textWhite: '#e2e8f0',
+  textGray: '#64748b',
 };
 
 const STATUS_COLORS: Record<NodeStatus, { dot: string; glow: string; border: string }> = {

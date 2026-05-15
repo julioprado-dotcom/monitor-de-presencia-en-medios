@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.resolve('.'),
   // output: 'standalone', // Disabled: use next start directly
 
+  // Prisma needs Node.js runtime, not Edge
+  serverExternalPackages: ['prisma', '@prisma/client'],
+
   // Permitir preview en iframe cross-origin (Z.ai)
   allowedDevOrigins: [
     'preview-chat-8529d95c-eec4-472f-b7ed-fe76a883c56b.space-z.ai',

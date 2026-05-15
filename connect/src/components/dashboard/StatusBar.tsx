@@ -239,10 +239,10 @@ export function StatusBar() {
     <div
       ref={panelRef}
       className="relative w-full"
-      style={{ backgroundColor: '#0a0a0f' }}
+      style={{ backgroundColor: '#080c14' }}
     >
       {/* ── Main bar ── */}
-      <div className="flex items-center justify-between px-4 sm:px-6 py-2 max-h-[80px] border-b" style={{ borderColor: '#1a1a2e' }}>
+      <div className="flex items-center justify-between px-4 sm:px-6 py-2 max-h-[80px] border-b" style={{ borderColor: '#1a2744' }}>
         {/* Orbs */}
         <div className="flex items-center gap-4 sm:gap-8 overflow-x-auto no-scrollbar">
           {/* CAPTURA */}
@@ -294,7 +294,7 @@ export function StatusBar() {
       </div>
 
       {/* ── Actions bar (problem text + buttons) ── */}
-      <div className="flex items-center justify-between px-4 sm:px-6 py-1 min-h-[28px] border-b" style={{ borderColor: '#1a1a2e' }}>
+      <div className="flex items-center justify-between px-4 sm:px-6 py-1 min-h-[28px] border-b" style={{ borderColor: '#1a2744' }}>
         <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
           {captura.problem && (
             <span className="text-[11px] whitespace-nowrap" style={{ color: estadoColor(captura.status) }}>
@@ -365,7 +365,7 @@ export function StatusBar() {
             exit="collapsed"
             variants={panelVariants}
             className="overflow-hidden border-b"
-            style={{ borderColor: '#1a1a2e', backgroundColor: '#0a0a0f' }}
+            style={{ borderColor: '#1a2744', backgroundColor: '#080c14' }}
           >
             {/* CAPTURA expanded */}
             {expanded === 'captura' && (
@@ -381,7 +381,7 @@ export function StatusBar() {
                 <div className="flex-1 overflow-y-auto px-4 sm:px-6 custom-scrollbar">
                   <table className="w-full text-[11px]">
                     <thead>
-                      <tr className="text-gray-500 border-b" style={{ borderColor: '#1a1a2e' }}>
+                      <tr className="text-gray-500 border-b" style={{ borderColor: '#1a2744' }}>
                         <th className="text-left py-1 font-medium">Fuente</th>
                         <th className="text-left py-1 font-medium w-24">Estado</th>
                         <th className="text-right py-1 font-medium w-20">Semana</th>
@@ -389,7 +389,7 @@ export function StatusBar() {
                     </thead>
                     <tbody>
                       {data.captura.fuentes.slice(0, 20).map(f => (
-                        <tr key={f.id} className="border-b" style={{ borderColor: '#1a1a2e22' }}>
+                        <tr key={f.id} className="border-b" style={{ borderColor: '#1a274422' }}>
                           <td className="py-1.5 text-gray-300 truncate max-w-[200px]" title={f.nombre}>
                             {f.nombre}
                           </td>
@@ -429,7 +429,7 @@ export function StatusBar() {
                       return (
                         <div key={l.nombre} className="flex items-center gap-2">
                           <span className="text-[11px] text-gray-400 w-28 truncate shrink-0">{l.nombre}</span>
-                          <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#1a1a2e' }}>
+                          <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#1a2744' }}>
                             <motion.div
                               className="h-full rounded-full"
                               style={{ backgroundColor: barColor, opacity: 0.8 }}
@@ -450,11 +450,11 @@ export function StatusBar() {
                   </div>
                   {/* Pending mentions info */}
                   {data.clasificacion.pendientes > 0 && (
-                    <div className="mt-2 pt-2 border-t flex items-center justify-between" style={{ borderColor: '#1a1a2e' }}>
+                    <div className="mt-2 pt-2 border-t flex items-center justify-between" style={{ borderColor: '#1a2744' }}>
                       <span className="text-[11px] text-gray-500">
                         {data.clasificacion.pendientes} menciones sin tratamiento periodistico
                       </span>
-                      <button className="text-[10px] px-2 py-1 rounded text-gray-300 hover:bg-white/5 transition-colors" style={{ border: '1px solid #1a1a2e' }}>
+                      <button className="text-[10px] px-2 py-1 rounded text-gray-300 hover:bg-white/5 transition-colors" style={{ border: '1px solid #1a2744' }}>
                         Asignar
                       </button>
                     </div>
@@ -474,7 +474,7 @@ export function StatusBar() {
                 <div className="flex-1 overflow-y-auto px-4 sm:px-6 custom-scrollbar">
                   <div className="space-y-1">
                     {data.produccion.semana.map(p => (
-                      <div key={p.tipo} className="flex items-center justify-between py-1 border-b" style={{ borderColor: '#1a1a2e22' }}>
+                      <div key={p.tipo} className="flex items-center justify-between py-1 border-b" style={{ borderColor: '#1a274422' }}>
                         <div className="flex items-center gap-2 min-w-0">
                           {estadoIcon(p.estado)}
                           <span className="text-[11px] text-gray-300 truncate">{p.nombre}</span>
@@ -489,7 +489,7 @@ export function StatusBar() {
                             </span>
                           )}
                           {(p.estado === 'pending' || p.estado === 'error') && (
-                            <button className="text-[9px] px-1.5 py-0.5 rounded text-gray-300 hover:bg-white/5 transition-colors flex items-center gap-1" style={{ border: '1px solid #1a1a2e' }}>
+                            <button className="text-[9px] px-1.5 py-0.5 rounded text-gray-300 hover:bg-white/5 transition-colors flex items-center gap-1" style={{ border: '1px solid #1a2744' }}>
                               <RefreshCw className="w-2.5 h-2.5" />
                               Generar
                             </button>
@@ -519,7 +519,7 @@ export function StatusBar() {
                 <div className="flex-1 overflow-y-auto px-4 sm:px-6 custom-scrollbar">
                   <div className="space-y-1">
                     {data.distribucion.ultimos.map(e => (
-                      <div key={e.id} className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: '#1a1a2e22' }}>
+                      <div key={e.id} className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: '#1a274422' }}>
                         <div className="flex items-center gap-2 min-w-0">
                           {estadoIcon(e.estado)}
                           <div className="min-w-0">
@@ -533,11 +533,11 @@ export function StatusBar() {
                           <span className="text-[10px] text-gray-500">{formatRelativeTime(e.timestamp)}</span>
                           {e.estado === 'fallido' && (
                             <div className="flex items-center gap-1">
-                              <button className="text-[9px] px-1.5 py-0.5 rounded text-gray-300 hover:bg-white/5 transition-colors flex items-center gap-1" style={{ border: '1px solid #1a1a2e' }} title={e.error}>
+                              <button className="text-[9px] px-1.5 py-0.5 rounded text-gray-300 hover:bg-white/5 transition-colors flex items-center gap-1" style={{ border: '1px solid #1a2744' }} title={e.error}>
                                 <Wrench className="w-2.5 h-2.5" />
                                 Diagnosticar
                               </button>
-                              <button className="text-[9px] px-1.5 py-0.5 rounded text-gray-300 hover:bg-white/5 transition-colors flex items-center gap-1" style={{ border: '1px solid #1a1a2e' }}>
+                              <button className="text-[9px] px-1.5 py-0.5 rounded text-gray-300 hover:bg-white/5 transition-colors flex items-center gap-1" style={{ border: '1px solid #1a2744' }}>
                                 <RefreshCw className="w-2.5 h-2.5" />
                                 Reintentar
                               </button>

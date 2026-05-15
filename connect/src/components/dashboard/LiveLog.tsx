@@ -139,8 +139,8 @@ export function LiveLog() {
       variants={logVariants}
       className="relative overflow-hidden shrink-0"
       style={{
-        backgroundColor: '#0a0a0f',
-        borderTop: '1px solid #1a1a2e',
+        backgroundColor: '#080c14',
+        borderTop: '1px solid #1a2744',
       }}
     >
       {/* ── Collapsed bar (always visible) ── */}
@@ -225,7 +225,7 @@ export function LiveLog() {
               className="h-full overflow-y-auto px-3 py-2 custom-scrollbar"
               style={{
                 scrollbarWidth: 'thin',
-                scrollbarColor: '#1a1a2e #0a0a0f',
+                scrollbarColor: '#1a2744 #080c14',
               }}
             >
               {events.length === 0 && !loading && (

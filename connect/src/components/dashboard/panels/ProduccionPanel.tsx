@@ -80,11 +80,11 @@ function ProductRow({ product }: { product: ProductoItem }) {
 
   // Construir contenido del iframe preview con datos reales
   const previewSrcDoc = product.previewContenido
-    ? `<!DOCTYPE html><html><body style="margin:0;padding:10px;font-family:'Inter',system-ui,sans-serif;background:#0a0a0f;color:#e0e0e0;font-size:11px;line-height:1.6;">
+    ? `<!DOCTYPE html><html><body style="margin:0;padding:10px;font-family:'Inter',system-ui,sans-serif;background:#080c14;color:#e0e0e0;font-size:11px;line-height:1.6;">
         <p style="color:#00ff88;font-weight:bold;font-size:12px;margin:0 0 6px 0;">${product.nombre}</p>
         ${escapeHtml(product.previewContenido)}
       </body></html>`
-    : `<!DOCTYPE html><html><body style="margin:0;padding:10px;font-family:'Inter',system-ui,sans-serif;background:#0a0a0f;color:#6b7280;font-size:11px;display:flex;align-items:center;justify-content:center;height:100%;box-sizing:border-box;">
+    : `<!DOCTYPE html><html><body style="margin:0;padding:10px;font-family:'Inter',system-ui,sans-serif;background:#080c14;color:#6b7280;font-size:11px;display:flex;align-items:center;justify-content:center;height:100%;box-sizing:border-box;">
         <p>Sin contenido generado para este producto.</p>
       </body></html>`;
 
@@ -211,7 +211,7 @@ function ProductRow({ product }: { product: ProductoItem }) {
                 </div>
                 <div
                   className="rounded-md overflow-hidden"
-                  style={{ background: '#0a0a0f', border: '1px solid #1a1a2e', maxHeight: 280 }}
+                  style={{ background: '#080c14', border: '1px solid #1a2744', maxHeight: 280 }}
                 >
                   <iframe
                     srcDoc={previewSrcDoc}
@@ -225,9 +225,9 @@ function ProductRow({ product }: { product: ProductoItem }) {
               {/* Edit button */}
               <button
                 className="w-full px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors text-center"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #1a1a2e', color: '#ffffff' }}
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #1a2744', color: '#ffffff' }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#00ff88'; (e.currentTarget as HTMLButtonElement).style.color = '#00ff88'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#1a1a2e'; (e.currentTarget as HTMLButtonElement).style.color = '#ffffff'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#1a2744'; (e.currentTarget as HTMLButtonElement).style.color = '#ffffff'; }}
               >
                 Editar antes de enviar
               </button>
@@ -316,7 +316,7 @@ export function ProduccionPanel({ onClose }: { onClose?: () => void }) {
         {data && (
           <div
             className="flex items-center gap-3 px-3 py-2 rounded-lg"
-            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1a1a2e' }}
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1a2744' }}
           >
             <span className="text-[10px] flex items-center gap-1" style={{ color: '#00ff88' }}>
               <CheckCircle className="w-3 h-3" /> {data.resumen.generados}
