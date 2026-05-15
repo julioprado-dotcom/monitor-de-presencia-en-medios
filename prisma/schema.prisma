@@ -342,6 +342,14 @@ model Mencion {
   deduplicacionLog        String?
   intencionMedio          String?
   ejeEstructuralId        String?
+  // ─── Evidencia Forense Digital (Blindaje Histórico) ────────────────
+  evidenciaHtmlRuta       String?   @default("")   // Ruta al archivo HTML estático capturado
+  evidenciaPngRuta        String?   @default("")   // Ruta al screenshot PNG capturado
+  evidenciaHashSha256     String?   @default("")   // Hash SHA-256 del contenido original (integridad)
+  evidenciaTimestamp      DateTime?                // Momento exacto de la captura forense
+  evidenciaUrlOriginal    String?   @default("")   // URL original al momento de captura (puede cambiar)
+  evidenciaTamanoBytes    Int?      @default(0)    // Tamaño del archivo capturado en bytes
+  // ─── Fin Evidencia Forense ──────────────────────────────────────────
   Comentario              Comentario[]
   EjeTematico             EjeTematico?          @relation(fields: [ejeEstructuralId], references: [id])
   Medio                   Medio                 @relation(fields: [medioId], references: [id])
