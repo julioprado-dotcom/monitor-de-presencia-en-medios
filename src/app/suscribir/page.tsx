@@ -2,9 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Shield,
   CheckCircle2,
@@ -34,6 +31,39 @@ const FREE_PRODUCTS = [
     desc: 'Profundización temática: un eje, una mirada, cada semana.',
   },
 ];
+
+/* ── Shared styles ─────────────────────────────────────────── */
+const S = {
+  label: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: '10px',
+    fontWeight: 700,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.1em',
+    color: '#64748b',
+  },
+  input: {
+    width: '100%',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    fontSize: '13px',
+    backgroundColor: 'rgba(0,255,136,0.04)',
+    border: '1px solid #1a2744',
+    color: '#e2e8f0',
+    outline: 'none',
+    fontFamily: "'JetBrains Mono', monospace",
+    boxShadow: '0 0 8px rgba(0,255,136,0.04)',
+    transition: 'all 0.2s',
+  },
+  inputFocus: {
+    borderColor: 'rgba(0,255,136,0.4)',
+    boxShadow: '0 0 15px rgba(0,255,136,0.1)',
+  },
+  cardBg: {
+    background: 'linear-gradient(135deg, rgba(0,255,136,0.03) 0%, rgba(13,19,33,0.9) 50%, rgba(6,182,212,0.03) 100%)',
+    border: '1px solid rgba(0,255,136,0.1)',
+  },
+};
 
 export default function SuscribirPage() {
   const [nombre, setNombre] = useState('');
@@ -111,69 +141,88 @@ export default function SuscribirPage() {
         <div className="flex flex-col items-center gap-3">
           <div
             className="h-12 w-12 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: '#0A1628' }}
+            style={{
+              backgroundColor: 'rgba(0,255,136,0.1)',
+              border: '1px solid rgba(0,255,136,0.25)',
+            }}
           >
-            <span className="text-white text-lg font-bold">D</span>
+            <span style={{ color: '#00ff88' }} className="text-lg font-bold">D</span>
           </div>
           <div className="text-center">
-            <p className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+            <p
+              className="text-xs font-bold tracking-wider uppercase"
+              style={{ color: '#64748b', fontFamily: "'JetBrains Mono', monospace" }}
+            >
               DECODEX BOLIVIA
             </p>
-            <p className="text-[11px] text-muted-foreground">
+            <p
+              className="text-[11px]"
+              style={{ color: '#334155', fontFamily: "'JetBrains Mono', monospace" }}
+            >
               Inteligencia de Señales
             </p>
           </div>
         </div>
 
         {/* Success message */}
-        <Card className="border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/30">
-          <CardContent className="pt-6 pb-6 flex flex-col items-center text-center gap-4">
-            <div className="h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-              <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-lg font-bold text-foreground">
-                ¡Suscripción exitosa!
-              </h2>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {nombre
-                  ? `Gracias, ${nombre}.`
-                  : '¡Gracias por suscribirte!'}{' '}
-                A partir de ahora recibirás{' '}
-                <span className="font-semibold text-foreground">
-                  El Radar
-                </span>
-                ,{' '}
-                <span className="font-semibold text-foreground">
-                  Voz y Voto
-                </span>
-                ,{' '}
-                <span className="font-semibold text-foreground">El Hilo</span>{' '}
-                y{' '}
-                <span className="font-semibold text-foreground">
-                  Foco de la Semana
-                </span>{' '}
-                directamente en tu correo electrónico.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Mail className="h-3.5 w-3.5" />
-              <span>Revisa tu bandeja de entrada (y carpeta de spam).</span>
-            </div>
-          </CardContent>
-        </Card>
+        <div
+          className="rounded-xl p-6 text-center space-y-4"
+          style={{
+            background: 'linear-gradient(135deg, rgba(0,255,136,0.06) 0%, rgba(13,19,33,0.9) 50%, rgba(6,182,212,0.04) 100%)',
+            border: '1px solid rgba(0,255,136,0.2)',
+            boxShadow: '0 0 25px rgba(0,255,136,0.06)',
+          }}
+        >
+          <div
+            className="h-16 w-16 rounded-full flex items-center justify-center mx-auto"
+            style={{
+              backgroundColor: 'rgba(0,255,136,0.1)',
+              border: '1px solid rgba(0,255,136,0.25)',
+            }}
+          >
+            <CheckCircle2 size={32} style={{ color: '#00ff88' }} />
+          </div>
+          <div className="space-y-2">
+            <h2
+              className="text-lg font-bold"
+              style={{ color: '#e2e8f0', fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              ¡Suscripción exitosa!
+            </h2>
+            <p
+              className="text-sm leading-relaxed"
+              style={{ color: '#64748b', fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              {nombre
+                ? `Gracias, ${nombre}.`
+                : '¡Gracias por suscribirte!'}{' '}
+              A partir de ahora recibirás{' '}
+              <span style={{ color: '#e2e8f0' }}>El Radar</span>,{' '}
+              <span style={{ color: '#e2e8f0' }}>Voz y Voto</span>,{' '}
+              <span style={{ color: '#e2e8f0' }}>El Hilo</span> y{' '}
+              <span style={{ color: '#e2e8f0' }}>Foco de la Semana</span>{' '}
+              directamente en tu correo electrónico.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs justify-center" style={{ color: '#64748b' }}>
+            <Mail size={14} />
+            <span>Revisa tu bandeja de entrada (y carpeta de spam).</span>
+          </div>
+        </div>
 
         {/* Links */}
-        <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-col items-center gap-2 text-xs">
           <Link
             href="/dashboard"
-            className="hover:text-foreground transition-colors underline underline-offset-2"
+            className="transition-colors underline underline-offset-2"
+            style={{ color: '#64748b' }}
           >
             ¿Eres cliente? Accede al panel de administración
           </Link>
           <Link
             href="/agente"
-            className="hover:text-foreground transition-colors underline underline-offset-2"
+            className="transition-colors underline underline-offset-2"
+            style={{ color: '#64748b' }}
           >
             ¿Eres agente comercial? Accede al portal
           </Link>
@@ -188,16 +237,26 @@ export default function SuscribirPage() {
       {/* ── DECODEX Branding ──────────────────────────────────── */}
       <div className="flex flex-col items-center gap-3">
         <div
-          className="h-12 w-12 rounded-xl flex items-center justify-center shadow-lg"
-          style={{ backgroundColor: '#0A1628' }}
+          className="h-12 w-12 rounded-xl flex items-center justify-center"
+          style={{
+            backgroundColor: 'rgba(0,255,136,0.1)',
+            border: '1px solid rgba(0,255,136,0.25)',
+            boxShadow: '0 0 15px rgba(0,255,136,0.06)',
+          }}
         >
-          <span className="text-white text-lg font-bold">D</span>
+          <span style={{ color: '#00ff88' }} className="text-lg font-bold">D</span>
         </div>
         <div className="text-center">
-          <p className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+          <p
+            className="text-xs font-bold tracking-wider uppercase"
+            style={{ color: '#64748b', fontFamily: "'JetBrains Mono', monospace" }}
+          >
             DECODEX BOLIVIA
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p
+            className="text-[11px]"
+            style={{ color: '#334155', fontFamily: "'JetBrains Mono', monospace" }}
+          >
             Inteligencia de Señales
           </p>
         </div>
@@ -205,80 +264,99 @@ export default function SuscribirPage() {
 
       {/* ── Title & subtitle ──────────────────────────────────── */}
       <div className="text-center space-y-2">
-        <h1 className="text-2xl font-bold text-foreground tracking-tight">
+        <h1
+          className="text-2xl font-bold tracking-tight"
+          style={{ color: '#e2e8f0', fontFamily: "'JetBrains Mono', monospace" }}
+        >
           Suscripción Gratuita
         </h1>
-        <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto">
+        <p
+          className="text-sm leading-relaxed max-w-sm mx-auto"
+          style={{ color: '#64748b', fontFamily: "'JetBrains Mono', monospace" }}
+        >
           Recibe{' '}
-          <span className="font-semibold text-foreground">El Radar</span>,{' '}
-          <span className="font-semibold text-foreground">Voz y Voto</span>,{' '}
-          <span className="font-semibold text-foreground">El Hilo</span> y{' '}
-          <span className="font-semibold text-foreground">
-            Foco de la Semana
-          </span>{' '}
+          <span style={{ color: '#e2e8f0' }}>El Radar</span>,{' '}
+          <span style={{ color: '#e2e8f0' }}>Voz y Voto</span>,{' '}
+          <span style={{ color: '#e2e8f0' }}>El Hilo</span> y{' '}
+          <span style={{ color: '#e2e8f0' }}>Foco de la Semana</span>{' '}
           directamente en tu email.
         </p>
       </div>
 
       {/* ── Products overview ─────────────────────────────────── */}
-      <Card className="border-dashed">
-        <CardContent className="pt-5 pb-5">
-          <div className="grid gap-3">
-            {FREE_PRODUCTS.map((p) => (
-              <div key={p.name} className="flex items-start gap-3">
-                <div className="h-7 w-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Radio className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground">
-                    {p.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {p.desc}
-                  </p>
-                </div>
+      <div className="rounded-xl p-5" style={S.cardBg}>
+        <div className="grid gap-3">
+          {FREE_PRODUCTS.map((p) => (
+            <div key={p.name} className="flex items-start gap-3">
+              <div
+                className="h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{
+                  backgroundColor: 'rgba(0,255,136,0.08)',
+                  border: '1px solid rgba(0,255,136,0.15)',
+                }}
+              >
+                <Radio size={14} style={{ color: '#00ff88' }} />
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="min-w-0">
+                <p
+                  className="text-sm font-semibold"
+                  style={{ color: '#e2e8f0', fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  {p.name}
+                </p>
+                <p
+                  className="text-xs leading-relaxed"
+                  style={{ color: '#64748b' }}
+                >
+                  {p.desc}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* ── Subscription form ─────────────────────────────────── */}
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Error banner */}
         {error && (
-          <div className="flex items-start gap-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <div
+            className="flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm"
+            style={{
+              backgroundColor: 'rgba(255,51,85,0.08)',
+              border: '1px solid rgba(255,51,85,0.2)',
+              color: '#ff3355',
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
         )}
 
         {/* nombre */}
         <div className="space-y-1.5">
-          <label
-            htmlFor="suscribir-nombre"
-            className="text-sm font-medium text-foreground"
-          >
+          <label htmlFor="suscribir-nombre" style={S.label}>
             Nombre
           </label>
-          <Input
+          <input
             id="suscribir-nombre"
             placeholder="Tu nombre completo"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             autoComplete="name"
+            style={S.input}
+            onFocus={(e) => Object.assign(e.target.style, S.inputFocus)}
+            onBlur={(e) => { e.target.style.borderColor = '#1a2744'; e.target.style.boxShadow = '0 0 8px rgba(0,255,136,0.04)'; }}
           />
         </div>
 
         {/* email */}
         <div className="space-y-1.5">
-          <label
-            htmlFor="suscribir-email"
-            className="text-sm font-medium text-foreground"
-          >
-            Correo electrónico <span className="text-red-500">*</span>
+          <label htmlFor="suscribir-email" style={S.label}>
+            Correo electrónico <span style={{ color: '#ff3355' }}>*</span>
           </label>
-          <Input
+          <input
             id="suscribir-email"
             type="email"
             placeholder="tu@email.com"
@@ -286,73 +364,91 @@ export default function SuscribirPage() {
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
+            style={S.input}
+            onFocus={(e) => Object.assign(e.target.style, S.inputFocus)}
+            onBlur={(e) => { e.target.style.borderColor = '#1a2744'; e.target.style.boxShadow = '0 0 8px rgba(0,255,136,0.04)'; }}
           />
         </div>
 
         {/* whatsapp */}
         <div className="space-y-1.5">
-          <label
-            htmlFor="suscribir-whatsapp"
-            className="text-sm font-medium text-foreground"
-          >
+          <label htmlFor="suscribir-whatsapp" style={S.label}>
             WhatsApp{' '}
-            <span className="text-xs font-normal text-muted-foreground">
+            <span style={{ color: '#334155', fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 400, textTransform: 'none', letterSpacing: 'normal' }}>
               (opcional)
             </span>
           </label>
-          <Input
+          <input
             id="suscribir-whatsapp"
             type="tel"
             placeholder="+591 70000000"
             value={whatsapp}
             onChange={(e) => setWhatsapp(e.target.value)}
             autoComplete="tel"
+            style={S.input}
+            onFocus={(e) => Object.assign(e.target.style, S.inputFocus)}
+            onBlur={(e) => { e.target.style.borderColor = '#1a2744'; e.target.style.boxShadow = '0 0 8px rgba(0,255,136,0.04)'; }}
           />
-          <p className="text-[11px] text-muted-foreground">
+          <p
+            className="text-[11px]"
+            style={{ color: '#334155' }}
+          >
             Formato boliviano: +591 seguido de tu número (ej. +591 70000000)
           </p>
         </div>
 
-        {/* Hidden origen field */}
         <input type="hidden" name="origen" value="landing" readOnly />
 
-        {/* Checkbox: consent communications */}
+        {/* Checkboxes */}
         <div className="space-y-4 pt-1">
-          <label className="flex items-start gap-3 cursor-pointer group">
+          <label className="flex items-start gap-3 group" style={{ cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={consentComms}
               onChange={(e) => setConsentComms(e.target.checked)}
-              className="h-4 w-4 mt-0.5 rounded border-muted-foreground/30 text-emerald-600 focus:ring-emerald-500/50 accent-emerald-600 cursor-pointer"
+              className="h-4 w-4 mt-0.5 rounded accent-[#00ff88] cursor-pointer"
+              style={{ accentColor: '#00ff88' }}
             />
-            <span className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground transition-colors">
+            <span
+              className="text-sm leading-relaxed transition-colors"
+              style={{ color: '#64748b' }}
+            >
               Acepto recibir comunicaciones periódicas de DECODEX Bolivia.
-              <span className="text-red-500 ml-0.5">*</span>
+              <span style={{ color: '#ff3355' }}>*</span>
             </span>
           </label>
 
-          {/* Checkbox: consent privacy */}
-          <label className="flex items-start gap-3 cursor-pointer group">
+          <label className="flex items-start gap-3 group" style={{ cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={consentPrivacy}
               onChange={(e) => setConsentPrivacy(e.target.checked)}
-              className="h-4 w-4 mt-0.5 rounded border-muted-foreground/30 text-emerald-600 focus:ring-emerald-500/50 accent-emerald-600 cursor-pointer"
+              className="h-4 w-4 mt-0.5 rounded cursor-pointer"
+              style={{ accentColor: '#00ff88' }}
             />
-            <span className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground transition-colors">
+            <span
+              className="text-sm leading-relaxed transition-colors"
+              style={{ color: '#64748b' }}
+            >
               Confirmo que mis datos no serán compartidos con terceros y serán
               utilizados exclusivamente para el envío de boletines gratuitos.
-              <span className="text-red-500 ml-0.5">*</span>
+              <span style={{ color: '#ff3355' }}>*</span>
             </span>
           </label>
         </div>
 
         {/* Submit button */}
-        <Button
+        <button
           type="submit"
           disabled={submitting}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-11 text-sm"
-          size="lg"
+          className="w-full py-3 px-4 rounded-lg font-bold uppercase tracking-wider text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          style={{
+            backgroundColor: submitting ? 'rgba(0,255,136,0.08)' : 'rgba(0,255,136,0.12)',
+            border: '1px solid rgba(0,255,136,0.3)',
+            color: '#00ff88',
+            fontFamily: "'JetBrains Mono', monospace",
+            boxShadow: submitting ? '0 0 20px rgba(0,255,136,0.15)' : '0 0 8px rgba(0,255,136,0.08)',
+          }}
         >
           {submitting ? (
             <>
@@ -362,53 +458,68 @@ export default function SuscribirPage() {
           ) : (
             <>
               Suscribirme — Es gratuito
-              <ArrowRight className="h-4 w-4 ml-1.5" />
+              <ArrowRight className="h-4 w-4" />
             </>
           )}
-        </Button>
+        </button>
       </form>
 
       {/* ── Privacy section ────────────────────────────────────── */}
-      <Card className="border-dashed bg-muted/30">
-        <CardContent className="pt-5 pb-5">
-          <div className="flex items-start gap-3">
-            <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
-              <Shield className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-sm font-semibold text-foreground">
-                Política de Datos
-              </p>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                DECODEX Bolivia / ONION200 no vende, comparte ni comercializa
-                los datos personales de sus suscriptores. Tu información es
-                utilizada exclusivamente para el envío de los boletines
-                gratuitos que has seleccionado. Puedes darte de baja en
-                cualquier momento.
-              </p>
-            </div>
+      <div className="rounded-xl p-5" style={S.cardBg}>
+        <div className="flex items-start gap-3">
+          <div
+            className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{
+              backgroundColor: 'rgba(6,182,212,0.1)',
+              border: '1px solid rgba(6,182,212,0.2)',
+            }}
+          >
+            <Shield size={16} style={{ color: '#06b6d4' }} />
           </div>
-        </CardContent>
-      </Card>
+          <div className="space-y-1.5">
+            <p
+              className="text-sm font-semibold"
+              style={{ color: '#e2e8f0', fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              Política de Datos
+            </p>
+            <p
+              className="text-xs leading-relaxed"
+              style={{ color: '#64748b' }}
+            >
+              DECODEX Bolivia / ONION200 no vende, comparte ni comercializa
+              los datos personales de sus suscriptores. Tu información es
+              utilizada exclusivamente para el envío de los boletines
+              gratuitos que has seleccionado. Puedes darte de baja en
+              cualquier momento.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* ── Footer links ───────────────────────────────────────── */}
-      <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground pt-2">
+      <div className="flex flex-col items-center gap-2 text-xs pt-2">
         <Link
           href="/dashboard"
-          className="hover:text-foreground transition-colors underline underline-offset-2"
+          className="transition-colors underline underline-offset-2"
+          style={{ color: '#64748b' }}
         >
           ¿Eres cliente? Accede al panel de administración
         </Link>
         <Link
           href="/agente"
-          className="hover:text-foreground transition-colors underline underline-offset-2"
+          className="transition-colors underline underline-offset-2"
+          style={{ color: '#64748b' }}
         >
           ¿Eres agente comercial? Accede al portal
         </Link>
       </div>
 
       {/* ── Copyright ──────────────────────────────────────────── */}
-      <p className="text-center text-[10px] text-muted-foreground/60 pt-2">
+      <p
+        className="text-center pt-2"
+        style={{ color: '#1a2744', fontFamily: "'JetBrains Mono', monospace", fontSize: '10px' }}
+      >
         &copy; {new Date().getFullYear()} DECODEX Bolivia &middot; ONION200
         &middot; Todos los derechos reservados
       </p>
