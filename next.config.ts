@@ -18,8 +18,9 @@ const nextConfig: NextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
 
+  serverExternalPackages: ['@prisma/client', 'better-sqlite3'],
+
   experimental: {
-    // Tree-shake lucide-react, @base-ui, framer-motion
     optimizePackageImports: [
       'lucide-react',
       '@base-ui/react',
