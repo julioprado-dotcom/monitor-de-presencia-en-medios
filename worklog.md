@@ -49,3 +49,29 @@ Stage Summary:
 - Endpoint seguro con URL firmada temporal (5 min) y verificación de nivel
 - Archivos: extractor-menciones.ts (modificado), evidence/route.ts (nuevo/rewrite)
 - Repo: https://github.com/julioprado-dotcom/connect — commit 852b889
+
+---
+Task ID: 3
+Agent: Main Agent (Super Z)
+Task: Fusionar documentación estratégica desde rama instalacion-de-sistemas-en-servidores a main
+
+Work Log:
+- Fetch remoto: rama `instalación-de-sistemas-en-servidores-df35a` encontrada con 3 docs
+- Verificación de archivos nuevos en la rama:
+  - docs/estrategia/MANIFIESTO_EPISTEMOLOGICO.md (227 líneas)
+  - docs/estrategia/APENDICE_TECNICO_ALERTAS.md (156 líneas)
+  - ECOSISTEMA_NEWS_CONNECT_MASTER.md (498 líneas)
+- EJERCICIO DE SEGURIDAD: La rama contenía .env y upload/.env.persist con SECRETOS EXPUESTOS
+  - .env: AUTH_SECRET=bRvZTcdn..., ADMIN_API_KEY=decodex-admin-dev-2026 (VALORES PURADOS ANTERIORMENTE)
+  - upload/.env.persist: AUTH_SECRET=fhvhBPYdj... (VALOR PURADO ANTERIORMENTE)
+- Decisión: NO hacer merge (historias no relacionadas post git-filter-repo)
+- Estrategia: Extraer solo los 3 archivos de documentación via git show
+- Verificación: rg confirmó 0 secretos en los 3 archivos extraídos
+- Commit d9cd6eb + push exitoso a main
+- Limpieza: branch temporal `doc-merge` eliminada
+
+Stage Summary:
+- Documentación estratégica fusionada en main sin secretos
+- 3 archivos nuevos visibles públicamente en GitHub
+- Repo: https://github.com/julioprado-dotcom/connect — commit d9cd6eb
+- ALERTA: La rama instalacion-de-sistemas-en-servidores-df35a aún contiene .env con secretos en GitHub. No fusionar directamente.
