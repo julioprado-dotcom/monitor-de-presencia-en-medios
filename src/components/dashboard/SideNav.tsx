@@ -9,6 +9,7 @@ import {
   FileText,
   Send,
   Settings,
+  Bell,
   type LucideIcon,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -36,6 +37,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { id: 'clasificacion',    icon: Tags,     tooltip: 'Clasificacion' },
   { id: 'produccion',       icon: FileText, tooltip: 'Produccion' },
   { id: 'distribucion',     icon: Send,     tooltip: 'Distribucion' },
+  { id: 'alertas',          icon: Bell,     tooltip: 'Alertas' },
   { id: 'configuracion',    icon: Settings, tooltip: 'Configuracion' },
 ];
 

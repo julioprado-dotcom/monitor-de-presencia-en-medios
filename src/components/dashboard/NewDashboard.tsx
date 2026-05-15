@@ -11,6 +11,7 @@ import {
   Tags,
   FileText,
   Send,
+  Bell,
 } from 'lucide-react';
 
 import { StatusBar } from './StatusBar';
@@ -24,12 +25,13 @@ import { ClasificacionPanel } from './panels/ClasificacionPanel';
 import { ProduccionPanel } from './panels/ProduccionPanel';
 import { DistribucionPanel } from './panels/DistribucionPanel';
 import { BoletinExpressPanel } from './panels/BoletinExpressPanel';
+import AlertasView from '@/components/views/AlertasView';
 
 // ═══════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════
 
-type NodeKey = 'captura' | 'clasificacion' | 'produccion' | 'distribucion' | 'boletin-express';
+type NodeKey = 'captura' | 'clasificacion' | 'produccion' | 'distribucion' | 'boletin-express' | 'alertas';
 
 // ═══════════════════════════════════════════════════════════
 // Animation variants
@@ -290,6 +292,7 @@ function ActivePanel({
     produccion: <ProduccionPanel onClose={onClose} />,
     distribucion: <DistribucionPanel onClose={onClose} />,
     'boletin-express': <BoletinExpressPanel onClose={onClose} />,
+    alertas: <AlertasView />,
   };
 
   return (
@@ -326,6 +329,7 @@ function MobileBottomNav({
     { id: 'clasificacion', icon: Tags, label: 'Clasif.' },
     { id: 'produccion', icon: FileText, label: 'Prod.' },
     { id: 'distribucion', icon: Send, label: 'Dist.' },
+    { id: 'alertas', icon: Bell, label: 'Alertas' },
   ];
 
   return (
@@ -395,6 +399,11 @@ export function NewDashboard() {
       });
     } else if (viewId === 'resumen') {
       setActiveNode(null);
+    } else if (viewId === 'alertas') {
+      setActiveNode((prev) => {
+        if (prev === 'alertas') return null;
+        return 'alertas';
+      });
     } else if (viewId === 'configuracion') {
       // Keep active node as-is (config could open a modal in future)
     }
@@ -443,7 +452,7 @@ export function NewDashboard() {
         <div style={{ borderBottom: '1px solid #1a1a2e' }}>
           <PipelineFlow
             activeNode={
-              activeNode && activeNode !== 'boletin-express'
+              activeNode && activeNode !== 'boletin-express' && activeNode !== 'alertas'
                 ? activeNode
                 : null
             }
