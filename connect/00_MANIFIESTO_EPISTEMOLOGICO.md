@@ -192,6 +192,23 @@ El sistema de triaje por keywords establece explícitamente que "prefiere falso 
 
 DECODEX no es un sistema genérico de media monitoring adaptado a Bolivia —es un sistema diseñado desde Bolivia para Bolivia. La Constitución Política del Estado (CPE 2009) es explícitamente mencionada como marco operativo. El conocimiento del contexto político e institucional boliviano es un principio obligatorio para la IA. Los ejes temáticos están diseñados para la realidad boliviana: desde Hidrocarburos hasta Movimientos Sociales, desde la COB hasta el TSE.
 
+### D.8 Ante la verdad histórica: Evidencia Forense Bajo Demanda
+
+DECODEX opera bajo el principio de **"Blindaje Histórico"**: cada mención procesada es capturada en su estado original (HTML estático o imagen) y sellada criptográficamente (SHA-256) en el momento de su ingesta. Este principio responde a una realidad del ecosistema mediático boliviano: las notas digitales pueden ser modificadas, corregidas o eliminadas por sus medios de origen sin dejar rastro público. Sin evidencia forense, la mención registrada por DECODEX podría convertirse en una afirmación no verificable.
+
+**Almacenamiento Universal:** El sistema guarda la evidencia de TODAS las menciones, independientemente del nivel del usuario. Esto garantiza que la verdad histórica esté preservada incluso si el medio original modifica o borra la nota. El almacenamiento no es un privilegio comercial —es una obligación epistémica. La evidencia existe porque la verdad existe, no porque alguien pague por ella.
+
+**Acceso Diferenciado:** El acceso a la evidencia sigue el modelo de acceso diferenciado del ecosistema:
+
+- *Niveles Básico/Profesional:* Acceden a metadatos textuales en los reportes estándar (Fuente, Fecha, URL, tratamiento periodístico). Estos metadatos son suficientes para la mayoría de los usos operativos.
+- *Nivel Premium:* Tiene derecho a solicitar la "Evidencia Forense Digital" (archivo original + hash SHA-256 + timestamp de captura) bajo demanda. Esta capa adicional de verificación está diseñada para contextos donde la prueba documental es requerida: procesos legales, auditorías, verificación independiente.
+
+**No Exposición Automática:** La evidencia cruda (HTML, captura de pantalla) nunca se incluye en boletines, reportes automáticos ni productos del sistema. Los productos DECODEX mantienen su naturaleza sintética y analítica: entregan mapas, no archivos brutos. La evidencia se entrega únicamente mediante solicitud expresa vía API segura, generando una URL firmada de corta duración (5 minutos). Este diseño preserva la ligereza de los productos y evita la exposición accidental de contenido archivado.
+
+**Integridad Criptográfica:** El hash SHA-256 permite al usuario verificar de forma independiente que el archivo entregado no ha sido alterado desde su captura. El flujo es: el usuario recibe el archivo + el hash almacenado → calcula el hash local del archivo recibido → compara ambos valores → si coinciden, la evidencia es íntegra. DECODEX no pide confianza —proporciona verificabilidad.
+
+Este principio extiende el axioma fundamental de "la fuente es la verdad" al dominio temporal: no basta con registrar qué dijo la fuente —es necesario preservar la prueba de que lo dijo, tal como lo dijo, en el momento en que lo dijo. La verdad sin evidencia es una afirmación; la verdad con evidencia es un hecho demostrable.
+
 ---
 
 ## CONTRADICCIONES IDENTIFICADAS
@@ -219,6 +236,7 @@ Estos son los principios que no pueden ser modificados sin una revisión formal 
 8. **Tratamiento, no sentimiento.** El sistema clasifica postura editorial, no emociones.
 9. **Soberanía tecnológica.** Solo GLM. Datos de Bolivia, procesados bajo control boliviano.
 10. **Falso positivo sobre falso negativo.** Es mejor procesar ruido que perder señal.
+11. **Verdad histórica blindada.** Toda mención es capturada y sellada criptográficamente en el momento de ingesta. La evidencia se almacena siempre; el acceso a la evidencia cruda es bajo demanda y exclusivo para usuarios Premium.
 
 ---
 
