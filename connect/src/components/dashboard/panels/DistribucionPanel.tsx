@@ -11,6 +11,21 @@ import { PanelShell } from './PanelShell';
 import { fetchWithTimeout } from '@/lib/fetch-utils';
 import { usePolling } from '../hooks/usePolling';
 
+// ─── Tactical Theme ──────────────────────────────────────────
+const THEME = {
+  bg: '#0a0e17',
+  panelBg: '#0d1321',
+  border: '#1a2744',
+  accentCyan: '#06b6d4',
+  accentGreen: '#00ff88',
+  accentAmber: '#ffaa00',
+  accentRed: '#ff3355',
+  textPrimary: '#e2e8f0',
+  textSecondary: '#64748b',
+  textMuted: '#334155',
+  scanLine: 'rgba(6, 182, 212, 0.03)',
+};
+
 // ─── Types ────────────────────────────────────────────────────
 
 interface CanalItem {
@@ -153,7 +168,15 @@ export function DistribucionPanel({ onClose }: { onClose?: () => void }) {
 
   return (
     <PanelShell title="Gestión de Distribución" icon={<Send className="w-4 h-4" />} onClose={onClose}>
-      <div className="p-4 space-y-5">
+      <div className="p-4 space-y-5 relative" style={{ background: THEME.bg }}>
+      {/* Scan line overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: `repeating-linear-gradient(0deg, transparent, transparent 3px, ${THEME.scanLine} 3px, ${THEME.scanLine} 4px)`,
+        }}
+      />
+      <div className="relative z-10 space-y-5">
         {loading ? (
           <div className="flex items-center justify-center py-10">
             <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#00ff88' }} />
@@ -162,15 +185,21 @@ export function DistribucionPanel({ onClose }: { onClose?: () => void }) {
           <>
             {/* ── Section A: Canales ─────────────────────── */}
             <section>
-              <h3 className="text-[11px] font-medium mb-2.5 uppercase tracking-wider" style={{ color: '#6b7280' }}>
-                Canales
-              </h3>
+              <div className="flex items-center gap-2 mb-2.5">
+                <Send size={12} style={{ color: THEME.accentCyan }} />
+                <h3
+                  className="text-[10px] font-bold uppercase tracking-widest"
+                  style={{ color: THEME.accentCyan, fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  Canales
+                </h3>
+              </div>
               <div className="grid grid-cols-3 gap-2">
                 {canales.map((canal) => (
                   <div
                     key={canal.canal}
                     className="rounded-lg p-3 text-center"
-                    style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${canal.conectado ? 'rgba(0,255,136,0.2)' : 'rgba(255,51,85,0.2)'}` }}
+                    style={{ background: `linear-gradient(135deg, ${canal.conectado ? 'rgba(0,255,136,0.04)' : 'rgba(255,51,85,0.04)'} 0%, rgba(13,19,33,0.8) 60%)`, border: `1px solid ${canal.conectado ? 'rgba(0,255,136,0.2)' : 'rgba(255,51,85,0.2)'}`, boxShadow: `0 0 10px ${canal.conectado ? 'rgba(0,255,136,0.06)' : 'rgba(255,51,85,0.06)'}` }}
                   >
                     <div className="flex justify-center mb-1.5" style={{ color: canal.conectado ? '#00ff88' : '#ff3355' }}>
                       {CANAL_ICONS[canal.canal]}
@@ -203,12 +232,20 @@ export function DistribucionPanel({ onClose }: { onClose?: () => void }) {
               </div>
             </section>
 
+            {/* Glow separator */}
+            <div className="h-[1px]" style={{ background: 'linear-gradient(90deg, transparent, rgba(6,182,212,0.2), transparent)' }} />
             {/* ── Section B: Suscriptores ────────────────── */}
             <section style={{ borderTop: '1px solid #1a2744' }} className="pt-4">
               <div className="flex items-center justify-between mb-2.5">
-                <h3 className="text-[11px] font-medium uppercase tracking-wider" style={{ color: '#6b7280' }}>
-                  Suscriptores
-                </h3>
+                <div className="flex items-center gap-2">
+                  <Send size={12} style={{ color: THEME.accentCyan }} />
+                  <h3
+                    className="text-[10px] font-bold uppercase tracking-widest"
+                    style={{ color: THEME.accentCyan, fontFamily: "'JetBrains Mono', monospace" }}
+                  >
+                    Suscriptores
+                  </h3>
+                </div>
                 <button
                   onClick={() => setShowAddSuscriptor(!showAddSuscriptor)}
                   className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium"
@@ -332,11 +369,19 @@ export function DistribucionPanel({ onClose }: { onClose?: () => void }) {
               )}
             </section>
 
+            {/* Glow separator */}
+            <div className="h-[1px]" style={{ background: 'linear-gradient(90deg, transparent, rgba(6,182,212,0.2), transparent)' }} />
             {/* ── Section C: Últimos envíos ───────────────── */}
             <section style={{ borderTop: '1px solid #1a2744' }} className="pt-4">
-              <h3 className="text-[11px] font-medium mb-2.5 uppercase tracking-wider" style={{ color: '#6b7280' }}>
-                Últimos envíos
-              </h3>
+              <div className="flex items-center gap-2 mb-2.5">
+                <Send size={12} style={{ color: THEME.accentCyan }} />
+                <h3
+                  className="text-[10px] font-bold uppercase tracking-widest"
+                  style={{ color: THEME.accentCyan, fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  Últimos envíos
+                </h3>
+              </div>
               {envios.length === 0 ? (
                 <p className="text-[11px] py-3 text-center" style={{ color: '#6b7280' }}>Sin envíos registrados</p>
               ) : (
@@ -351,8 +396,8 @@ export function DistribucionPanel({ onClose }: { onClose?: () => void }) {
                         <div
                           className="flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors"
                           style={{ background: 'rgba(255,255,255,0.02)' }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.04)'; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.02)'; }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(6,182,212,0.04)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 8px rgba(6,182,212,0.06)'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.02)'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; }}
                         >
                           {/* Status badge */}
                           {isError ? (
@@ -458,7 +503,7 @@ export function DistribucionPanel({ onClose }: { onClose?: () => void }) {
               {data && (
                 <div
                   className="flex items-center gap-3 px-3 py-2 rounded-lg mt-2.5"
-                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1a2744' }}
+                  style={{ background: `linear-gradient(135deg, rgba(6,182,212,0.04) 0%, rgba(13,19,33,0.8) 60%)`, border: '1px solid rgba(6,182,212,0.15)', boxShadow: '0 0 10px rgba(6,182,212,0.05)' }}
                 >
                   <span className="text-[10px]" style={{ color: '#00ff88' }}>
                     ✓ {data.resumen.enviosExitosos} exitosos
@@ -474,6 +519,7 @@ export function DistribucionPanel({ onClose }: { onClose?: () => void }) {
             </section>
           </>
         )}
+      </div>
       </div>
     </PanelShell>
   );
