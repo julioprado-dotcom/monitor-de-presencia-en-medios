@@ -1,97 +1,220 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, ShieldCheck, Activity, Wifi, RefreshCw, ChevronRight, Terminal, Crosshair } from 'lucide-react';
 
-// Tipos de datos (Deberían coincidir con tu backend)
+// ─── Tipos del Componente (Frontend) ──────────────────────────────────
+
 type NivelAlerta = 'VERDE' | 'AMARILLO' | 'ROJO';
+
 type EjeData = {
   id: string;
   nombre: string;
   estado: NivelAlerta;
-  valor: number; // 0-100 para barra de progreso
+  valor: number;
   alertasCount: number;
+  alertasDetalle: string[];
 };
+
 type CruceData = {
   origen: string;
   destino: string;
   impacto: 'CRITICO' | 'ALTO' | 'MEDIO';
+  mensaje: string;
 };
+
 type DashboardData = {
   global: NivelAlerta;
   timestamp: string;
   ejes: EjeData[];
   cruces: CruceData[];
   totalAlertas: number;
+  resumen: string;
+  recomendacion: string;
+  meta: {
+    indicadores_disponibles: number;
+    indicadores_total: number;
+    umbrales_configurados: number;
+  };
 };
 
-// Datos Mock para demostración (Se reemplazan con fetch real)
-const MOCK_DATA: DashboardData = {
-  global: 'ROJO',
-  timestamp: new Date().toISOString(),
-  totalAlertas: 16,
-  ejes: [
-    { id: 'MACRO', nombre: 'MACROECONOMÍA', estado: 'ROJO', valor: 92, alertasCount: 4 },
-    { id: 'SOCIAL', nombre: 'CONFLICTIVIDAD', estado: 'ROJO', valor: 88, alertasCount: 5 },
-    { id: 'ENERGIA', nombre: 'ENERGÍA', estado: 'ROJO', valor: 75, alertasCount: 3 },
-    { id: 'POLITICA', nombre: 'GOBERNANZA', estado: 'AMARILLO', valor: 45, alertasCount: 2 },
-    { id: 'LOGISTICA', nombre: 'LOGÍSTICA', estado: 'ROJO', valor: 80, alertasCount: 1 },
-    { id: 'AMBIENTE', nombre: 'CLIMA/AGUA', estado: 'ROJO', valor: 60, alertasCount: 1 },
-  ],
-  cruces: [
-    { origen: 'ENERGÍA', destino: 'MINERÍA', impacto: 'CRITICO' },
-    { origen: 'CAMBIO', destino: 'INFLACIÓN', impacto: 'ALTO' },
-    { origen: 'BLOQUEOS', destino: 'ABASTECIMIENTO', impacto: 'CRITICO' },
-  ]
+// ─── Nombres legibles para ejes ───────────────────────────────────────
+
+const EJE_NOMBRES: Record<string, string> = {
+  MACRO: 'MACROECONOMÍA',
+  SOCIAL: 'CONFLICTIVIDAD',
+  ENERGIA: 'ENERGÍA',
+  POLITICA: 'GOBERNANZA',
+  LOGISTICA: 'LOGÍSTICA',
+  AMBIENTE: 'CLIMA/AGUA',
 };
+
+// ─── Adaptador: API response → DashboardData ─────────────────────────
+// Transforma el SemaforoConsolidado del backend al formato del componente.
+
+function adaptarDatos(apiRes: {
+  data: {
+    estado_global: string;
+    hora_actualizacion: string;
+    fecha: string;
+    ejes: Record<string, {
+      eje: string;
+      estado: string;
+      alertas: Array<{ mensaje: string; nivel: string; valor: number }>;
+      indicadoresEnRojo: number;
+      indicadoresEnAmarillo: number;
+    }>;
+    cruces_activos: Array<{
+      ejeA: string;
+      ejeB: string;
+      nombre: string;
+      nivel: string;
+      mensaje: string;
+    }>;
+    alertas: Array<{ nivel: string }>;
+    resumen: string;
+    recomendacion_accion: string;
+  };
+  meta: {
+    indicadores_disponibles: number;
+    indicadores_total: number;
+    umbrales_configurados: number;
+  };
+}): DashboardData {
+  const { data, meta } = apiRes;
+
+  // Mapear ejes: Record → Array
+  const ejes: EjeData[] = Object.values(data.ejes).map(eje => {
+    const rojos = eje.indicadoresEnRojo || 0;
+    const amarillos = eje.indicadoresEnAmarillo || 0;
+    const total = rojos + amarillos;
+    // Calcular intensidad de riesgo (0-100) basada en alertas activas
+    const valor = Math.min(100, (rojos * 40) + (amarillos * 20) + (total > 0 ? 10 : 0));
+
+    return {
+      id: eje.eje,
+      nombre: EJE_NOMBRES[eje.eje] || eje.eje,
+      estado: eje.estado as NivelAlerta,
+      valor,
+      alertasCount: eje.alertas.length,
+      alertasDetalle: eje.alertas.map(a => a.mensaje),
+    };
+  });
+
+  // Mapear cruces sistémicos
+  const cruces: CruceData[] = data.cruces_activos.map(c => ({
+    origen: c.ejeA,
+    destino: c.ejeB,
+    impacto: (c.nivel === 'alto' ? 'CRITICO' : c.nivel === 'medio' ? 'ALTO' : 'MEDIO') as CruceData['impacto'],
+    mensaje: c.mensaje,
+  }));
+
+  return {
+    global: data.estado_global as NivelAlerta,
+    timestamp: new Date(`${data.fecha}T${data.hora_actualizacion}`).toISOString(),
+    ejes,
+    cruces,
+    totalAlertas: data.alertas.length,
+    resumen: data.resumen,
+    recomendacion: data.recomendacion_accion,
+    meta,
+  };
+}
+
+// ─── Componente Principal ────────────────────────────────────────────
 
 export default function AlertasView() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedEje, setSelectedEje] = useState<string | null>(null);
-  const [simulating, setSimulating] = useState(false);
+  const [lastFetchMs, setLastFetchMs] = useState<number>(0);
 
-  // Cargar datos
-  const fetchData = async () => {
+  // Cargar datos desde API real
+  const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      // En producción: fetch('/api/alertas/estado')
-      // Simulamos latencia de red baja
-      await new Promise(r => setTimeout(r, 400));
-      setData(MOCK_DATA);
-    } catch (error) {
-      console.error("Error fetching alerts", error);
+      const response = await fetch('/api/alertas/estado');
+      if (!response.ok) {
+        throw new Error(`API respondió con ${response.status}`);
+      }
+      const json = await response.json();
+
+      if (json.estado === 'sin_datos') {
+        // No hay indicadores en la DB — mostrar estado vacío
+        setData({
+          global: 'VERDE',
+          timestamp: new Date().toISOString(),
+          ejes: [
+            { id: 'MACRO', nombre: 'MACROECONOMÍA', estado: 'VERDE', valor: 0, alertasCount: 0, alertasDetalle: [] },
+            { id: 'SOCIAL', nombre: 'CONFLICTIVIDAD', estado: 'VERDE', valor: 0, alertasCount: 0, alertasDetalle: [] },
+            { id: 'ENERGIA', nombre: 'ENERGÍA', estado: 'VERDE', valor: 0, alertasCount: 0, alertasDetalle: [] },
+            { id: 'POLITICA', nombre: 'GOBERNANZA', estado: 'VERDE', valor: 0, alertasCount: 0, alertasDetalle: [] },
+            { id: 'LOGISTICA', nombre: 'LOGÍSTICA', estado: 'VERDE', valor: 0, alertasCount: 0, alertasDetalle: [] },
+            { id: 'AMBIENTE', nombre: 'CLIMA/AGUA', estado: 'VERDE', valor: 0, alertasCount: 0, alertasDetalle: [] },
+          ],
+          cruces: [],
+          totalAlertas: 0,
+          resumen: json.mensaje || 'No hay indicadores configurados. El sistema está en modo monitoreo pasivo.',
+          recomendacion: '',
+          meta: { indicadores_disponibles: 0, indicadores_total: 0, umbrales_configurados: 0 },
+        });
+        return;
+      }
+
+      const dashboardData = adaptarDatos(json);
+      setData(dashboardData);
+      setLastFetchMs(Date.now());
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      setError(msg);
+      console.error('Error fetching alerts:', msg);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
-    // Polling ligero cada 60s (ajustable según necesidad)
+    // Polling cada 60s
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchData]);
 
-  const toggleSimulation = () => {
-    setSimulating(!simulating);
-    // Aquí podrías disparar un endpoint de test si existiera
-    fetchData();
-  };
+  // ─── Loader ──────────────────────────────────────────────────────────
 
-  if (loading || !data) {
+  if (loading && !data) {
     return (
       <div className="flex h-[60vh] items-center justify-center flex-col space-y-4">
         <div className="relative w-16 h-16">
           <div className="absolute inset-0 border-t-2 border-emerald-500 rounded-full animate-spin"></div>
-          <div className="absolute inset-2 border-r-2 border-cyan-500 rounded-full animate-spin reverse"></div>
+          <div className="absolute inset-2 border-r-2 border-cyan-500 rounded-full animate-spin" style={{ animationDirection: 'reverse' }}></div>
         </div>
         <p className="text-xs font-mono text-emerald-500/70 animate-pulse">ESTABLECIENDO ENLACE DE DATOS...</p>
       </div>
     );
   }
 
-  // Colores dinámicos según estado
+  // ─── Error State ─────────────────────────────────────────────────────
+
+  if (error && !data) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center flex-col space-y-4">
+        <div className="text-red-500 text-4xl mb-2">⚠</div>
+        <p className="text-xs font-mono text-red-400">ERROR DE CONEXIÓN</p>
+        <p className="text-[10px] font-mono text-slate-500 max-w-md text-center">{error}</p>
+        <button onClick={fetchData} className="mt-4 px-4 py-2 border border-red-500/30 text-red-400 text-xs rounded hover:bg-red-500/10 transition-colors">
+          REINTENTAR
+        </button>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  // ─── Helpers de color ────────────────────────────────────────────────
+
   const getColor = (state: string) => {
     switch (state) {
       case 'ROJO': return 'text-red-500 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] bg-red-500/10';
@@ -106,30 +229,51 @@ export default function AlertasView() {
     return 'bg-slate-950';
   };
 
+  const getBarGlow = (state: string) => {
+    if (state === 'ROJO') return 'shadow-[0_0_10px_red]';
+    if (state === 'AMARILLO') return 'shadow-[0_0_10px_amber]';
+    return 'shadow-[0_0_10px_green]';
+  };
+
+  // ─── Render ──────────────────────────────────────────────────────────
+
   return (
-    <div className={`min-h-screen w-full p-4 md:p-6 transition-colors duration-1000 ${getBgGlow(data.global)} font-mono text-slate-200 overflow-hidden`}>
+    <div className={`min-h-screen w-full p-4 md:p-6 transition-colors duration-700 ${getBgGlow(data.global)} font-mono text-slate-200 overflow-hidden`}>
 
       {/* HEADER TÁCTICO */}
       <header className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
         <div className="flex items-center gap-3">
-          <Crosshair className={`w-6 h-6 ${data.global === 'ROJO' ? 'animate-pulse text-red-500' : 'text-emerald-500'}`} />
+          <Crosshair className={`w-6 h-6 ${data.global === 'ROJO' ? 'animate-pulse text-red-500' : data.global === 'AMARILLO' ? 'text-amber-400' : 'text-emerald-500'}`} />
           <div>
             <h1 className="text-lg font-bold tracking-widest uppercase text-white">Monitor de Riesgos ONION200</h1>
             <p className="text-[10px] text-slate-400 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              EN LÍNEA • ACTUALIZADO: {new Date(data.timestamp).toLocaleTimeString()}
+              EN LÍNEA • ACTUALIZADO: {new Date(data.timestamp).toLocaleTimeString('es-BO')}
+              {lastFetchMs > 0 && (
+                <span className="ml-2 text-slate-600">• {Math.round((Date.now() - lastFetchMs) / 1000)}s</span>
+              )}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={toggleSimulation} className="p-2 hover:bg-white/10 rounded border border-white/10 text-xs transition-colors">
-            {simulating ? 'MODO REAL' : 'SIMULAR CRISIS'}
-          </button>
-          <button onClick={fetchData} className="p-2 hover:bg-white/10 rounded border border-white/10 text-xs transition-colors">
+          <button onClick={fetchData} className="p-2 hover:bg-white/10 rounded border border-white/10 text-xs transition-colors" title="Refrescar datos">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </header>
+
+      {/* Barra de Recomendación (si hay alertas activas) */}
+      {data.recomendacion && (
+        <div className={`mb-4 px-4 py-2 rounded-lg border text-xs ${
+          data.global === 'ROJO'
+            ? 'bg-red-500/10 border-red-500/30 text-red-300'
+            : data.global === 'AMARILLO'
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+        }`}>
+          {data.recomendacion}
+        </div>
+      )}
 
       {/* GRID PRINCIPAL */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -145,7 +289,9 @@ export default function AlertasView() {
               <div className={`absolute inset-0 rounded-full border-2 opacity-30 animate-ping ${data.global === 'ROJO' ? 'border-red-500' : data.global === 'AMARILLO' ? 'border-amber-400' : 'border-emerald-500'}`}></div>
               <div className={`absolute inset-4 rounded-full border border-dashed animate-[spin_10s_linear_infinite] ${data.global === 'ROJO' ? 'border-red-400/50' : 'border-white/30'}`}></div>
               <div className="text-center z-10">
-                <span className="block text-4xl font-black tracking-tighter">{data.global === 'ROJO' ? 'ALERTA' : data.global === 'AMARILLO' ? 'PRECAUCIÓN' : 'ESTABLE'}</span>
+                <span className="block text-3xl md:text-4xl font-black tracking-tighter">
+                  {data.global === 'ROJO' ? 'ALERTA' : data.global === 'AMARILLO' ? 'PRECAUCIÓN' : 'ESTABLE'}
+                </span>
                 <span className="text-xs opacity-80 mt-1 block">NIVEL {data.global}</span>
               </div>
             </div>
@@ -156,7 +302,9 @@ export default function AlertasView() {
                 <span className="font-bold">{data.totalAlertas}</span>
               </div>
               <div className="w-full bg-black/40 h-1.5 rounded-full overflow-hidden">
-                <div className={`h-full ${data.global === 'ROJO' ? 'bg-red-500' : 'bg-emerald-500'} w-full animate-pulse`}></div>
+                <div className={`h-full transition-all duration-500 ${data.global === 'ROJO' ? 'bg-red-500' : data.global === 'AMARILLO' ? 'bg-amber-400' : 'bg-emerald-500'} animate-pulse`}
+                  style={{ width: `${Math.min(100, data.totalAlertas * 10)}%` }}
+                ></div>
               </div>
             </div>
           </div>
@@ -174,11 +322,14 @@ export default function AlertasView() {
                   <div key={idx} className="group relative pl-4 border-l border-white/20 py-1 hover:border-red-500 transition-colors cursor-default">
                     <div className="text-[10px] text-slate-500 absolute -left-1 top-0 bg-slate-900 px-1">LINK {idx + 1}</div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-300">{cruce.origen} <span className="text-red-500 font-bold">→</span> {cruce.destino}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${cruce.impacto === 'CRITICO' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                      <span className="text-slate-300">{EJE_NOMBRES[cruce.origen] || cruce.origen} <span className="text-red-500 font-bold mx-1">→</span> {EJE_NOMBRES[cruce.destino] || cruce.destino}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${cruce.impacto === 'CRITICO' ? 'bg-red-500/20 text-red-400' : cruce.impacto === 'ALTO' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-500/20 text-slate-400'}`}>
                         {cruce.impacto}
                       </span>
                     </div>
+                    {cruce.mensaje && (
+                      <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">{cruce.mensaje}</p>
+                    )}
                   </div>
                 ))
               )}
@@ -197,7 +348,9 @@ export default function AlertasView() {
               `}
             >
               {/* Indicador de Estado (Barra lateral) */}
-              <div className={`absolute left-0 top-0 bottom-0 w-1 ${eje.estado === 'ROJO' ? 'bg-red-500 shadow-[0_0_10px_red]' : eje.estado === 'AMARILLO' ? 'bg-amber-400 shadow-[0_0_10px_amber]' : 'bg-emerald-500 shadow-[0_0_10px_green]'}`}></div>
+              <div className={`absolute left-0 top-0 bottom-0 w-1 transition-all duration-500 ${getBarGlow(eje.estado)} ${
+                eje.estado === 'ROJO' ? 'bg-red-500' : eje.estado === 'AMARILLO' ? 'bg-amber-400' : 'bg-emerald-500'
+              }`}></div>
 
               <div className="flex justify-between items-start mb-2 pl-2">
                 <div>
@@ -217,33 +370,36 @@ export default function AlertasView() {
                 </div>
                 <div className="w-full bg-black/60 h-1.5 rounded-full overflow-hidden">
                   <div
-                    className={`h-full transition-all duration-1000 ease-out ${eje.estado === 'ROJO' ? 'bg-red-500' : eje.estado === 'AMARILLO' ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                    className={`h-full transition-all duration-700 ease-out ${
+                      eje.estado === 'ROJO' ? 'bg-red-500' : eje.estado === 'AMARILLO' ? 'bg-amber-400' : 'bg-emerald-500'
+                    }`}
                     style={{ width: `${eje.valor}%` }}
                   ></div>
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-400">
                   <AlertTriangle className={`w-3 h-3 ${eje.alertasCount > 0 ? 'text-red-400' : 'hidden'}`} />
-                  <span>{eje.alertasCount} alertas activas</span>
-                  <ChevronRight className={`w-3 h-3 ml-auto transition-transform ${selectedEje === eje.id ? 'rotate-90' : ''}`} />
+                  <span>{eje.alertasCount} alerta{eje.alertasCount !== 1 ? 's' : ''} activa{eje.alertasCount !== 1 ? 's' : ''}</span>
+                  <ChevronRight className={`w-3 h-3 ml-auto transition-transform duration-200 ${selectedEje === eje.id ? 'rotate-90' : ''}`} />
                 </div>
               </div>
 
               {/* Panel Expansible (Detalles) */}
               {selectedEje === eje.id && (
                 <div className="mt-4 pt-4 border-t border-white/10 pl-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-black/40 p-2 rounded text-[10px]">
-                      <span className="block text-slate-500 mb-1">ÚLTIMO EVENTO</span>
-                      <span className="text-slate-300 truncate block">Umbral superado en 15%</span>
+                  {eje.alertasDetalle.length > 0 ? (
+                    <div className="space-y-2">
+                      {eje.alertasDetalle.map((msg, idx) => (
+                        <div key={idx} className="bg-black/40 p-2 rounded text-[10px]">
+                          <span className="block text-slate-500 mb-0.5">ALERTA #{idx + 1}</span>
+                          <span className="text-slate-300 block leading-relaxed">{msg}</span>
+                        </div>
+                      ))}
                     </div>
+                  ) : (
                     <div className="bg-black/40 p-2 rounded text-[10px]">
-                      <span className="block text-slate-500 mb-1">FUENTE</span>
-                      <span className="text-slate-300 truncate block">Sensores ONION200</span>
+                      <span className="block text-slate-500">Sin alertas activas en este eje</span>
                     </div>
-                  </div>
-                  <button className="mt-2 w-full py-1.5 text-[10px] bg-white/5 hover:bg-white/10 text-emerald-400 border border-emerald-500/30 rounded transition-colors flex items-center justify-center gap-2">
-                    <Terminal className="w-3 h-3" /> VER LOG COMPLETO
-                  </button>
+                  )}
                 </div>
               )}
             </button>
@@ -252,10 +408,11 @@ export default function AlertasView() {
       </div>
 
       {/* FOOTER TÉCNICO */}
-      <footer className="mt-8 border-t border-white/10 pt-4 flex justify-between items-center text-[10px] text-slate-600 font-mono">
+      <footer className="mt-8 border-t border-white/10 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-[10px] text-slate-600 font-mono">
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1"><Wifi className="w-3 h-3" /> LATENCIA: 24ms</span>
-          <span>UPTIME: 99.98%</span>
+          <span className="flex items-center gap-1"><Wifi className="w-3 h-3" /> EN VIVO</span>
+          <span>INDICADORES: {data.meta.indicadores_disponibles}/{data.meta.indicadores_total}</span>
+          <span>UMBRALES: {data.meta.umbrales_configurados}</span>
         </div>
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-3 h-3" />
