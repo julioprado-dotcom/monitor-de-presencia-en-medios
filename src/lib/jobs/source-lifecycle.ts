@@ -49,9 +49,9 @@ export interface FuenteCapacidadData {
 
 const UMBRALES = {
   /** Si no hay check OK en este tiempo, la fuente baja a capa 0 */
-  CHECK_OK_FRESHNESS_MS: 24 * 60 * 60 * 1000,     // 24 horas
+  CHECK_OK_FRESHNESS_MS: 72 * 60 * 60 * 1000,     // 72 horas (3 días — tolerancia para entornos con paradas frecuentes)
   /** Advertencia si check OK fue hace más de esto (no degrada, solo warn) */
-  CHECK_OK_WARNING_MS: 48 * 60 * 60 * 1000,       // 48 horas
+  CHECK_OK_WARNING_MS: 96 * 60 * 60 * 1000,       // 96 horas (4 días — warn antes de degradar a capa 0)
   /** Fallos consecutivos para desactivar automáticamente */
   FALLOS_PARA_INACTIVAR: 3,
   /** Días inactiva antes de degradar a deprecada */
