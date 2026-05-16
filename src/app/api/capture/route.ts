@@ -22,10 +22,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { safeError } from '@/lib/safe-error';
-import ZAI from 'z-ai-web-dev-sdk';
 import { analyzeMencion, applyAnalysisToMencion } from '@/lib/analyze';
 import { deduplicarMencion, actualizarCoberturaDuplicado } from '@/lib/deduplicacion';
 import { withAuth } from '@/lib/auth-helpers';
+import { webSearchNative } from '@/lib/web-search-native';
 
 // ─── Configuración de la Cola ──────────────────────────────────
 const QUEUE_CONFIG = {
@@ -129,7 +129,6 @@ async function processMedio(
   medio: { id: string; nombre: string; url: string | null },
   personas: Array<{ id: string; nombre: string }>,
   ejes: Array<{ id: string; nombre: string; keywords: string | null }>,
-  zai: Awaited<ReturnType<typeof ZAI.create>>,
   processedUrls: Set<string>,
 ): Promise<{ menciones: number; clasificadas: number; errores: number; tematicas: number }> {
   let menciones = 0;
@@ -147,12 +146,9 @@ async function processMedio(
   for (const persona of personas) {
     try {
       const query = `"${persona.nombre}" Bolivia site:${medioDomain}`;
-      const results = await zai.functions.invoke('web_search', {
-        query,
-        num: QUEUE_CONFIG.searchResultsPerQuery,
-      });
+      const results = await webSearchNative(query, QUEUE_CONFIG.searchResultsPerQuery);
 
-      const searchItems = (Array.isArray(results) ? results : []) as Array<{
+      const searchItems = results as Array<{
         title?: string;
         snippet?: string;
         url?: string;
@@ -253,9 +249,9 @@ async function processMedio(
     try {
       const keywordsQuery = keywordsList.slice(0, 3).map((k) => `"${k}"`).join(' OR ');
       const query = `(${keywordsQuery}) Bolivia site:${medioDomain}`;
-      const results = await zai.functions.invoke('web_search', { query, num: 5 });
+      const results = await webSearchNative(query, 5);
 
-      const searchItems = (Array.isArray(results) ? results : []) as Array<{
+      const searchItems = results as Array<{
         title?: string;
         snippet?: string;
         url?: string;
@@ -435,7 +431,8 @@ export async function POST(request: NextRequest) {
         queueLog('⚠️  No se pudieron precargar URLs existentes');
       }
 
-      let zai: Awaited<ReturnType<typeof ZAI.create>> | null = null;
+      // ZAI ya no se necesita para web_search (se usa webSearchNative).
+      // Se mantiene la importación para compatibilidad futura con chat.completions.
 
       for (let i = 0; i < totalMedios; i++) {
         const medio = activeMedios[i];
@@ -446,20 +443,7 @@ export async function POST(request: NextRequest) {
         queueLog(`[${progressPct}%] ━━ (${i + 1}/${totalMedios}) PROCESANDO: ${medio.nombre} ━━`);
 
         try {
-          // Inicializar cliente ZAI si es necesario (lazy, para no consumir recursos al inicio)
-          if (!zai) {
-            try {
-              zai = await ZAI.create();
-              queueLog('Cliente ZAI inicializado');
-            } catch (err) {
-              const errMsg = err instanceof Error ? err.message : String(err);
-              queueLog(`❌ Error crítico: No se pudo inicializar ZAI — ${errMsg}`);
-              queueLog('Cancelando cola — no se puede continuar sin ZAI.');
-              break;
-            }
-          }
-
-          const result = await processMedio(medio, personas, ejes, zai, processedUrls);
+          const result = await processMedio(medio, personas, ejes, processedUrls);
 
           // Acumular estadísticas
           queueState.stats.menciones += result.menciones;
@@ -495,8 +479,7 @@ export async function POST(request: NextRequest) {
         `🎉 COLA FINALIZADA — ${s.menciones} menciones nuevas, ${s.clasificadas} clasificadas, ${s.tematicas} temáticas, ${s.errores} errores`,
       );
 
-      // Limpiar cliente ZAI
-      try { zai && await zai.close(); } catch { /* ignore */ }
+      // No hay cliente ZAI que limpiar (se usa fetch nativo)
     })();
 
     // ── Respuesta INMEDIATA al frontend (< 1 segundo) ───────────

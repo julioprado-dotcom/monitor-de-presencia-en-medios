@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import ZAI from 'z-ai-web-dev-sdk';
 import { guardedParse, rateGuard, RATE, safeError } from '@/lib/rate-guard';
 import { searchSchema } from '@/lib/validations';
+import { webSearchNative } from '@/lib/web-search-native';
+
+const BOLIVIA_SITES = 'site:la-razon.com OR site:paginasiete.bo OR site:eldeber.com.bo OR site:lostiempos.com OR site:opinion.com.bo OR site:correodelsur.com OR site:elpotosi.net OR site:lapatria.bo OR site:eldiario.net OR site:jornadanet.com OR site:unitel.bo OR site:reduno.bo OR site:atb.com.bo OR site:boliviaverifica.bo OR site:abi.bo';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,11 +19,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const zai = await ZAI.create();
-    const results = await zai.functions.invoke('web_search', {
-      query: `${q} Bolivia site:la-razon.com OR site:paginasiete.bo OR site:eldeber.com.bo OR site:lostiempos.com OR site:opinion.com.bo OR site:correodelsur.com OR site:elpotosi.net OR site:lapatria.bo OR site:eldiario.net OR site:jornadanet.com OR site:unitel.bo OR site:reduno.bo OR site:atb.com.bo OR site:boliviaverifica.bo OR site:abi.bo`,
-      num: 20,
-    });
+    // Usar webSearchNative en lugar de zai.functions.invoke (fix 404)
+    const results = await webSearchNative(`${q} Bolivia ${BOLIVIA_SITES}`, 20);
 
     return NextResponse.json(results);
   } catch (error: unknown) {
@@ -38,11 +37,8 @@ export async function POST(request: NextRequest) {
     if (parsed instanceof NextResponse) return parsed;
     const { personaNombre } = parsed.body;
 
-    const zai = await ZAI.create();
-    const results = await zai.functions.invoke('web_search', {
-      query: `${personaNombre} Bolivia site:la-razon.com OR site:paginasiete.bo OR site:eldeber.com.bo OR site:lostiempos.com OR site:opinion.com.bo OR site:correodelsur.com OR site:elpotosi.net OR site:lapatria.bo OR site:eldiario.net OR site:jornadanet.com OR site:unitel.bo OR site:reduno.bo OR site:atb.com.bo OR site:boliviaverifica.bo OR site:abi.bo`,
-      num: 20,
-    });
+    // Usar webSearchNative en lugar de zai.functions.invoke (fix 404)
+    const results = await webSearchNative(`${personaNombre} Bolivia ${BOLIVIA_SITES}`, 20);
 
     return NextResponse.json(results);
   } catch (error: unknown) {
