@@ -111,13 +111,19 @@ export async function GET() {
     const promedioDiario = totalSemanaPasada > 0 ? Math.round(totalSemanaPasada / 7) : safeNum(mencionesHoy);
 
     // Ultima captura (para saber horas sin captura)
+    // FIX: Usar COALESCE-like logic — buscar primero por fechaCaptura,
+    // si todas son null (menciones históricas), usar createdAt como fallback
     const ultimaMencion = await db.mencion.findFirst({
       orderBy: { fechaCaptura: 'desc' },
-      select: { fechaCaptura: true },
+      select: { fechaCaptura: true, createdAt: true },
     });
     let sinCapturaHoras: number | null = null;
-    if (ultimaMencion?.fechaCaptura) {
-      sinCapturaHoras = Math.floor((Date.now() - ultimaMencion.fechaCaptura.getTime()) / (1000 * 60 * 60));
+    if (ultimaMencion) {
+      // Usar fechaCaptura si existe, si no usar createdAt
+      const fechaRef = ultimaMencion.fechaCaptura || ultimaMencion.createdAt;
+      if (fechaRef) {
+        sinCapturaHoras = Math.floor((Date.now() - fechaRef.getTime()) / (1000 * 60 * 60));
+      }
     }
 
     // Fuentes con nombres legibles

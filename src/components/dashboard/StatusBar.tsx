@@ -208,7 +208,7 @@ export function StatusBar() {
     }
 
     load();
-    const interval = setInterval(load, 30000);
+    const interval = setInterval(load, 10000); // 10s polling for near-real-time status
     return () => clearInterval(interval);
   }, []);
 

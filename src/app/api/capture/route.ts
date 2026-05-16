@@ -217,6 +217,7 @@ async function processMedio(
             tipoMencion: 'no_clasificado',
             sentimiento: 'no_clasificado',
             verificado: false,
+            fechaCaptura: new Date(), // FIX: Registrar timestamp de captura para status API
             ...(dedupResult.eventoId ? { eventoId: dedupResult.eventoId } : {}),
             deduplicacionLog: dedupLog,
           },
@@ -285,6 +286,7 @@ async function processMedio(
             tipoMencion: 'referencia_tematica',
             sentimiento: 'no_clasificado',
             verificado: false,
+            fechaCaptura: new Date(), // FIX: Registrar timestamp de captura para status API
           },
         });
 

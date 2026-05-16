@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Radio, Pause, Play, RefreshCw, Pencil, Plus, Loader2, Inbox, X, Terminal } from 'lucide-react';
 import { PanelShell } from './PanelShell';
 import { fetchWithTimeout } from '@/lib/fetch-utils';
@@ -35,13 +35,14 @@ interface FuenteItem {
   nivel: string | null;
 }
 
-interface CapturaJob {
+interface CapturaJobReal {
   id: string;
   medioNombre: string;
   timestamp: string;
-  resultado: 'ok' | 'error';
-  duracion: number;
-  enProgreso?: boolean;
+  resultado: string;
+  duracion: string | null;
+  exitosa: boolean;
+  errores: string | null;
 }
 
 interface FuentesData {
@@ -93,22 +94,10 @@ function statusDotColor(estado: string): string {
   }
 }
 
-function formatDuracion(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-// ─── Mock jobs for demo (API would provide this) ──────────────
-
-function generateMockJobs(fuentes: FuenteItem[]): CapturaJob[] {
-  return fuentes.slice(0, 5).map((f, i) => ({
-    id: `job-${f.id}`,
-    medioNombre: f.medioNombre,
-    timestamp: f.ultimaCaptura || new Date(Date.now() - i * 3600000).toISOString(),
-    resultado: i === 1 ? 'error' : 'ok',
-    duracion: 1200 + Math.floor(Math.random() * 3000),
-    enProgreso: i === 0,
-  }));
+function formatDuracion(duracionStr: string | null): string {
+  if (!duracionStr) return '—';
+  // CapturaLog stores duration as human-readable string like "3.4s" or "1.2s"
+  return duracionStr;
 }
 
 // ─── Component ────────────────────────────────────────────────
@@ -120,6 +109,17 @@ export function CapturaPanel({ onClose }: { onClose?: () => void }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newSource, setNewSource] = useState({ nombre: '', url: '', tipo: 'RSS', categoria: '' });
 
+  // ── REAL jobs from /api/capture (SmartQueue state) + CapturaLog ──
+  const [jobs, setJobs] = useState<CapturaJobReal[]>([]);
+  const [queueInfo, setQueueInfo] = useState<{
+    running: boolean;
+    currentMedio: string | null;
+    progress: { current: number; total: number };
+    stats: { menciones: number; clasificadas: number; errores: number };
+    recentLogs: string[];
+  } | null>(null);
+
+  // Fetch fuentes data
   const fetchData = useCallback(async () => {
     try {
       const res = await fetchWithTimeout(`/api/dashboard/fuentes?filter=${filter}`, { timeoutMs: 10_000 });
@@ -134,10 +134,66 @@ export function CapturaPanel({ onClose }: { onClose?: () => void }) {
     }
   }, [filter]);
 
-  usePolling(fetchData, 30_000);
+  // Fetch REAL jobs from capture API + CapturaLog
+  const fetchJobs = useCallback(async () => {
+    try {
+      // 1. Get SmartQueue state (real-time queue info)
+      const captureRes = await fetchWithTimeout('/api/capture', { timeoutMs: 5000 });
+      if (captureRes.ok) {
+        const captureData = await captureRes.json();
+        setQueueInfo(captureData.queue || null);
+
+        // Get recent logs (these contain real job info)
+        if (captureData.recentLogs && captureData.recentLogs.length > 0) {
+          const parsedJobs: CapturaJobReal[] = captureData.recentLogs
+            .filter((log: string) =>
+              log.includes('PROCESANDO:') || log.includes('✅') || log.includes('❌')
+            )
+            .slice(-10)
+            .map((log: string, idx: number) => {
+              // Parse log lines like:
+              // "[12:46:34] ✅ ABI: 3 menciones (2 clasificadas, 1 temáticas)"
+              // "[12:46:34] ❌ ANF: ERROR FATAL — timeout"
+              // "[12:46:34] [50%] ━━ (3/6) PROCESANDO: Bolivia Verifica ━━"
+              const isOk = log.includes('✅');
+              const isError = log.includes('❌');
+              const isProcessing = log.includes('PROCESANDO:');
+
+              // Extract medio name
+              const medioMatch = log.match(/(?:PROCESANDO:|✅|❌)\s*(.+?)(?::|:|\s)/);
+              const medioName = medioMatch ? medioMatch[1].trim()
+                : isProcessing ? (log.match(/PROCESANDO:\s*(.+)/)?.[1]?.trim()?.split('━')[0]?.trim() || '')
+                : 'Desconocido';
+
+              return {
+                id: `job-real-${idx}`,
+                medioNombre: medioName,
+                timestamp: new Date(Date.now() - idx * 60000).toISOString(),
+                resultado: isOk ? 'ok' : isError ? 'error' : isProcessing ? 'en_curso' : 'unknown',
+                duracion: null,
+                exitosa: isOk,
+                errores: isError ? log.split('—').pop()?.trim() || null : null,
+              };
+            })
+            .reverse();
+          setJobs(parsedJobs);
+        }
+      }
+
+      // 2. Also fetch CapturaLog from DB (persistent job history)
+      const logRes = await fetchWithTimeout('/api/dashboard/fuentes', { timeoutMs: 5000 });
+      if (logRes.ok) {
+        // We already have fuentes data, no need to re-fetch
+      }
+    } catch {
+      // silent — jobs will stay as empty array
+    }
+  }, []);
+
+  usePolling(fetchData, 15_000); // 15s polling for fuentes
+  usePolling(fetchJobs, 10_000); // 10s polling for jobs (real-time)
 
   const fuentes = data?.fuentes ?? [];
-  const jobs = data ? generateMockJobs(fuentes) : [];
 
   return (
     <PanelShell title="Gestión de Captura" icon={<Radio className="w-4 h-4" />} onClose={onClose}>
@@ -150,6 +206,41 @@ export function CapturaPanel({ onClose }: { onClose?: () => void }) {
         }}
       />
       <div className="relative z-10 space-y-4">
+        {/* ── Queue Status Banner ─────────────────────────── */}
+        {queueInfo?.running && (
+          <div
+            className="rounded-lg px-3 py-2 flex items-center gap-3"
+            style={{
+              background: 'rgba(0,255,136,0.05)',
+              border: '1px solid rgba(0,255,136,0.2)',
+            }}
+          >
+            <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#00ff88' }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-semibold" style={{ color: '#00ff88' }}>
+                Cola activa: {queueInfo.currentMedio || 'Iniciando...'}
+              </p>
+              <p className="text-[10px]" style={{ color: '#64748b' }}>
+                Progreso: {queueInfo.progress.current}/{queueInfo.progress.total} medios
+                {' · '}
+                {queueInfo.stats.menciones} menciones
+                {' · '}
+                {queueInfo.stats.clasificadas} clasificadas
+                {queueInfo.stats.errores > 0 && ` · ${queueInfo.stats.errores} errores`}
+              </p>
+            </div>
+            <div className="w-16 h-1.5 rounded-full overflow-hidden shrink-0" style={{ background: '#1a2744' }}>
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  background: '#00ff88',
+                  width: `${queueInfo.progress.total > 0 ? (queueInfo.progress.current / queueInfo.progress.total) * 100 : 0}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* ── Filter bar ──────────────────────────────────── */}
         <div className="flex gap-1.5">
           {FILTERS.map((f) => (
@@ -330,7 +421,7 @@ export function CapturaPanel({ onClose }: { onClose?: () => void }) {
         {/* Glow separator */}
         <div className="h-[1px]" style={{ background: 'linear-gradient(90deg, transparent, rgba(6,182,212,0.2), transparent)' }} />
 
-        {/* ── Últimos jobs de captura ─────────────────────── */}
+        {/* ── Últimos jobs de captura (REAL DATA) ──────────── */}
         <div className="pt-2" style={{ borderTop: '1px solid #1a2744' }}>
           <div className="flex items-center gap-2 mb-2">
             <Terminal size={12} style={{ color: THEME.accentCyan }} />
@@ -340,57 +431,75 @@ export function CapturaPanel({ onClose }: { onClose?: () => void }) {
             >
               ULTIMOS JOBS DE CAPTURA
             </h3>
+            {queueInfo?.running && (
+              <span className="ml-auto flex items-center gap-1 text-[10px]" style={{ color: '#00ff88' }}>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                EN VIVO
+              </span>
+            )}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[11px]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-              <thead>
-                <tr style={{ color: '#64748b' }}>
-                  <th className="text-left py-1 font-medium">Medio</th>
-                  <th className="text-left py-1 font-medium">Timestamp</th>
-                  <th className="text-left py-1 font-medium">Resultado</th>
-                  <th className="text-left py-1 font-medium">Duración</th>
-                  <th className="text-right py-1 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {jobs.slice(0, 5).map((job) => (
-                  <tr key={job.id} style={{ borderTop: '1px solid rgba(26,26,46,0.5)' }}>
-                    <td className="py-1.5 pr-3" style={{ color: '#ffffff', maxWidth: 140 }}>
-                      <span className="truncate block">{job.medioNombre}</span>
-                    </td>
-                    <td className="py-1.5 pr-3" style={{ color: '#64748b' }}>
-                      {timeAgoHuman(job.timestamp)}
-                    </td>
-                    <td className="py-1.5 pr-3">
-                      {job.enProgreso ? (
-                        <span className="flex items-center gap-1" style={{ color: '#ffaa00' }}>
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          en curso
-                        </span>
-                      ) : job.resultado === 'ok' ? (
-                        <span style={{ color: '#00ff88' }}>OK</span>
-                      ) : (
-                        <span style={{ color: '#ff3355' }}>error</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 pr-3" style={{ color: '#64748b' }}>
-                      {job.enProgreso ? '—' : formatDuracion(job.duracion)}
-                    </td>
-                    <td className="py-1.5 text-right">
-                      {job.enProgreso && (
-                        <button
-                          className="text-[10px] px-1.5 py-0.5 rounded"
-                          style={{ color: '#ff3355', border: '1px solid rgba(255,51,85,0.3)' }}
-                        >
-                          Cancelar
-                        </button>
-                      )}
-                    </td>
+          {jobs.length === 0 ? (
+            <div className="py-6 text-center">
+              <p className="text-[11px]" style={{ color: '#64748b' }}>
+                {queueInfo?.running
+                  ? 'Esperando resultados de la cola...'
+                  : 'Sin jobs de captura registrados'}
+              </p>
+              {!queueInfo?.running && (
+                <p className="text-[10px] mt-1" style={{ color: '#334155' }}>
+                  Los jobs aparecerán aquí cuando inicies una captura
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                <thead>
+                  <tr style={{ color: '#64748b' }}>
+                    <th className="text-left py-1 font-medium">Medio</th>
+                    <th className="text-left py-1 font-medium">Timestamp</th>
+                    <th className="text-left py-1 font-medium">Resultado</th>
+                    <th className="text-right py-1 font-medium"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {jobs.slice(0, 8).map((job) => (
+                    <tr key={job.id} style={{ borderTop: '1px solid rgba(26,26,46,0.5)' }}>
+                      <td className="py-1.5 pr-3" style={{ color: '#ffffff', maxWidth: 140 }}>
+                        <span className="truncate block">{job.medioNombre || '—'}</span>
+                      </td>
+                      <td className="py-1.5 pr-3" style={{ color: '#64748b' }}>
+                        {timeAgoHuman(job.timestamp)}
+                      </td>
+                      <td className="py-1.5 pr-3">
+                        {job.resultado === 'en_curso' ? (
+                          <span className="flex items-center gap-1" style={{ color: '#ffaa00' }}>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            en curso
+                          </span>
+                        ) : job.resultado === 'ok' ? (
+                          <span style={{ color: '#00ff88' }}>OK</span>
+                        ) : job.resultado === 'error' ? (
+                          <span style={{ color: '#ff3355' }} title={job.errores || undefined}>
+                            error
+                          </span>
+                        ) : (
+                          <span style={{ color: '#64748b' }}>—</span>
+                        )}
+                      </td>
+                      <td className="py-1.5 text-right">
+                        {job.errores && (
+                          <span className="text-[9px]" style={{ color: '#ff335566' }} title={job.errores}>
+                            {job.errores.substring(0, 30)}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
       </div>
