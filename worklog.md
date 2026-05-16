@@ -189,3 +189,24 @@ Stage Summary:
 - ProduccionPanel: THEME + scan lines + cyan labels + product row glow + gradient expanded content
 - DistribucionPanel: THEME + scan lines + 3 cyan section headers + canal card glow + envío hover glow + summary bar glow
 - Todos los paneles del dashboard ahora tienen estética Sci-Fi táctica consistente
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix zai.functions.invoke 404 — reemplazar con fetch nativo
+
+Work Log:
+- Diagnosticado: SDK z-ai-web-dev-sdk@0.0.17 llama a ${baseUrl}/functions/invoke que retorna 404
+- Encontradas 5 llamadas activas a zai.functions.invoke() en 3 archivos
+- Verificados 11 archivos que usan chat.completions.create() — todos OK
+- Creado src/lib/web-search-native.ts — búsqueda web vía Bing con parsing regex
+- Actualizado src/lib/jobs/fetch/zai-fetcher.ts — page_reader reemplazado por fetch() nativo
+- Actualizado src/app/api/capture/route.ts — 2x web_search reemplazados por webSearchNative()
+- Actualizado src/app/api/search/route.ts — 2x web_search reemplazados por webSearchNative()
+- Build exitoso, cero errores
+- Commit f6273f6, push a main completado
+
+Stage Summary:
+- Fix completo: cero llamadas a functions.invoke en el código activo
+- Nuevo módulo web-search-native.ts como reemplazo funcional
+- chat.completions.create() no se tocó (funciona correctamente para clasificación)
+- Listo para despliegue en servidor 47.84.59.154
