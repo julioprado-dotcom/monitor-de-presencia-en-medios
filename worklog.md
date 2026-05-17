@@ -40,3 +40,25 @@ Stage Summary:
 - New component: src/components/onion200/FuentesView.tsx
 - Integrated into dashboard as FUENTES tab
 - Build passed, committed as 91343da, pushed to main
+---
+Task ID: 1
+Agent: Main Agent
+Task: AUDITORÍA CRÍTICA — Fallo en Vinculación de Personas (IA devuelve arrays vacíos)
+
+Work Log:
+- Audit of src/lib/ai/extractor-menciones.ts: Pipeline A (scrape-fuente) DOES inject 173 personas into prompt
+- Audit of src/lib/analyze.ts: analyzeMencion() does NOT extract persons — only classifies treatment
+- Audit of /api/analyze/batch/route.ts: Uses analyzeMencion() → cannot link persons in orphan mentions
+- Audit of /api/capture/route.ts: personasBatchSize was 10 (only 10/173 persons processed)
+- Audit of parseo: filter rejects personaId/persona_nombre variants, only accepts persona_id
+- Identified 3 root causes (see report)
+- Implemented fixes:
+  1. extractor-menciones.ts: added robust parseo with fuzzy name matching, alias support, debug logging
+  2. analyze/batch/route.ts: now uses extraerMencionesDeTexto for orphan mentions (personaId=null)
+  3. capture/route.ts: increased personasBatchSize from 10 to 173, removed take limit
+
+Stage Summary:
+- 3 files modified: extractor-menciones.ts, analyze/batch/route.ts, capture/route.ts
+- Root cause: batch endpoint used wrong function (analyzeMencion vs extraerMencionesDeTexto)
+- Debug logs persist to logs/extractor-debug/ directory
+- Fuzzy matching added: persona_id/personaId/name-based fallback

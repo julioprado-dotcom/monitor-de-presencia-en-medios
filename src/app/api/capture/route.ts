@@ -31,8 +31,8 @@ import { webSearchNative } from '@/lib/web-search-native';
 const QUEUE_CONFIG = {
   /** Milisegundos de pausa obligatoria entre cada medio */
   delayBetweenMediaMs: 60_000, // 60 segundos
-  /** Lote de personas a procesar por medio (limitado para no saturar) */
-  personasBatchSize: 10,
+  /** Lote de personas a procesar por medio */
+  personasBatchSize: 173, // FIX: procesar TODAS las personas activas, no solo 10
   /** Resultados máximos por búsqueda web */
   searchResultsPerQuery: 8,
   /** Milisegundos de cooldown entre invocaciones al endpoint */
@@ -404,8 +404,8 @@ export async function POST(request: NextRequest) {
 
     const personas = await db.persona.findMany({
       where: { activa: true },
-      take: QUEUE_CONFIG.personasBatchSize,
-      orderBy: { fechaActualizacion: 'asc' },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: 'asc' }, // FIX: ordenar por nombre, no por fecha (más equitativo)
     });
 
     const ejes = await db.ejeTematico.findMany({

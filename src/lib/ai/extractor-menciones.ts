@@ -488,6 +488,15 @@ export async function extraerMencionesDeTexto(
     sentimiento_general: 'no_clasificado',
   };
 
+  // ─── Debug logging (activable con env DECODEX_DEBUG=1) ─────
+  const DEBUG = process.env.DECODEX_DEBUG === '1';
+  const debugLog: string[] = [];
+  const debugStamp = () => new Date().toISOString().slice(11, 23);
+  const debugWrite = (msg: string) => {
+    debugLog.push(`[${debugStamp()}] ${msg}`);
+    if (DEBUG) console.log(`[EXTRACTOR-DEBUG] ${msg}`);
+  };
+
   try {
     // 1. Load Marco Conceptual (cached)
     let marco: MarcoData | null = null;
@@ -525,7 +534,12 @@ export async function extraerMencionesDeTexto(
 
     const [personas, ejes, temasRecientes, indicadores] = await Promise.all(dbQueries) as [any[], any[], any[], any[]];
 
-    if (personas.length === 0 && ejes.length === 0) return emptyResult;
+    debugWrite(`Datos cargados: ${personas.length} personas, ${ejes.length} ejes, ${ejesCliente.length} ejes cliente, ${indicadores.length} indicadores`);
+
+    if (personas.length === 0 && ejes.length === 0) {
+      debugWrite('RETORNO ANTICIPADO: sin personas ni ejes en DB');
+      return emptyResult;
+    }
 
     // 4. Construir sección de legisladores
     const listaLegisladores = personas.length > 0
@@ -611,8 +625,14 @@ export async function extraerMencionesDeTexto(
     userContent += indicadoresSection;
     userContent += `TEXTO DE LA NOTICIA:\n${textoTruncado}`;
 
+    debugWrite(`Prompt usuario longitud: ${userContent.length} chars, texto truncado: ${textoTruncado.length} chars`);
+    debugWrite(`System prompt longitud: ${systemPrompt.length} chars`);
+
     // 9. Llamada al LLM
     const zai = await ZAI.create();
+    debugWrite('Llamando a LLM (glm-4-air)...');
+    const llmStart = Date.now();
+
     const completion = await zai.chat.completions.create({
       model: 'glm-4-air',
       messages: [
@@ -623,15 +643,25 @@ export async function extraerMencionesDeTexto(
       signal: AbortSignal.timeout(60000), // 60s timeout
     });
 
+    const llmElapsed = Date.now() - llmStart;
     const raw = (completion?.choices?.[0]?.message?.content || '').trim();
+
+    debugWrite(`LLM respondió en ${llmElapsed}ms, longitud: ${raw.length} chars`);
+    debugWrite(`RESPUESTA CRUDA (primeros 2000 chars):\n${raw.substring(0, 2000)}`);
+
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return emptyResult;
+    if (!jsonMatch) {
+      debugWrite('FALLO: No se encontró JSON en la respuesta del LLM');
+      await persistDebugLog(debugLog);
+      return emptyResult;
+    }
 
     let parsed: Record<string, unknown>;
     try {
       parsed = JSON.parse(jsonMatch[0]);
     } catch (parseErr) {
-      console.warn('[extractor-menciones] JSON parse falló, primerosp 500 chars:', raw.substring(0, 500));
+      debugWrite(`FALLO: JSON parse falló. Primeros 500 chars: ${raw.substring(0, 500)}`);
+      await persistDebugLog(debugLog);
       return emptyResult;
     }
 
@@ -656,16 +686,64 @@ export async function extraerMencionesDeTexto(
     const confianzasValidas = new Set(['alta', 'media', 'baja']);
 
     // Legisladores (key in LLM output: legisladores_mencionados)
-    const legisladores = ensureArray(parsed.legisladores_mencionados)
-          .filter((m: Record<string, unknown>) =>
-            m.persona_id && validPersonIds.has(m.persona_id as string) && m.cita
-          )
+    // FIX: Aceptar tanto persona_id como personaId, y hacer matching por nombre si el ID falla
+    const legisladoresRaw = ensureArray(parsed.legisladores_mencionados);
+    debugWrite(`legisladores_mencionados crudos del LLM: ${legisladoresRaw.length} items`);
+    if (legisladoresRaw.length > 0) {
+      debugWrite(`Primer legislador crudo: ${JSON.stringify(legisladoresRaw[0]).substring(0, 300)}`);
+    }
+
+    // Build name→id map for fuzzy matching
+    const nombreToId = new Map<string, string>();
+    for (const p of personas) {
+      nombreToId.set(p.nombre.toLowerCase().trim(), p.id);
+      // Also map without accents
+      const sinAcentos = p.nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+      nombreToId.set(sinAcentos, p.id);
+    }
+
+    const legisladores = legisladoresRaw
+          .map((m: Record<string, unknown>) => {
+            // Accept both persona_id and personaId
+            let pid = m.persona_id || m.personaId || '';
+            const cita = m.cita || m.quote || m.texto || '';
+            const contexto = m.contexto || m.context || '';
+            const nombreRaw = m.nombre || m.name || m.persona_nombre || '';
+
+            // If PID is not a valid ID, try to match by name
+            if (!validPersonIds.has(pid as string) && nombreRaw) {
+              const nombreNorm = String(nombreRaw).toLowerCase().trim();
+              const nombreNormSA = nombreNorm.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              pid = nombreToId.get(nombreNorm) || nombreToId.get(nombreNormSA) || '';
+              if (pid) {
+                debugWrite(`Matching por nombre: "${nombreRaw}" → ID ${pid}`);
+              }
+            }
+
+            return { persona_id: String(pid), cita: String(cita), contexto: String(contexto), _raw: m };
+          })
+          .filter((m: { persona_id: string; cita: string; _raw: Record<string, unknown> }) => {
+            if (!m.persona_id || !validPersonIds.has(m.persona_id)) {
+              debugWrite(`RECHAZADO legislador: ID="${m.persona_id}" no válido. Raw: ${JSON.stringify(m._raw).substring(0, 200)}`);
+              return false;
+            }
+            if (!m.cita) {
+              debugWrite(`RECHAZADO legislador ${m.persona_id}: sin cita. Raw: ${JSON.stringify(m._raw).substring(0, 200)}`);
+              return false;
+            }
+            return true;
+          })
           .slice(0, 5)
-          .map((m: { persona_id: string; cita: string; contexto?: string }) => ({
+          .map((m: { persona_id: string; cita: string; contexto: string }) => ({
             persona_id: m.persona_id,
             cita: String(m.cita),
             contexto: String(m.contexto || ''),
           }));
+
+    debugWrite(`Legisladores válidos después de parseo: ${legisladores.length}`);
+    for (const leg of legisladores) {
+      debugWrite(`  → ${leg.persona_id}: "${leg.cita.substring(0, 80)}"`);
+    }
 
     // Ejes (LLM returns "ejes_institucionales", we map to ejes_mencionados)
     const ejesRaw = parsed.ejes_institucionales || parsed.ejes_mencionados;
@@ -737,9 +815,39 @@ export async function extraerMencionesDeTexto(
       preguntas_fundamentales,
       sentimiento_general: sentimiento,
     };
+    debugWrite(`RESULTADO FINAL: relevante=${resultado.es_relevante}, legislators=${resultado.legisladores_mencionados.length}, ejes=${resultado.ejes_mencionados.length}`);
+
+    await persistDebugLog(debugLog);
+
+    return resultado;
   } catch (err) {
+    debugWrite(`ERROR FATAL en extracción LLM: ${err instanceof Error ? err.message : String(err)}`);
     console.warn('[extractor-menciones] Error en extracción LLM:', err);
+    await persistDebugLog(debugLog);
     return emptyResult;
+  }
+}
+
+// ─── Persist debug log to file ────────────────────────────────
+async function persistDebugLog(entries: string[]): Promise<void> {
+  if (entries.length === 0) return;
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const logDir = path.join(process.cwd(), 'logs', 'extractor-debug');
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const logFile = path.join(logDir, `extract-${timestamp}.log`);
+    fs.writeFileSync(logFile, entries.join('\n'), 'utf-8');
+    // Keep only last 50 log files
+    const files = fs.readdirSync(logDir).sort();
+    while (files.length > 50) {
+      fs.unlinkSync(path.join(logDir, files.shift()!));
+    }
+  } catch {
+    // Non-critical — debug logging should never break production
   }
 }
 
