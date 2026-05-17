@@ -813,6 +813,9 @@ export async function crearMencionesExtraidas(
   let creadas = 0;
   const ejeIds = resultado.ejes_mencionados.map(e => e.eje_id);
 
+  // Timestamp de clasificación: el momento exacto en que la IA completó el análisis
+  const clasificacionTimestamp = new Date();
+
   // Shared data fields for all menciones
   const sharedData = {
     tratamientoPeriodistico: resultado.tratamientoPeriodistico,
@@ -821,6 +824,7 @@ export async function crearMencionesExtraidas(
     preguntasFundamentales: resultado.preguntas_fundamentales as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     sentimiento: resultado.sentimiento_general, // backward-compatible sentiment from tratamiento
     temas: resultado.temas_detectados.join(', '),
+    fechaClasificacion: clasificacionTimestamp, // Trazabilidad: cuándo la IA clasificó esta mención
   };
 
   // 1. Crear menciones por legislador (si hay)

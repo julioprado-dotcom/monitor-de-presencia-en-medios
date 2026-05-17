@@ -320,6 +320,7 @@ model Mencion {
   url                     String                @default("")
   fechaPublicacion        DateTime?
   fechaCaptura            DateTime              @default(now())
+  fechaClasificacion      DateTime?             // Fecha en que la IA completó la clasificación de esta mención
   tipoMencion             String                @default("mencion_pasiva")
   temas                   String                @default("")
   reach                   Int                   @default(0)

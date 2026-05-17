@@ -375,6 +375,7 @@ export async function applyAnalysisToMencion(mencionId: string, result: AnalyzeR
         ? (result.preguntasFundamentales as Prisma.InputJsonValue)
         : Prisma.JsonNull,
       temas: result.ejesTematicos.join(', '),
+      fechaClasificacion: new Date(), // Trazabilidad: cuándo la IA completó la clasificación
     },
   });
 

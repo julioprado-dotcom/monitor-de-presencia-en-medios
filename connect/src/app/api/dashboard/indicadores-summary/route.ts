@@ -60,6 +60,7 @@ export async function GET() {
       fuentesActivas,
       fuentesDegradadas,
       ultMencion,
+      ultClasif,
       mencionesPorNivel,
 
       // CLASIFICACIÓN
@@ -102,6 +103,7 @@ export async function GET() {
         { checksSinCambio: { gte: 7 } },
       ] } }),
       db.mencion.findFirst({ orderBy: { fechaCaptura: 'desc' }, select: { fechaCaptura: true } }),
+      db.mencion.findFirst({ orderBy: { fechaClasificacion: 'desc' }, select: { fechaClasificacion: true } }),
       // Menciones por nivel de medio (cast BigInt to Number)
       db.$queryRaw`
         SELECT m.nivel as nivel, COUNT(ml.id) as total
@@ -175,6 +177,8 @@ export async function GET() {
         fuentes: { activas: fuentesActivas, degradadas: fuentesDegradadas },
         ultimaCaptura: ultMencion?.fechaCaptura?.toISOString() ?? null,
         ultimaCapturaHace: ultMencion ? haceTexto(ultMencion.fechaCaptura) : 'nunca',
+        ultimaClasificacion: ultClasif?.fechaClasificacion?.toISOString() ?? null,
+        ultimaClasificacionHace: ultClasif?.fechaClasificacion ? haceTexto(ultClasif.fechaClasificacion) : 'nunca',
         porNivel,
         status: fuentesDegradadas > fuentesActivas * 0.5 ? 'error'
           : fuentesDegradadas > 0 ? 'warn'
