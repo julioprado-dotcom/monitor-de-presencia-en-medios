@@ -276,3 +276,26 @@ Stage Summary:
 - Pipeline A (analyze.ts): establece fecha al actualizar menciones existentes
 - Dashboard: nueva métrica "Última clasificación: hace X" en indicadores-summary
 - Build OK. Commit d543045 en main.
+---
+Task ID: 1
+Agent: main
+Task: Blindar endpoints de monitoreo contra HTTP 500
+
+Work Log:
+- Audit de 6 endpoints: vitals, dashboard/system, jobs/stats, dashboard/status, indicadores-summary, dashboard/status
+- Identificado: worker/scheduler imports estáticos lanzan errores si módulos no inicializados
+- Identificado: Todas las DB queries sin catch individual devuelven 500 si fallan
+- Rewrite completo de /api/system/vitals: safe imports + try/catch por métrica + fallback degraded
+- Rewrite completo de /api/dashboard/system: safe imports + diagnósticos blindados + fallback degraded  
+- Rewrite completo de /api/jobs/stats: dynamic imports con try/catch + fallback degraded
+- Rewrite completo de /api/dashboard/status: .catch() en cada query DB + fallback degraded
+- Fix /api/dashboard/indicadores-summary: cambiado de status 500 a 200 con payload degradado
+- Build exitoso (0 errores)
+- Commit 078e4b9 push a main
+
+Stage Summary:
+- 5 endpoints blindados: NUNCA devuelven HTTP 500
+- Patrón: siempre 200 con { status: "degraded", ...valores vacíos } en caso de error
+- Frontend ya maneja datos vacíos (muestra "Esperando señal...")
+- Commit: 078e4b9 "fix: Robust error handling in vitals and stats endpoints"
+---
