@@ -325,3 +325,31 @@ Stage Summary:
 - Control web: botones ACTIVAR/DETENER que ejecutan pm2 start/stop
 - Commit: d6c4626
 
+---
+Task ID: 3
+Agent: Main Agent (Super Z)
+Task: Activar Frontend ONION200 — Consola de Control Activa (v2.0)
+
+Work Log:
+- Exploración completa del codebase: 8 archivos leídos (page.tsx, SystemStatus.tsx, VitalMonitor.tsx, LiveFeed.tsx, capture/route.ts, analyze/batch/route.ts, menciones/route.ts, vitals/route.ts)
+- Confirmado: Worker/Scheduler toggle buttons ya existentes en SystemStatus.tsx (POST /api/system/worker/toggle, POST /api/system/scheduler/toggle)
+- Confirmado: /api/capture (POST + GET), /api/analyze/batch (POST), /api/menciones (GET) todos funcionales
+- Creado ResumenView.tsx: extracto de la grilla original (VitalMonitor + SystemStatus + LiveFeed)
+- Creado CapturaView.tsx: Control de captura con botón "Iniciar Captura Ahora" (POST /api/capture), barra de progreso en vivo, stats de menciones/clasificadas/errores, log en tiempo real (polling cada 5s)
+- Creado ClasificacionView.tsx: Panel IA con botón "Clasificar Pendientes (20)" (POST /api/analyze/batch), lista de menciones sin clasificar con refresh, resultado del lote con detalles por mención
+- Creado ProduccionView.tsx: Resumen de producción con KPIs (total/hoy/semana), productos recientes
+- Creado DistribucionView.tsx: Envíos con tasa de éxito (barra visual), suscriptores activos, historial reciente
+- Reescrito page.tsx: estado activeTab (resumen, captura, clasificacion, produccion, distribucion), PipelineStatusBar ahora es navegable con clicks, KPI Cards clickeables, renderizado condicional por tab
+- Corregido VitalMonitor.tsx: heap % ahora usa base fija de 512MB en lugar de heapTotalMB (elimina alerta falsa de 95%), muestra "XX MB / 512 MB"
+- Actualizado LiveFeed.tsx: botón de refresh manual con icono animado
+- Build exitoso (0 errores), 1255 líneas agregadas
+- Commit fe0a359 push a main
+
+Stage Summary:
+- ONION200 v2.0: De monitor pasivo a consola de control activa
+- 5 vistas: Resumen (3 paneles), Captura (botón launch + logs), Clasificación (botón IA + pendientes), Producción (KPIs + productos), Distribución (tasa éxito + envíos)
+- Navegación funcional: PipelineStatusBar + KPI Cards cambian vista
+- Heap fix: 512MB baseline elimina falsos 95% rojos
+- Live Feed: refresh manual
+- Commit: fe0a359
+
