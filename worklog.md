@@ -299,3 +299,29 @@ Stage Summary:
 - Frontend ya maneja datos vacíos (muestra "Esperando señal...")
 - Commit: 078e4b9 "fix: Robust error handling in vitals and stats endpoints"
 ---
+---
+Task ID: 2
+Agent: main
+Task: Arquitectura multi-proceso (Worker + Scheduler) + Control desde Dashboard
+
+Work Log:
+- Analisis completo de la arquitectura actual (worker.ts, scheduler.ts, queue.ts, index.ts, constants.ts)
+- Identificado: Worker/Scheduler corren dentro de Next.js via instrumentation.ts usando globalThis
+- Creado worker-service.ts: proceso independiente con 9 runners, flow control, graceful shutdown, heartbeat
+- Creado scheduler-service.ts: proceso independiente con node-cron, reschedule cada 6h, heartbeat
+- Creado ecosystem.config.js: PM2 config para 3 procesos (decodex-web, decodex-worker, decodex-scheduler)
+- Creado /api/system/worker/toggle: POST para iniciar/detener worker via PM2
+- Creado /api/system/scheduler/toggle: POST para iniciar/detener scheduler via PM2
+- Creado /api/system/processes: GET estado consolidado de 3 procesos (heartbeat + pm2 jlist)
+- Reescrito SystemStatus.tsx: usa heartbeat files reales, botones ACTIVAR/DETENER, Health Score calculado
+- Actualizado package.json: tsx devDependency + scripts start:worker, start:scheduler
+- Build exitoso (0 errores, 3 nuevos endpoints)
+- Commit d6c4626 push a main
+
+Stage Summary:
+- 8 archivos creados/modificados
+- 3 servicios PM2 independientes: Web, Worker, Scheduler
+- Mecanismo heartbeat: servicios writean JSON a /tmp/ cada 5s, dashboard lee sin depender de PM2 SDK
+- Control web: botones ACTIVAR/DETENER que ejecutan pm2 start/stop
+- Commit: d6c4626
+
