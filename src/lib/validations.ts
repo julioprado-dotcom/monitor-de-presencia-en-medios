@@ -118,12 +118,21 @@ export const ejePatchSchema = z.object({
 export const medioUpdateSchema = z.object({
   activo: z.boolean().optional(),
   nombre: z.string().max(300).optional(),
-  url: z.string().max(500).optional(),
+  url: z.string().max(500).optional().refine(
+    (v) => !v || v.startsWith('http://') || v.startsWith('https://'),
+    { message: 'URL debe comenzar con http:// o https://' }
+  ),
   tipo: z.string().max(50).optional(),
   nivel: z.string().max(10).optional(),
   departamento: z.string().max(100).nullable().optional(),
   plataformas: z.string().max(500).optional(),
   notas: z.string().max(1000).optional(),
+  categoria: z.enum(['oficial', 'corporativo', 'regional', 'alternativo', 'red_social']).optional(),
+  naturaleza: z.enum(['ESTATAL', 'PRIVADO', 'COMUNITARIO', 'MIXTO', 'ONG']).optional(),
+  ambito: z.enum(['NACIONAL', 'REGIONAL', 'LOCAL', 'INTERNACIONAL']).optional(),
+  enfoque: z.enum(['GENERALISTA', 'ECONOMICO', 'POLITICO', 'DEPORTIVO', 'CULTURAL']).optional(),
+  credibilidad: z.number().int().min(1).max(100).optional(),
+  frecuenciaOverride: z.string().max(50).optional(),
 });
 
 // ─── Auth Setup ───────────────────────────────────────────────────
@@ -285,7 +294,10 @@ export const fuenteUpdateSchema = z.object({
 // ─── Medio Create ─────────────────────────────────────────────────
 export const medioCreateSchema = z.object({
   nombre: z.string().trim().min(1, 'Nombre es obligatorio').max(300),
-  url: z.string().max(500).optional().default(''),
+  url: z.string().max(500).optional().default('').refine(
+    (v) => !v || v.startsWith('http://') || v.startsWith('https://'),
+    { message: 'URL debe comenzar con http:// o https://' }
+  ),
   tipo: z.string().min(1, 'Tipo es obligatorio').max(50),
   categoria: z.enum(['oficial', 'corporativo', 'regional', 'alternativo', 'red_social']).optional().default('corporativo'),
   nivel: z.string().max(10).optional().default('1'),
@@ -293,4 +305,8 @@ export const medioCreateSchema = z.object({
   plataformas: z.string().max(500).optional().default(''),
   notas: z.string().max(1000).optional().default(''),
   pais: z.string().max(100).optional().default('Bolivia'),
+  naturaleza: z.enum(['ESTATAL', 'PRIVADO', 'COMUNITARIO', 'MIXTO', 'ONG']).optional().default('PRIVADO'),
+  ambito: z.enum(['NACIONAL', 'REGIONAL', 'LOCAL', 'INTERNACIONAL']).optional().default('NACIONAL'),
+  enfoque: z.enum(['GENERALISTA', 'ECONOMICO', 'POLITICO', 'DEPORTIVO', 'CULTURAL']).optional().default('GENERALISTA'),
+  credibilidad: z.number().int().min(1).max(100).optional().default(50),
 });

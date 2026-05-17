@@ -47,6 +47,22 @@ export async function PUT(
       });
     }
 
+    // Also sync URL to FuenteEstado if it changed
+    if (parsed.body.url !== undefined) {
+      await db.fuenteEstado.updateMany({
+        where: { medioId: id },
+        data: { url: parsed.body.url as string },
+      }).catch(() => {});
+    }
+
+    // Update ultimaRevisionHumana when classification fields change
+    if (parsed.body.naturaleza || parsed.body.ambito || parsed.body.enfoque || parsed.body.credibilidad) {
+      await db.medio.update({
+        where: { id },
+        data: { ultimaRevisionHumana: new Date() },
+      }).catch(() => {});
+    }
+
     return NextResponse.json({ medio });
   } catch (error: unknown) {
     return NextResponse.json({ error: safeError(error, 'medios/[id]') }, { status: 500 });

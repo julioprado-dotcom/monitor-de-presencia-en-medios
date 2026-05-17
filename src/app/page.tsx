@@ -7,6 +7,7 @@ import { CapturaView } from '@/components/onion200/CapturaView';
 import { ClasificacionView } from '@/components/onion200/ClasificacionView';
 import { ProduccionView } from '@/components/onion200/ProduccionView';
 import { DistribucionView } from '@/components/onion200/DistribucionView';
+import { FuentesView } from '@/components/onion200/FuentesView';
 import {
   Crosshair,
   Radio,
@@ -16,6 +17,7 @@ import {
   ArrowUpRight,
   RefreshCw,
   Monitor,
+  Database,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════
@@ -42,7 +44,7 @@ interface PipelineKPIs {
   };
 }
 
-type TabKey = 'resumen' | 'captura' | 'clasificacion' | 'produccion' | 'distribucion';
+type TabKey = 'resumen' | 'fuentes' | 'captura' | 'clasificacion' | 'produccion' | 'distribucion';
 
 interface TabConfig {
   key: TabKey;
@@ -53,6 +55,7 @@ interface TabConfig {
 
 const TABS: TabConfig[] = [
   { key: 'resumen', label: 'RESUMEN', icon: <Monitor className="w-3.5 h-3.5" /> },
+  { key: 'fuentes', label: 'FUENTES', icon: <Database className="w-3.5 h-3.5" /> },
   { key: 'captura', label: 'CAPTURA', icon: <Radio className="w-3.5 h-3.5" />, statusKey: 'captura' },
   { key: 'clasificacion', label: 'CLASIFICACION', icon: <Crosshair className="w-3.5 h-3.5" />, statusKey: 'clasificacion' },
   { key: 'produccion', label: 'PRODUCCION', icon: <FileText className="w-3.5 h-3.5" />, statusKey: 'produccion' },
@@ -402,6 +405,7 @@ export default function ONION200Dashboard() {
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6">
         <div className="max-w-[1400px] mx-auto">
           {activeTab === 'resumen' && <ResumenView />}
+          {activeTab === 'fuentes' && <FuentesView />}
           {activeTab === 'captura' && <CapturaView />}
           {activeTab === 'clasificacion' && <ClasificacionView />}
           {activeTab === 'produccion' && <ProduccionView />}

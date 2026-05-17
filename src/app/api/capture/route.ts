@@ -136,9 +136,20 @@ async function processMedio(
   let errores = 0;
   let tematicas = 0;
 
-  const medioDomain = MEDIO_DOMAIN_MAP[medio.nombre];
+  // Fallback: Try to extract domain from medio.url if not in MEDIO_DOMAIN_MAP
+  let medioDomain = MEDIO_DOMAIN_MAP[medio.nombre];
+  if (!medioDomain && medio.url) {
+    try {
+      const hostname = new URL(medio.url).hostname.replace('www.', '');
+      medioDomain = hostname;
+      queueLog(`  ℹ️  Medio "${medio.nombre}" sin dominio mapeado — usando URL: ${medioDomain}`);
+    } catch {
+      queueLog(`  ⚠️  Medio "${medio.nombre}" sin dominio conocido y URL inválida — saltando`);
+      return { menciones, clasificadas, errores, tematicas };
+    }
+  }
   if (!medioDomain) {
-    queueLog(`  ⚠️  Medio "${medio.nombre}" sin dominio conocido — saltando`);
+    queueLog(`  ⚠️  Medio "${medio.nombre}" sin dominio conocido y sin URL — saltando`);
     return { menciones, clasificadas, errores, tematicas };
   }
 

@@ -306,6 +306,12 @@ model Medio {
   activo             Boolean       @default(true)
   fechaCreacion      DateTime      @default(now())
   frecuenciaOverride String        @default("")
+  naturaleza         String        @default("PRIVADO")
+  ambito             String        @default("NACIONAL")
+  enfoque            String        @default("GENERALISTA")
+  credibilidad       Int           @default(50)
+  ultimaRevisionHumana DateTime?
+  ultimoError        String        @default("")
   CapturaLog         CapturaLog[]
   FuenteEstado       FuenteEstado?
   Mencion            Mencion[]

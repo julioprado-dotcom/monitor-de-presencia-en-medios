@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
   try {
     const parsed = await guardedParse(request, medioCreateSchema, RATE.WRITE);
     if (parsed instanceof NextResponse) return parsed;
-    const { nombre, url, tipo, categoria, nivel, departamento, plataformas, notas, pais } = parsed.body;
+    const { nombre, url, tipo, categoria, nivel, departamento, plataformas, notas, pais, naturaleza, ambito, enfoque, credibilidad } = parsed.body;
 
     if (!TIPOS_VALIDOS.includes(tipo)) {
       return NextResponse.json({ error: `Tipo inválido. Valores: ${TIPOS_VALIDOS.join(', ')}` }, { status: 400 });
@@ -130,6 +130,10 @@ export async function POST(request: NextRequest) {
         plataformas,
         notas,
         pais,
+        naturaleza: naturaleza || 'PRIVADO',
+        ambito: ambito || 'NACIONAL',
+        enfoque: enfoque || 'GENERALISTA',
+        credibilidad: credibilidad || 50,
         activo: true,
       },
     });
