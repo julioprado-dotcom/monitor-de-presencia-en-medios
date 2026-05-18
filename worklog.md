@@ -62,3 +62,41 @@ Stage Summary:
 - Root cause: batch endpoint used wrong function (analyzeMencion vs extraerMencionesDeTexto)
 - Debug logs persist to logs/extractor-debug/ directory
 - Fuzzy matching added: persona_id/personaId/name-based fallback
+---
+Task ID: 2
+Agent: Main Agent
+Task: Módulo Descubrimiento Inteligente + Auditoría de Despliegue
+
+Work Log:
+- Added SugerenciaInteligencia model to Prisma schema (tipo, datoPropuesto, confianza, estado)
+- Ran prisma db push — schema synced, Prisma Client regenerated
+- Created src/lib/ai/discovery.ts — full discovery engine:
+  - getMencionesHuerfanasDelDia: collects orphan mentions from today
+  - extractEntidades: LLM-based entity extraction (persona/org/tema)
+  - Agrupar + filtrar anti-duplicados against 173 existing personas
+  - Calcular confianza: 10pts per mention + 20pts per distinct medium
+  - Only suggest if confidence >= 30 (appears in 2+ media)
+  - aprobarSugerenciaPersona: creates Persona record from suggestion
+  - rechazarSugerencia: marks as rejected
+- Created API /api/sugerencias (GET with filters, POST to run discovery, PATCH to approve/reject, DELETE)
+- Created API /api/sugerencias/[id] (PATCH approve/reject with auth, DELETE)
+- Integrated discovery into scrape-fuente.ts Pipeline A (runs after capture, best-effort)
+- Created InteligenciaView.tsx — ONION200-styled view:
+  - Sparkles icon, violet theme
+  - KPI counts (pendientes/aprobadas/rechazadas)
+  - Card grid with confidence, media tags, frequency
+  - Action buttons: Crear Persona / Ignorar / Eliminar
+  - Discovery log panel
+  - Filters by estado
+- Added INTELIGENCIA tab to main dashboard (page.tsx)
+- Deployment audit verified:
+  - personasBatchSize: 173 (no take limit) ✓
+  - extractormenciones timeout: 60s ✓
+  - discovery timeout: 45s ✓
+  - All new files compile without TS errors ✓
+
+Stage Summary:
+- 7 files changed, 1283 insertions
+- 4 new files created
+- Commit: feat: Modulo Descubrimiento Inteligente + Fix vinculacion personas
+- Ready for VPS deploy: git push origin main
