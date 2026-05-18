@@ -1,5 +1,7 @@
 // POST /api/jobs/worker - Pause or resume the worker
 
+export const runtime = 'nodejs'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { startWorker, stopWorker, getWorkerStats } from '@/lib/jobs/worker'
 import { safeError } from '@/lib/rate-guard'

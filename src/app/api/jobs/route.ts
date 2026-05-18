@@ -1,6 +1,8 @@
 // GET /api/jobs - List jobs with filters
 // POST /api/jobs - Manually enqueue a job
 
+export const runtime = 'nodejs'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { enqueue, getJobs, countByEstado } from '@/lib/jobs/queue'
 import type { JobTipo, JobPrioridad, JobEstado } from '@/lib/jobs/types'

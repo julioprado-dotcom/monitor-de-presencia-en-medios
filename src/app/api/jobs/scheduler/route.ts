@@ -1,6 +1,8 @@
 // GET /api/jobs/scheduler - Scheduler status
 // POST /api/jobs/scheduler - Recalculate, pause, or resume scheduler
 
+export const runtime = 'nodejs'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { rescheduleAll, startScheduler, stopScheduler, getSchedulerStatus } from '@/lib/jobs/scheduler'
 import { getBackupSchedulerStatus } from '@/lib/jobs/backup-scheduler'

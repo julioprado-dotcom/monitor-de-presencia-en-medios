@@ -1,6 +1,8 @@
 // POST /api/jobs/maintenance — Acciones correctivas del administrador
 // Purge completados, purge fallidos, reclaim huerfanos
 
+export const runtime = 'nodejs'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { purgeCompleted, purgeFailed, reclaimOrphanJobs, countByEstado } from '@/lib/jobs/queue'
 import { safeError } from '@/lib/rate-guard'

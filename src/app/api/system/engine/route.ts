@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { NextResponse } from 'next/server';
 import { getStats, ensureWorkerRunning, getWorkerStats } from '@/lib/jobs';
 import { getSchedulerStatus } from '@/lib/jobs/scheduler';

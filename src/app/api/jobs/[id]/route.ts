@@ -2,6 +2,8 @@
 // PATCH /api/jobs/[id] - Pause/resume a job
 // DELETE /api/jobs/[id] - Cancel or hard-delete a job
 
+export const runtime = 'nodejs'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getJob, cancel, pauseJob, resumeJob, deleteJob } from '@/lib/jobs/queue'
 import { safeError } from '@/lib/rate-guard'

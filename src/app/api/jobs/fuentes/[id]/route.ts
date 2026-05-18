@@ -2,6 +2,8 @@
 // PUT /api/jobs/fuentes/[id] - Update frequency override
 // PATCH /api/jobs/fuentes/[id] - Batch corrective actions (reset frecuencia, checksSinCambio, etc.)
 
+export const runtime = 'nodejs'
+
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { safeError } from '@/lib/safe-error'

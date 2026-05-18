@@ -4,6 +4,8 @@
 //            avanzar_fase, retroceder_fase, reiniciar, ejecutar_uno,
 //            seleccionar_fuentes, forzar_check
 
+export const runtime = 'nodejs'
+
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { enqueue } from '@/lib/jobs/queue'

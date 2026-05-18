@@ -1,5 +1,7 @@
 // GET /api/jobs/fuentes - List all source states (FuenteEstado)
 
+export const runtime = 'nodejs'
+
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { safeError } from '@/lib/safe-error'

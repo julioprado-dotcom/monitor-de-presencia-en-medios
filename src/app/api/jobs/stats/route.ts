@@ -5,6 +5,8 @@
  * devuelve datos degradados con status 200.
  */
 
+export const runtime = 'nodejs'
+
 import { NextResponse } from 'next/server'
 
 export async function GET() {
