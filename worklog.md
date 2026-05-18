@@ -119,3 +119,23 @@ Stage Summary:
 - 12 files modified/created: 6 new, 6 modified
 - 5 functional fixes deployed to GitHub main
 - VPS needs: git pull, npm run build, pm2 restart decodex-prod, npx prisma migrate deploy
+
+---
+Task ID: 1
+Agent: Super Z (Main)
+Task: Investigar y corregir módulo de Alerta Temprano no visible en dashboard
+
+Work Log:
+- Audit completo del módulo de Alertas Tempranas existente en el codebase
+- Encontrados 3 componentes de alertas: AlertasView.tsx, AlertasPanel.tsx, API /api/alertas/estado
+- Identificado el problema raíz: page.tsx (dashboard principal ONION200) no incluía 'alertas' en sus tabs
+- Los tabs existentes eran: resumen | fuentes | captura | clasificacion | inteligencia | produccion | distribucion
+- AlertasPanel estaba solo en NewDashboard.tsx (componente no activo en routing)
+- AlertasView nunca fue importada en ninguna página
+
+Stage Summary:
+- Fix aplicado: Agregado tab 'ALERTAS' con icono Bell como segunda posición en page.tsx
+- Importación de AlertasPanel desde @/components/dashboard/panels/AlertasPanel
+- Agregado 'alertas' al TabKey type y al array TABS
+- Build exitoso, commit cc04fea pusheado a main
+- El módulo ahora es visible en el dashboard principal ONION200
