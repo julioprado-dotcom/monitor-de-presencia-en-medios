@@ -3,6 +3,8 @@
  * Uses the peso-calculator to compute scores and update the DB
  */
 
+export const runtime = 'nodejs';
+
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { withAuth } from '@/lib/auth-helpers';
