@@ -100,3 +100,22 @@ Stage Summary:
 - 4 new files created
 - Commit: feat: Modulo Descubrimiento Inteligente + Fix vinculacion personas
 - Ready for VPS deploy: git push origin main
+
+---
+Task ID: 1-5
+Agent: Main Agent + 4 subagents
+Task: PLAN MAESTRO ONION200 — 5 reparaciones funcionales
+
+Work Log:
+- Task 1: Created src/instrumentation.ts to auto-start worker+scheduler, uncommented startScheduler() in index.ts, created /api/system/engine endpoint
+- Task 2: Rewrote GET /api/medios with $queryRaw instead of Prisma groupBy (fixes HTTP 500), added ambito filter and sortBy=peso
+- Task 3: Added abortRequested flag + DELETE handler in capture/route.ts, added Stop button (red) in CapturaView.tsx
+- Task 4: Created POST /api/analyze/signal endpoint (ZAI AI deep analysis), created SignalAnalysisModal.tsx (7-section scanner UI)
+- Task 5: Added pesoInformativo Float field to schema, created peso-calculator.ts (weighted score 0-100), created POST /api/medios/pesos
+- All changes compiled with zero TypeScript errors
+- Committed and pushed: b3f7616..45effac
+
+Stage Summary:
+- 12 files modified/created: 6 new, 6 modified
+- 5 functional fixes deployed to GitHub main
+- VPS needs: git pull, npm run build, pm2 restart decodex-prod, npx prisma migrate deploy
