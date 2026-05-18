@@ -44,6 +44,8 @@ const OFFSET_ARG = args.find(a => a.startsWith('--offset'));
 const OFFSET = OFFSET_ARG ? parseInt(OFFSET_ARG.split('=')[1] || args[args.indexOf(OFFSET_ARG) + 1] || '0', 10) : 0;
 const LIMIT_ARG = args.find(a => a.startsWith('--limit'));
 const LIMIT = LIMIT_ARG ? parseInt(LIMIT_ARG.split('=')[1] || args[args.indexOf(LIMIT_ARG) + 1] || '0', 10) : 0;
+const BATCH_ARG = args.find(a => a.startsWith('--batch'));
+const BATCH_ID = BATCH_ARG ? (BATCH_ARG.split('=')[1] || args[args.indexOf(BATCH_ARG) + 1] || '') : '';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────
 
@@ -93,6 +95,7 @@ interface AuditResult {
   // Estado actual en DB
   dbEstado: string;
   dbStrategyScrape: string;
+  dbFallos: number;
   dbUltimoError: string;
   dbActivo: boolean;
   dbUltimoCheck: string | null;
@@ -680,7 +683,7 @@ async function main() {
         dbEstado: fuente?.estado || 'sin_fuente',
         dbStrategyScrape: fuente?.strategyScrape || '',
         dbFallos: fuente?.fallosConsecutivos || 0,
-        dbUltimoError: fuente?.error || medio.ultimoError,
+        dbUltimoError: fuente?.error || '',
         dbActivo: medio.activo,
         dbUltimoCheck: fuente?.ultimoCheck?.toISOString() || null,
         diagnostico: diag.diagnostico,
@@ -744,7 +747,7 @@ async function main() {
       mkdirSync(logsDir, { recursive: true });
     }
 
-    const reportFilename = `auditoria-fuentes-${fechaArchivo()}.json`;
+    const reportFilename = `auditoria-fuentes-${fechaArchivo()}${BATCH_ID ? '-batch' + BATCH_ID : ''}.json`;
     const reportPath = join(logsDir, reportFilename);
     writeFileSync(reportPath, JSON.stringify(reporte, null, 2), 'utf-8');
 
