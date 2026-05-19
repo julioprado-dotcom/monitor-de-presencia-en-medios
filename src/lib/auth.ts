@@ -41,14 +41,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        if (user.password) {
-          const isValid = await bcrypt.compare(
-            credentials.password as string,
-            user.password
-          );
-          if (!isValid) {
-            return null;
-          }
+        if (!user.password) {
+          return null; // Sin contraseña configurada → no permitir login por credentials
+        }
+
+        const isValid = await bcrypt.compare(
+          credentials.password as string,
+          user.password
+        );
+        if (!isValid) {
+          return null;
         }
 
         return {
