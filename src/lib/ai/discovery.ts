@@ -132,41 +132,45 @@ async function getMencionesHuerfanasDelDia(): Promise<Array<{
     }));
 }
 
-// ─── Prompt de descubrimiento ──────────────────────────────────
+// ─── Prompt de descubrimiento (VERSIÓN ENDURECIDA V2) ──────────────────────────────────
 
 function buildDiscoveryPrompt(): string {
-  return `Eres un analista de inteligencia de medios especializado en Bolivia. Tu tarea es identificar ACTORES Y TEMAS EMERGENTES que aparecen en las noticias pero que NO son figuras políticas establecidas.
+  return `Eres el Analista Jefe de Inteligencia de ONION200 para Bolivia. Tu única misión es detectar ACTORES EMERGENTES REALES (personas u organizaciones) que estén ganando relevancia política, económica o social HOY y que NO estén en nuestra base de datos de 173 legisladores.
 
-INSTRUCCIONES:
-1. Lee los textos de noticias proporcionados.
-2. Identifica TODOS los nombres propios de PERSONAS que aparezcan mencionados como actores políticos, gubernamentales, empresariales, sindicales o sociales relevantes.
-3. Identifica ORGANIZACIONES o instituciones mencionadas como actores clave.
-4. Identifica TEMAS o conceptos recurrentes que no sean temas políticos estándar.
+REGLAS DE FILTRADO ESTRICTO (CRÍTICO):
+1. EXCLUIR TOTALMENTE:
+   - Periodistas, reporteros, presentadores de TV o dueños de medios mencionados como fuente.
+   - Figuras históricas o expresidentes mencionados solo como contexto/comparación.
+   - Actores internacionales (ej. Biden, Maduro, CEOs de Tesla) a menos que tengan un impacto DIRECTO y FÍSICO en Bolivia hoy (ej. una visita oficial confirmada).
+   - Nombres propios genéricos sin cargo asociado (ej. "Juan Pérez" sin título).
+   - Delincuentes comunes en notas de sucesos (robos, accidentes) salvo que sean líderes de bandas organizadas con impacto político.
+   - Deportes, farándula, cultura o religión (salvo obispos/cardenales emitiendo declaraciones políticas).
 
-NO incluir:
-- Nombres de periodistas (reporteros de los medios)
-- Personas que solo aparecen como datos históricos o contextuales
-- Figuras internacionales que no tengan relevancia directa para Bolivia
-- Temas ya cubiertos por ejes temáticos estándar (hidrocarburos, elecciones, etc.)
+2. CRITERIOS DE INCLUSIÓN (SOLO SI CUMPLE):
+   - Debe tener un CARGO, ROL o INFLUENCIA explícita en el texto (ej. "dirigente", "ministro", "candidato", "vocero", "gerente estatal", "líder sindical").
+   - Debe aparecer como ACTOR de la noticia (quien hace o dice algo relevante), no como dato decorativo.
+   - Preferencia por nombres completos. Si es solo apellido, debe haber contexto claro de autoridad.
 
-FORMATO DE SALIDA:
-Responde ÚNICAMENTE con un JSON válido (sin markdown, sin backticks):
+3. PRIORIZACIÓN TEMÁTICA:
+   - ALTA: Política gubernamental, Legislativa, Conflictividad Social (bloqueos/paros), Economía/Empresas Estatales (YPFB, BOA), Corrupción/Justicia.
+   - BAJA: Sucesos menores, inauguraciones protocolares sin anuncios, opiniones de ciudadanos de a pie.
+
+FORMATO DE SALIDA OBLIGATORIO:
+Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicaciones):
 {
   "entidades": [
     {
-      "nombre": "Nombre completo",
-      "tipo": "persona",
-      "cargo_likely": "cargo o rol probable según el contexto",
-      "contexto": "en qué contexto aparece (1 frase)",
-      "medio": "nombre del medio donde se detectó",
-      "fragmento": "fragmento textual donde aparece (máximo 100 chars)"
+      "nombre": "Nombre Completo (o Apellido + Cargo si no hay nombre)",
+      "tipo": "persona" | "organizacion",
+      "cargo_likely": "Cargo exacto inferido (ej. 'Dirigente de la COB', 'Exministro')",
+      "contexto": "Frase resumen de por qué es relevante AHORA (máx 15 palabras)",
+      "medio": "Nombre del medio",
+      "fragmento": "Cita textual corta donde se evidencia su rol"
     }
   ]
 }
 
-TIPOS válidos: "persona", "organizacion", "tema"
-Máximo 15 entidades por lote.
-Si no encuentras entidades relevantes, devuelve: {"entidades": []}`;
+NOTA FINAL: Si en todo el lote de noticias no hay NINGÚN actor emergente real que cumpla las reglas, devuelve {"entidades": []}. Es mejor no detectar nada que detectar basura.`;
 }
 
 // ─── Extraer entidades con LLM ─────────────────────────────────

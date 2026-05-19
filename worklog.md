@@ -25,3 +25,52 @@ Stage Summary:
 - 60 sentencias SQL sugeridas en el reporte consolidado
 - Scripts modificados: `scripts/audit-fuentes-zai.ts` (fix TypeScript + --batch flag)
 - Scripts nuevos: `scripts/consolidar-auditoria.ts`, `scripts/run-auditoria-completa.ts`
+---
+Task ID: 1
+Agent: Main Agent
+Task: Scraping y extracción de contenido de los 13 medios con URLs corregidas
+
+Work Log:
+- Analizó el pipeline de scraping (scrape-fuente.ts): 3 fases (links → triaje → LLM)
+- Verificó que los 13 medios tienen FuenteEstado activo en la DB
+- Creó script de prueba de conectividad: 8/13 medios responden con HTML completo
+- Medios con Cloudflare 403: El Potosí, ANF, El Deber (necesitan Z.ai reader)
+- Medios con problemas: ABI (fetch failed), El Diario (307 redirect)
+- Creó script de scraping completo con pipeline 3 fases usando z-ai-web-dev-sdk
+- Corrigió errores de esquema Prisma (campo createdAt→fechaCaptura, ids manuales)
+- Ejecutó scraping exitosamente contra 13 medios
+
+Stage Summary:
+- **33 menciones nuevas creadas** en la DB por nuestro scraper
+- Medios scrapeados exitosamente con contenido:
+  - La Patria: 4 menciones (protestas, bloqueos, YPFB)
+  - Los Tiempos: 5 menciones (paro magisterio, bloqueos, bono Gestión de Aula)
+  - Unitel: 4 menciones (bloqueos, YPFB Senkata, paro chóferes)
+  - La Estrella: 1 mención (fiscalía Bermejo)
+  - ATB: 1 mención (ChatGPT seguridad)
+  - Red Uno: 2 menciones (Caneb, YPFB Senkata)
+  - RTP Bolivia: 2 menciones (aviones Hércules Argentina, magisterio)
+- Medios sin contenido scrapeable: El Potosí (Cloudflare), ANF (Cloudflare), ABI (fetch failed), Bolivia TV (sin links relevantes), El Deber (Cloudflare), El Diario (redirect)
+- Total menciones en DB: 432 (antes 399)
+- Scripts creados: scrape-medios-test.ts, scrape-all-13.ts, query-scraping-status.ts
+---
+Task ID: 2
+Agent: Main Agent
+Task: Mejora del motor de descubrimiento (discovery.ts) — Prompt V2 endurecido
+
+Work Log:
+- Leyó archivo src/lib/ai/discovery.ts completo (553 líneas)
+- Reemplazó exclusivamente la función buildDiscoveryPrompt() con versión endurecida V2
+- Verificó que las 11 funciones del archivo permanecen intactas
+- Verificó que la lógica de scores (calcularConfianza) no fue afectada
+- Verificó que el old prompt fue completamente removido (no contiene "NO incluir:", "TIPOS válidos", "tema")
+- Confirmó diff limpio: solo la función buildDiscoveryPrompt() cambió (+30, -26 líneas)
+- Commit: db7e040 — "feat: discovery prompt V2 endurecido — filtrado estricto anti-ruido"
+- Push exitoso a origin/main
+
+Stage Summary:
+- Commit db7e040 en main, push exitoso a GitHub
+- Cambios: solo buildDiscoveryPrompt() reemplazada
+- Lógica de scores, agrupación, filtrado anti-duplicados DB: SIN CAMBIOS
+- El motor ahora filtra estrictamente periodistas, figuras históricas, actores internacionales sin impacto directo, delincuentes comunes, deportes/farándula
+- Prioriza política, conflictividad social, economía estatal, corrupción
